@@ -1,0 +1,6 @@
+crawl4ai
+fastapi
+instructor
+jinja2
+ollama
+uvicorn[standard]

@@ -1,0 +1,6 @@
+venv/
+__pycache__/
+*.pyc
+site/villas/
+site/images/
+.env
