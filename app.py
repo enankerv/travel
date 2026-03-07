@@ -132,6 +132,7 @@ IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 VILLAS_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/images", StaticFiles(directory=str(IMAGES_DIR)), name="images")
 app.mount("/villas", StaticFiles(directory=str(VILLAS_DIR), html=True), name="villas")
+app.mount("/static", StaticFiles(directory=str(SITE_DIR)), name="static")
 
 
 @app.get("/")
