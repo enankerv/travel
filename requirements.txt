@@ -3,3 +3,6 @@ fastapi
 instructor
 ollama
 uvicorn[standard]
+supabase
+python-dotenv
+httpx

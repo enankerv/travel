@@ -1,0 +1,275 @@
+"""Database utilities for collaborative lists with Supabase."""
+import os
+import secrets
+from supabase import create_client, Client
+from datetime import datetime, timedelta
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+    raise ValueError("Missing Supabase credentials in .env")
+
+supabase_client: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+
+
+def get_supabase() -> Client:
+    """Get the Supabase client instance."""
+    return supabase_client
+
+
+# ============================================================================
+# LIST OPERATIONS
+# ============================================================================
+
+def create_list(user_id: str, name: str, description: str = None) -> dict:
+    """Create a new list."""
+    data = {
+        "user_id": user_id,
+        "name": name,
+        "description": description,
+    }
+    response = supabase_client.table("lists").insert(data).execute()
+    return response.data[0] if response.data else None
+
+
+def get_user_lists(user_id: str) -> list[dict]:
+    """Get all lists for a user (owned + member of)."""
+    # This query will be automatically filtered by RLS to show:
+    # - Lists the user owns
+    # - Lists the user is a member of
+    response = (
+        supabase_client.table("lists")
+        .select("*, list_members(user_id, role)")
+        .order("created_at", desc=True)
+        .execute()
+    )
+    return response.data or []
+
+
+def get_list_by_id(list_id: str) -> dict:
+    """Get a specific list with members."""
+    response = (
+        supabase_client.table("lists")
+        .select("*, list_members(user_id, role)")
+        .eq("id", list_id)
+        .single()
+        .execute()
+    )
+    return response.data if response.data else None
+
+
+def update_list(list_id: str, updates: dict) -> dict:
+    """Update a list (only creator can do this)."""
+    response = supabase_client.table("lists").update(updates).eq("id", list_id).execute()
+    return response.data[0] if response.data else None
+
+
+def delete_list(list_id: str) -> bool:
+    """Delete a list (only creator can do this)."""
+    response = supabase_client.table("lists").delete().eq("id", list_id).execute()
+    return len(response.data) > 0 if response.data else False
+
+
+# ============================================================================
+# LIST MEMBER OPERATIONS
+# ============================================================================
+
+def add_list_member(list_id: str, user_id: str, role: str = "viewer", invited_by: str = None) -> dict:
+    """Add a user to a list (only admin can do this)."""
+    data = {
+        "list_id": list_id,
+        "user_id": user_id,
+        "role": role,
+        "invited_by": invited_by,
+    }
+    response = supabase_client.table("list_members").insert(data).execute()
+    return response.data[0] if response.data else None
+
+
+def get_list_members(list_id: str) -> list[dict]:
+    """Get all members of a list."""
+    response = supabase_client.table("list_members").select("*").eq("list_id", list_id).execute()
+    return response.data or []
+
+
+def update_member_role(list_id: str, user_id: str, new_role: str) -> dict:
+    """Update a member's role in a list."""
+    response = (
+        supabase_client.table("list_members")
+        .update({"role": new_role})
+        .eq("list_id", list_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
+    return response.data[0] if response.data else None
+
+
+def remove_list_member(list_id: str, user_id: str) -> bool:
+    """Remove a user from a list."""
+    response = (
+        supabase_client.table("list_members")
+        .delete()
+        .eq("list_id", list_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
+    return len(response.data) > 0 if response.data else False
+
+
+# ============================================================================
+# INVITE TOKEN OPERATIONS
+# ============================================================================
+
+def create_invite_token(
+    list_id: str,
+    created_by: str,
+    role: str = "viewer",
+    expires_in_days: int = 30,
+    max_uses: int = None,
+) -> dict:
+    """Create a shareable invite link token."""
+    token = secrets.token_urlsafe(32)
+    expires_at = (datetime.utcnow() + timedelta(days=expires_in_days)).isoformat()
+
+    data = {
+        "list_id": list_id,
+        "token": token,
+        "created_by": created_by,
+        "role": role,
+        "expires_at": expires_at,
+        "max_uses": max_uses,
+    }
+    response = supabase_client.table("invite_tokens").insert(data).execute()
+    return response.data[0] if response.data else None
+
+
+def get_invite_token(token: str) -> dict:
+    """Get invite token details (for accepting invites)."""
+    response = (
+        supabase_client.table("invite_tokens")
+        .select("*, lists(id, name)")
+        .eq("token", token)
+        .eq("is_active", True)
+        .execute()
+    )
+    if not response.data:
+        return None
+
+    token_data = response.data[0]
+
+    # Check if token is expired
+    if token_data.get("expires_at"):
+        expires_at = datetime.fromisoformat(token_data["expires_at"].replace("Z", "+00:00"))
+        if expires_at < datetime.now(expires_at.tzinfo):
+            return None
+
+    # Check if max uses reached
+    if token_data.get("max_uses") and token_data["uses_count"] >= token_data["max_uses"]:
+        return None
+
+    return token_data
+
+
+def accept_invite(token: str, user_id: str) -> dict:
+    """Accept an invite and add user to list."""
+    token_data = get_invite_token(token)
+    if not token_data:
+        raise ValueError("Invalid or expired invite token")
+
+    list_id = token_data["lists"]["id"]
+    role = token_data["role"]
+
+    # Add user to list
+    member = add_list_member(list_id, user_id, role, invited_by=token_data["created_by"])
+
+    # Increment token uses
+    supabase_client.table("invite_tokens").update({"uses_count": token_data["uses_count"] + 1}).eq(
+        "token", token
+    ).execute()
+
+    return member
+
+
+def list_invite_tokens(list_id: str) -> list[dict]:
+    """Get all invite tokens for a list."""
+    response = supabase_client.table("invite_tokens").select("*").eq("list_id", list_id).execute()
+    return response.data or []
+
+
+def revoke_invite_token(token: str) -> dict:
+    """Deactivate an invite token."""
+    response = supabase_client.table("invite_tokens").update({"is_active": False}).eq("token", token).execute()
+    return response.data[0] if response.data else None
+
+
+# ============================================================================
+# VILLA OPERATIONS (updated for lists)
+# ============================================================================
+
+def insert_villa(list_id: str, user_id: str, villa_data: dict) -> dict:
+    """Insert a new villa into a list."""
+    villa_data["list_id"] = list_id
+    villa_data["user_id"] = user_id
+    response = supabase_client.table("villas").insert(villa_data).execute()
+    return response.data[0] if response.data else None
+
+
+def get_list_villas(list_id: str) -> list[dict]:
+    """Get all villas in a list."""
+    response = (
+        supabase_client.table("villas")
+        .select("*")
+        .eq("list_id", list_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    return response.data or []
+
+
+def get_villa_by_slug(list_id: str, slug: str) -> dict:
+    """Get a specific villa by slug in a list."""
+    response = (
+        supabase_client.table("villas")
+        .select("*")
+        .eq("list_id", list_id)
+        .eq("slug", slug)
+        .execute()
+    )
+    return response.data[0] if response.data else None
+
+
+def update_villa(villa_id: str, updates: dict) -> dict:
+    """Update a villa."""
+    response = supabase_client.table("villas").update(updates).eq("id", villa_id).execute()
+    return response.data[0] if response.data else None
+
+
+def update_villa_by_slug(list_id: str, slug: str, updates: dict) -> dict:
+    """Update a villa by slug."""
+    response = (
+        supabase_client.table("villas")
+        .update(updates)
+        .eq("list_id", list_id)
+        .eq("slug", slug)
+        .execute()
+    )
+    return response.data[0] if response.data else None
+
+
+def delete_villa(villa_id: str) -> bool:
+    """Delete a villa."""
+    response = supabase_client.table("villas").delete().eq("id", villa_id).execute()
+    return len(response.data) > 0 if response.data else False
+
+
+def delete_villa_by_slug(list_id: str, slug: str) -> bool:
+    """Delete a villa by slug."""
+    response = (
+        supabase_client.table("villas")
+        .delete()
+        .eq("list_id", list_id)
+        .eq("slug", slug)
+        .execute()
+    )
+    return len(response.data) > 0 if response.data else False

@@ -26,6 +26,7 @@ async def generate_villa_page(
     check_in: str | None = None,
     check_out: str | None = None,
     guests: int | None = None,
+    list_id: str | None = None,
 ):
     """Scrape a villa listing URL and extract structured data."""
     print(f"🚀 Scouting: {url}")
@@ -74,8 +75,24 @@ async def generate_villa_page(
     image_paths = await download_images(crawl_image_urls, slug)
     print(f"📸 Saved {len(image_paths)} images")
 
+    # Try to import db_lists for Supabase support
+    try:
+        from db_lists import insert_villa
+        if list_id:
+            villa_obj = listing.model_dump()
+            villa_obj["title"] = title
+            villa_obj["slug"] = slug
+            villa_obj["original_url"] = url
+            villa_obj["images"] = image_paths
+            result = insert_villa(list_id, user_id=None, villa_data=villa_obj)
+            villa_id = result.get("id") if result else None
+            print(f"✅ Success! Villa saved to Supabase")
+            return {"path": f"/villas/{slug}", "thin_scrape": False, "villa_id": villa_id}
+    except Exception as e:
+        log.warning("failed to save villa to Supabase: %s, falling back to JSON", e)
+    
+    # Fallback to JSON
     save_villa_json(slug, title, listing, url, image_paths)
-
     print(f"✅ Success! Villa data saved")
     return {"path": f"/villas/{slug}", "thin_scrape": False}
 
@@ -83,6 +100,7 @@ async def generate_villa_page(
 async def generate_villa_page_from_paste(
     pasted_text: str,
     original_url: str | None = None,
+    list_id: str | None = None,
 ) -> str:
     """Build a villa report from pasted listing text (e.g. copied from Airbnb).
     Skips crawling; runs the same two-pass extraction and saves the report.
@@ -117,8 +135,24 @@ async def generate_villa_page_from_paste(
     if image_paths:
         print(f"📸 Saved {len(image_paths)} images")
 
+    # Try to save to Supabase
+    try:
+        from db_lists import insert_villa
+        if list_id:
+            villa_obj = listing.model_dump()
+            villa_obj["title"] = title
+            villa_obj["slug"] = slug
+            villa_obj["original_url"] = original_url
+            villa_obj["images"] = image_paths
+            result = insert_villa(list_id, user_id=None, villa_data=villa_obj)
+            villa_id = result.get("id") if result else None
+            print(f"✅ Success! Villa saved to Supabase")
+            return {"path": f"/villas/{slug}", "villa_id": villa_id}
+    except Exception as e:
+        log.warning("failed to save villa to Supabase: %s, falling back to JSON", e)
+    
+    # Fallback to JSON
     save_villa_json(slug, title, listing, original_url, image_paths)
-
     print(f"✅ Success! Villa data saved")
     return f"/villas/{slug}"
 

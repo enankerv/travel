@@ -55,7 +55,7 @@ def is_likely_property_photo(url: str) -> bool:
     return True
 
 
-async def download_images(image_urls: list[str], slug: str, max_images: int = 1) -> list[str]:
+async def download_images(image_urls: list[str], slug: str, max_images: int = 5) -> list[str]:
     """Download images to site/images/<slug>/ and return relative web paths."""
     if not image_urls:
         return []
