@@ -10,7 +10,6 @@ import { useNotification } from './hooks/useNotification';
 export default function App() {
   const { notify } = useNotification();
   const [villas, setVillas] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [scoutingRows, setScoutingRows] = useState({}); // { rowId: { status, url, error } }
   const [pasteModal, setPasteModal] = useState(null); // { rowId, url } or null
 
@@ -20,13 +19,10 @@ export default function App() {
 
   async function loadVillas() {
     try {
-      setLoading(true);
       const data = await api.getVillas();
       setVillas(data.villas || []);
     } catch (err) {
       console.error('Failed to load villas:', err);
-    } finally {
-      setLoading(false);
     }
   }
 
