@@ -137,7 +137,7 @@ class VillaListing(BaseModel):
         data = {**data, "bathrooms": _coerce_int_value(data.get("bathrooms"))}
         data = {**data, "price_weekly_min_eur": _coerce_eur_value(data.get("price_weekly_min_eur"))}
         data = {**data, "price_weekly_max_eur": _coerce_eur_value(data.get("price_weekly_max_eur"))}
-        data = {**data, "price_weekly_usd": _coerce_str_or_list_to_str(data.get("price_weekly_usd"))}
+        data = {**data, "price_weekly_usd": _coerce_eur_value(data.get("price_weekly_usd"))}
         data = {**data, "security_deposit_eur": _coerce_eur_value(data.get("security_deposit_eur"))}
         data = {**data, "pool_features": _coerce_to_list(data.get("pool_features"))}
         data = {**data, "amenities": _coerce_to_list(data.get("amenities"))}
