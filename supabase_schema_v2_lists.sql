@@ -48,6 +48,9 @@ CREATE TABLE IF NOT EXISTS villas (
   list_id UUID NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
   user_id UUID,
   slug TEXT NOT NULL,
+  original_url TEXT,
+  scrap_status TEXT NOT NULL DEFAULT 'loading' CHECK (scrap_status IN ('loading', 'loaded', 'thin', 'error')),
+  scrap_error TEXT,
   title TEXT,
   villa_name TEXT,
   location TEXT,
@@ -68,7 +71,6 @@ CREATE TABLE IF NOT EXISTS villas (
   exteriors_summary TEXT,
   location_summary TEXT,
   the_catch TEXT,
-  original_url TEXT,
   images TEXT[],
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -78,6 +80,7 @@ CREATE TABLE IF NOT EXISTS villas (
 CREATE INDEX idx_villas_list_id ON villas(list_id);
 CREATE INDEX idx_villas_user_id ON villas(user_id);
 CREATE INDEX idx_villas_created_at ON villas(created_at DESC);
+CREATE INDEX idx_villas_scrap_status ON villas(scrap_status);
 
 ALTER TABLE villas ENABLE ROW LEVEL SECURITY;
 
@@ -374,3 +377,17 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+-- ============================================================================
+-- ENABLE REALTIME for villas (required for live updates)
+-- Dashboard alternative: Database → Replication → supabase_realtime → add villas
+-- ============================================================================
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'villas'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE villas;
+  END IF;
+END $$;

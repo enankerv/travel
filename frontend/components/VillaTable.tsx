@@ -3,14 +3,14 @@
 import { useState } from 'react'
 import VillaRow from './VillaRow'
 
-export default function VillaTable({ villas, isLoading, onDelete, onUpdate, onImageClick }) {
+export default function VillaTable({ villas, isLoading, onDelete, onUpdate, onImageClick }: any) {
   const [editingId, setEditingId] = useState(null)
 
-  const handleEditStart = (villaId) => {
+  const handleEditStart = (villaId: any) => {
     setEditingId(villaId)
   }
 
-  const handleEditEnd = (villaId, updatedData) => {
+  const handleEditEnd = (villaId: any, updatedData: any) => {
     if (updatedData && onUpdate) {
       onUpdate(villaId, updatedData)
     }
@@ -55,13 +55,13 @@ export default function VillaTable({ villas, isLoading, onDelete, onUpdate, onIm
             </tr>
           </thead>
           <tbody>
-            {villas.map((villa) => (
+            {villas.map((villa: any) => (
               <VillaRow
                 key={villa.id}
                 villa={villa}
                 isEditing={editingId === villa.id}
                 onEditStart={() => handleEditStart(villa.id)}
-                onEditEnd={(updatedData) => handleEditEnd(villa.id, updatedData)}
+                onEditEnd={(updatedData: any) => handleEditEnd(villa.id, updatedData)}
                 onDelete={() => onDelete && onDelete(villa.id)}
                 onImageClick={onImageClick}
               />

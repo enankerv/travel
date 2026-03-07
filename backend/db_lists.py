@@ -234,6 +234,25 @@ def revoke_invite_token(token: str, auth_token: str) -> dict:
 # VILLA OPERATIONS (updated for lists)
 # ============================================================================
 
+def create_loading_villa(list_id: str, url: str, auth_token: str = None) -> dict:
+    """Create a placeholder villa row with 'loading' status. Returns the villa ID."""
+    import secrets
+    from urllib.parse import urlparse
+    
+    client = get_supabase_client(auth_token)
+    domain = urlparse(url).netloc
+    slug = f"loading-{secrets.token_hex(4)}"
+    
+    data = {
+        "list_id": list_id,
+        "slug": slug,
+        "original_url": url,
+        "scrap_status": "loading",
+    }
+    response = client.table("villas").insert(data).execute()
+    return response.data[0] if response.data else None
+
+
 def insert_villa(list_id: str, user_id: str, villa_data: dict, auth_token: str = None) -> dict:
     """Insert a new villa into a list."""
     client = get_supabase_client(auth_token)

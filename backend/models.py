@@ -113,7 +113,9 @@ class VillaData(BaseModel):
 class VillaResponse(VillaData):
     id: str
     list_id: str
-    user_id: str
+    user_id: Optional[str] = None
+    scrap_status: Literal["loading", "loaded", "thin", "error"] = "loading"
+    scrap_error: Optional[str] = None
     created_at: str
     updated_at: str
 

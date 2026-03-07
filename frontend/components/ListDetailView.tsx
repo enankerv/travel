@@ -1,22 +1,24 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getVillas, scoutUrl, deleteVilla, updateVilla, createInvite, getListMembers } from '@/lib/api'
+import { getVillas, scoutUrl, scoutPaste, deleteVilla, updateVilla, createInvite, getListMembers } from '@/lib/api'
+import { supabase } from '@/lib/supabase'
 import DropZone from './DropZone'
 import VillaTable from './VillaTable'
+import PasteModal from './PasteModal'
 import ImageGallery from './ImageGallery'
 
-export default function ListDetailView({ list, onBack, onUpdate }) {
+export default function ListDetailView({ list, onBack }: any) {
   const [activeTab, setActiveTab] = useState<'places' | 'members'>('places')
-  const [villas, setVillas] = useState([])
-  const [members, setMembers] = useState([])
+  const [villas, setVillas] = useState<any[]>([])
+  const [members, setMembers] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [scouting, setScouting] = useState(false)
   const [error, setError] = useState('')
   const [inviteLink, setInviteLink] = useState('')
   const [galleryImages, setGalleryImages] = useState<string[] | null>(null)
   const [galleryIndex, setGalleryIndex] = useState(0)
   const [dataLoaded, setDataLoaded] = useState(false)
+  const [showPasteModal, setShowPasteModal] = useState(false)
 
   // Lazy load data only when component mounts (view is active)
   useEffect(() => {
@@ -24,6 +26,33 @@ export default function ListDetailView({ list, onBack, onUpdate }) {
       loadData()
     }
   }, [])
+
+  // Subscribe to realtime villa updates
+  useEffect(() => {
+    if (!dataLoaded) return
+
+    const subscription = supabase
+      .channel(`villas:list_id=eq.${list.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'villas',
+          filter: `list_id=eq.${list.id}`,
+        },
+        (payload) => {
+          console.log('Villa update received:', payload)
+          // Reload villas when any change occurs
+          loadData()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [list.id, dataLoaded])
 
   async function loadData() {
     setIsLoading(true)
@@ -44,29 +73,84 @@ export default function ListDetailView({ list, onBack, onUpdate }) {
   }
 
   async function handleScoutUrl(url: string) {
-    setScouting(true)
     setError('')
     try {
       const result = await scoutUrl(url, list.id)
       if (result.ok) {
-        await loadData()
+        if (Notification.permission === 'granted') {
+          new Notification('Scouting...', {
+            body: 'Processing listing...',
+            icon: '⏳',
+          })
+        }
       } else {
+        if (Notification.permission === 'granted') {
+          new Notification('Scouting Failed', {
+            body: result.error || 'Failed to scout villa',
+            icon: '✕',
+          })
+        }
         setError(result.error || 'Failed to scout villa')
       }
     } catch (err: any) {
       setError(err.message || 'Failed to scout villa')
-    } finally {
-      setScouting(false)
+      if (Notification.permission === 'granted') {
+        new Notification('Error', {
+          body: err.message || 'Failed to scout villa',
+          icon: '✕',
+        })
+      }
     }
   }
+
+  async function handleScoutPaste(text: string) {
+    setError('')
+    setShowPasteModal(false)
+    try {
+      const result = await scoutPaste(text, list.id)
+      if (result.ok) {
+        if (Notification.permission === 'granted') {
+          new Notification('Processing Paste...', {
+            body: 'Extracting villa details...',
+            icon: '⏳',
+          })
+        }
+      } else {
+        setError(result.error || 'Failed to process paste')
+        if (Notification.permission === 'granted') {
+          new Notification('Error', {
+            body: result.error || 'Failed to process paste',
+            icon: '✕',
+          })
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to process paste')
+      if (Notification.permission === 'granted') {
+        new Notification('Error', {
+          body: err.message || 'Failed to process paste',
+          icon: '✕',
+        })
+      }
+    }
+  }
+
+  // Request notification permission on component mount
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+  }, [])
 
   async function handleDeleteVilla(villaId: string) {
     if (!confirm('Delete this villa?')) return
 
     try {
-      const villa = villas.find(v => v.id === villaId)
-      await deleteVilla(list.id, villa?.slug)
-      setVillas(villas.filter(v => v.id !== villaId))
+      const villa = villas.find((v: any) => v.id === villaId)
+      if (villa) {
+        await deleteVilla(list.id, villa?.slug)
+        setVillas(villas.filter((v: any) => v.id !== villaId))
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to delete villa')
     }
@@ -74,9 +158,11 @@ export default function ListDetailView({ list, onBack, onUpdate }) {
 
   async function handleUpdateVilla(villaId: string, updatedData: any) {
     try {
-      const villa = villas.find(v => v.id === villaId)
-      await updateVilla(list.id, villa.slug, updatedData)
-      await loadData()
+      const villa = villas.find((v: any) => v.id === villaId)
+      if (villa) {
+        await updateVilla(list.id, villa.slug, updatedData)
+        await loadData()
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to update villa')
     }
@@ -148,7 +234,7 @@ export default function ListDetailView({ list, onBack, onUpdate }) {
             fontWeight: '600',
           }}
         >
-          Places ({villas.length})
+          Places
         </button>
         <button
           onClick={() => setActiveTab('members')}
@@ -173,7 +259,7 @@ export default function ListDetailView({ list, onBack, onUpdate }) {
         {activeTab === 'places' && (
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
             <div style={{ padding: '1.5rem 2rem', flexShrink: 0 }}>
-              <DropZone onUrlSubmit={handleScoutUrl} isLoading={scouting} />
+              <DropZone onUrlSubmit={handleScoutUrl} isLoading={false} />
             </div>
 
             {error && (
@@ -270,7 +356,7 @@ export default function ListDetailView({ list, onBack, onUpdate }) {
             <div>
               <h3 style={{ marginBottom: '1rem', color: 'var(--light)' }}>Members ({members.length + 1})</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {members.map(member => (
+                {members.map((member: any) => (
                   <div
                     key={member.user_id}
                     style={{
@@ -320,6 +406,14 @@ export default function ListDetailView({ list, onBack, onUpdate }) {
           onClose={() => setGalleryImages(null)}
         />
       )}
+
+      {/* Paste Modal */}
+      <PasteModal
+        isOpen={showPasteModal}
+        onClose={() => setShowPasteModal(false)}
+        onSubmit={handleScoutPaste}
+        isLoading={false}
+      />
     </>
   )
 }

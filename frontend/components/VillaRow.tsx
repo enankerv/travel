@@ -9,7 +9,7 @@ export default function VillaRow({
   onEditEnd,
   onDelete,
   onImageClick,
-}) {
+}: any) {
   const [editData, setEditData] = useState(villa)
 
   const handleSave = () => {
@@ -33,6 +33,66 @@ export default function VillaRow({
         window.open(villa.original_url, '_blank')
       }
     }
+  }
+
+  if (villa.scrap_status === 'loading') {
+    return (
+      <tr style={{ opacity: 0.6 }}>
+        <td className="col-thumb">
+          <div className="spinner" style={{ width: '2rem', height: '2rem' }}></div>
+        </td>
+        <td className="col-name" colSpan={7} style={{ color: 'var(--muted)' }}>
+          Processing {villa.original_url ? new URL(villa.original_url).hostname : 'listing'}...
+        </td>
+        <td className="col-catch"></td>
+      </tr>
+    )
+  }
+
+  if (villa.scrap_status === 'thin') {
+    return (
+      <tr style={{ opacity: 0.7, backgroundColor: 'var(--orange-soft)' }}>
+        <td className="col-thumb">
+          <div className="thumb-placeholder">⚠️</div>
+        </td>
+        <td className="col-name" colSpan={7} style={{ color: 'var(--orange)' }}>
+          <span style={{ cursor: 'pointer' }}>
+            Unable to extract full data. Click here to paste listing details manually.
+          </span>
+        </td>
+        <td className="col-catch">
+          <button
+            className="row-action-btn trash"
+            onClick={() => onDelete && onDelete()}
+            title="Delete"
+          >
+            🗑
+          </button>
+        </td>
+      </tr>
+    )
+  }
+
+  if (villa.scrap_status === 'error') {
+    return (
+      <tr style={{ opacity: 0.7, backgroundColor: 'var(--red-soft)' }}>
+        <td className="col-thumb">
+          <div className="thumb-placeholder">❌</div>
+        </td>
+        <td className="col-name" colSpan={7} style={{ color: 'var(--red)' }}>
+          {villa.scrap_error || 'Error while processing listing'}
+        </td>
+        <td className="col-catch">
+          <button
+            className="row-action-btn trash"
+            onClick={() => onDelete && onDelete()}
+            title="Delete"
+          >
+            🗑
+          </button>
+        </td>
+      </tr>
+    )
   }
 
   if (isEditing) {

@@ -351,26 +351,31 @@ async def delete_villa_endpoint(list_id: str, villa_slug: str, authorization: Op
 
 @router.post("/scout", response_model=ScoutResponse)
 async def scout_listing(req: ScoutRequest, authorization: Optional[str] = Header(None)):
-    """Scout a URL and save to a list."""
+    """Scout a URL and save to a list.
+    
+    Creates a loading villa row immediately, then processes in background.
+    Returns villa_id so frontend can track the loading row via Supabase Realtime.
+    """
     url = str(req.url)
     list_id = req.list_id
     
     try:
         token = extract_auth_token(authorization)
-        result = await generate_villa_page(
-            url,
-            check_in=req.check_in,
-            check_out=req.check_out,
-            guests=req.guests,
-            list_id=list_id,
-            auth_token=token,
-        )
         
-        villa_id = result.get("villa_id")
+        # Create a loading villa placeholder immediately
+        from db_lists import create_loading_villa
+        loading_villa = create_loading_villa(list_id, url, auth_token=token)
+        if not loading_villa:
+            raise Exception("Failed to create loading villa")
+        
+        villa_id = loading_villa.get("id")
+        
+        # Process scout in background (fire and forget)
+        import asyncio
+        asyncio.create_task(_process_scout(url, list_id, villa_id, req.check_in, req.check_out, req.guests, token))
+        
         return ScoutResponse(
             ok=True,
-            path=result.get("path"),
-            thin_scrape=result.get("thin_scrape", False),
             villa_id=villa_id,
         )
     except HTTPException:
@@ -379,27 +384,95 @@ async def scout_listing(req: ScoutRequest, authorization: Optional[str] = Header
         return ScoutResponse(ok=False, error=str(e), thin_scrape=False)
 
 
+async def _process_scout(url: str, list_id: str, villa_id: str, check_in: str, check_out: str, guests: int, auth_token: str):
+    """Background task to process scout and update the villa row."""
+    try:
+        from db_lists import update_villa
+        result = await generate_villa_page(
+            url,
+            check_in=check_in,
+            check_out=check_out,
+            guests=guests,
+            list_id=list_id,
+            auth_token=auth_token,
+            villa_id=villa_id,  # Pass villa_id to update instead of insert
+        )
+        
+        # Update the loading villa with the result or status
+        if result.get("thin_scrape"):
+            update_villa(villa_id, {"scrap_status": "thin"}, auth_token)
+        else:
+            # Update with all the scraped data
+            updates = {
+                "scrap_status": "loaded",
+                **{k: v for k, v in result.items() if k not in ["villa_id", "path", "thin_scrape"]}
+            }
+            update_villa(villa_id, updates, auth_token)
+    except Exception as e:
+        # Update villa with error status
+        from db_lists import update_villa
+        update_villa(villa_id, {
+            "scrap_status": "error",
+            "scrap_error": str(e)
+        }, auth_token)
+
+
 @router.post("/scout-paste", response_model=ScoutResponse)
 async def scout_from_paste(req: ScoutPasteRequest, authorization: Optional[str] = Header(None)):
-    """Build a villa report from pasted listing text."""
+    """Build a villa report from pasted listing text.
+    
+    Creates a loading villa row immediately, then processes in background.
+    """
     list_id = req.list_id
     
     try:
         token = extract_auth_token(authorization)
-        result = await generate_villa_page_from_paste(
-            pasted_text=req.pasted_text,
-            original_url=req.original_url,
-            list_id=list_id,
-            auth_token=token,
-        )
         
-        villa_id = result.get("villa_id")
+        # Create a loading villa placeholder immediately
+        from db_lists import create_loading_villa
+        url = req.original_url or "paste"
+        loading_villa = create_loading_villa(list_id, url, auth_token=token)
+        if not loading_villa:
+            raise Exception("Failed to create loading villa")
+        
+        villa_id = loading_villa.get("id")
+        
+        # Process scout in background (fire and forget)
+        import asyncio
+        asyncio.create_task(_process_scout_paste(req.pasted_text, list_id, villa_id, req.original_url, token))
+        
         return ScoutResponse(
             ok=True,
-            path=result.get("path"),
             villa_id=villa_id,
         )
     except HTTPException:
         raise
     except Exception as e:
         return ScoutResponse(ok=False, error=str(e))
+
+
+async def _process_scout_paste(pasted_text: str, list_id: str, villa_id: str, original_url: str, auth_token: str):
+    """Background task to process paste scout and update the villa row."""
+    try:
+        from db_lists import update_villa
+        result = await generate_villa_page_from_paste(
+            pasted_text=pasted_text,
+            original_url=original_url,
+            list_id=list_id,
+            auth_token=auth_token,
+            villa_id=villa_id,  # Pass villa_id to update instead of insert
+        )
+        
+        # Update the loading villa with the result
+        updates = {
+            "scrap_status": "loaded",
+            **{k: v for k, v in result.items() if k not in ["villa_id", "path"]}
+        }
+        update_villa(villa_id, updates, auth_token)
+    except Exception as e:
+        # Update villa with error status
+        from db_lists import update_villa
+        update_villa(villa_id, {
+            "scrap_status": "error",
+            "scrap_error": str(e)
+        }, auth_token)
