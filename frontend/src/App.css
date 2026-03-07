@@ -18,14 +18,10 @@
   --yellow-soft: rgba(251, 191, 36, 0.12);
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
-
-body {
-  font-family: "DM Sans", -apple-system, sans-serif;
-  background: var(--dark);
-  color: var(--light);
+.app {
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
-  line-height: 1.5;
 }
 
 /* Header */
@@ -117,6 +113,7 @@ body {
   border-radius: 10px;
   overflow: hidden;
   background: var(--dark-2);
+  flex: 1;
 }
 
 /* Table */
@@ -291,76 +288,6 @@ body {
   font-size: 0.9rem;
 }
 
-/* Badge pills */
-.badge {
-  display: inline-block;
-  padding: 0.15rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 500;
-}
-
-.badge-green {
-  background: var(--green-soft);
-  color: var(--green);
-}
-
-.badge-yellow {
-  background: var(--yellow-soft);
-  color: var(--yellow);
-}
-
-/* Editable cells */
-td[data-field] {
-  position: relative;
-}
-
-td[data-field] .cell-display {
-  display: block;
-  min-height: 1.2em;
-}
-
-td[data-field] .cell-display.empty-val {
-  color: var(--muted);
-  font-style: italic;
-  font-size: 0.8rem;
-}
-
-td[data-field] .cell-input {
-  display: none;
-  width: 100%;
-  background: var(--surface);
-  border: 1px solid var(--accent);
-  border-radius: 4px;
-  padding: 0.2rem 0.4rem;
-  color: var(--light);
-  font-size: inherit;
-  font-family: inherit;
-  outline: none;
-  box-shadow: 0 0 0 2px var(--accent-soft);
-}
-
-td[data-field].editing .cell-display {
-  display: none;
-}
-
-td[data-field].editing .cell-input {
-  display: block;
-}
-
-.save-flash {
-  animation: flashGreen 0.6s ease-out;
-}
-
-@keyframes flashGreen {
-  0% {
-    background: var(--green-soft);
-  }
-  100% {
-    background: transparent;
-  }
-}
-
 /* Row actions (pencil + trash) */
 .row-actions {
   display: flex;
@@ -513,14 +440,6 @@ td[data-field].editing .cell-input {
   padding: 0.2rem 0.6rem;
   border-radius: 6px;
   margin-top: 0.5rem;
-}
-
-/* Footer */
-.footer {
-  text-align: center;
-  padding: 2rem;
-  font-size: 0.75rem;
-  color: var(--muted);
 }
 
 /* Scrollable table body */
