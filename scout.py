@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import json
 import os
 import re
 import logging
@@ -247,6 +248,23 @@ def _pick_best_images_from_media(media: dict, villa_name: str = "", base_url: st
     return [src for _, _, src in ranked[:max_images]]
 
 
+VILLAS_JSON_DIR = Path("site/villas")
+
+
+def _save_villa_json(slug: str, title: str, listing: VillaListing, original_url: str | None, image_paths: list[str]):
+    """Persist structured villa data as JSON so the front-end can display it in the spreadsheet."""
+    VILLAS_JSON_DIR.mkdir(parents=True, exist_ok=True)
+    data = listing.model_dump()
+    data["title"] = title
+    data["slug"] = slug
+    data["original_url"] = original_url or ""
+    data["images"] = image_paths
+    data["report_path"] = f"/villas/{slug}.html"
+    with open(VILLAS_JSON_DIR / f"{slug}.json", "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    log.info("saved villa JSON: %s.json", slug)
+
+
 async def generate_villa_page(
     url: str,
     check_in: str | None = None,
@@ -415,6 +433,8 @@ async def generate_villa_page(
     
     with open(filepath, "w", encoding="utf-8") as f:
         f.write(final_html)
+
+    _save_villa_json(slug, title, listing, url, image_paths)
 
     print(f"✅ Success! Page created at: {filepath}")
     return {"path": f"/villas/{filename}", "thin_scrape": thin_scrape}
@@ -599,6 +619,8 @@ async def generate_villa_page_from_paste(
     filepath = os.path.join("site/villas", filename)
     with open(filepath, "w", encoding="utf-8") as f:
         f.write(final_html)
+
+    _save_villa_json(slug, title, listing, original_url, image_paths)
 
     print(f"✅ Success! Page created at: {filepath}")
     return f"/villas/{filename}"

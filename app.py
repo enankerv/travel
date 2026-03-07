@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import os
 from pathlib import Path
@@ -69,18 +70,66 @@ async def scout_from_paste(req: ScoutPasteRequest):
         return ScoutResponse(ok=False, error=str(e))
 
 
+@app.patch("/api/villa/{slug}")
+async def update_villa(slug: str, updates: dict):
+    """Merge partial updates into a villa's JSON file."""
+    json_path = VILLAS_DIR / f"{slug}.json"
+    if not json_path.exists():
+        raise HTTPException(status_code=404, detail="Villa not found")
+    data = json.loads(json_path.read_text(encoding="utf-8"))
+    EDITABLE = {
+        "villa_name", "location", "region", "max_guests", "bedrooms", "bathrooms",
+        "price_weekly_min_eur", "price_weekly_max_eur", "price_weekly_usd",
+        "security_deposit_eur", "pool_features", "amenities", "extras",
+        "interiors_summary", "exteriors_summary", "location_summary",
+        "included_in_price", "not_included", "the_catch", "original_url",
+    }
+    for key, val in updates.items():
+        if key in EDITABLE:
+            data[key] = val
+    json_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    return data
+
+
+@app.delete("/api/villa/{slug}")
+async def delete_villa(slug: str):
+    """Delete a villa's JSON and HTML files."""
+    json_path = VILLAS_DIR / f"{slug}.json"
+    html_path = VILLAS_DIR / f"{slug}.html"
+    if not json_path.exists():
+        raise HTTPException(status_code=404, detail="Villa not found")
+    try:
+        if json_path.exists():
+            json_path.unlink()
+        if html_path.exists():
+            html_path.unlink()
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/villas")
 async def list_villas():
     if not VILLAS_DIR.exists():
         return {"villas": []}
     villas = []
     for f in sorted(VILLAS_DIR.glob("*.html"), key=lambda p: p.stat().st_mtime, reverse=True):
-        villas.append({"path": f"/villas/{f.name}", "slug": f.stem})
+        slug = f.stem
+        json_path = VILLAS_DIR / f"{slug}.json"
+        if json_path.exists():
+            try:
+                data = json.loads(json_path.read_text(encoding="utf-8"))
+                villas.append(data)
+                continue
+            except Exception:
+                pass
+        villas.append({"path": f"/villas/{f.name}", "slug": slug})
     return {"villas": villas}
 
 
 # Static files (generated villa pages + images)
 IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+VILLAS_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/images", StaticFiles(directory=str(IMAGES_DIR)), name="images")
 app.mount("/villas", StaticFiles(directory=str(VILLAS_DIR), html=True), name="villas")
 
