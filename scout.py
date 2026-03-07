@@ -10,7 +10,6 @@ from urllib.parse import urlencode, urlparse, parse_qs, urlunparse
 import httpx
 import instructor
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, DefaultMarkdownGenerator, PruningContentFilter
-from jinja2 import Environment, FileSystemLoader
 
 from schema import VillaListing, FactSheet
 
@@ -18,10 +17,6 @@ IMAGES_DIR = Path("site/images")
 
 # Logging for extraction debugging
 log = logging.getLogger("scout")
-
-# Setup Jinja2
-env = Environment(loader=FileSystemLoader('templates'))
-template = env.get_template('villa.html')
 
 
 def _url_with_params(url: str, check_in: str | None, check_out: str | None, guests: int | None) -> str:
@@ -406,7 +401,7 @@ async def generate_villa_page(
     except Exception as e:
         log.warning("could not log extraction result: %s", e)
 
-    # 3. THE BAKE (Generate HTML from structured data)
+    # 3. SAVE (JSON only, no HTML template)
     title = url.split('/')[-1].split('?')[0].replace('-', ' ').title()
     if not title: title = "Tuscan Villa Listing"
     if listing.villa_name:
@@ -417,27 +412,10 @@ async def generate_villa_page(
     image_paths = await _download_images(crawl_image_urls, slug)
     print(f"📸 Saved {len(image_paths)} images")
 
-    final_html = template.render(
-        title=title,
-        listing=listing,
-        original_url=url,
-        raw_scraped=raw_markdown,
-        extraction_sent=extraction_md,
-        images=image_paths,
-    )
-
-    # 4. SAVE
-    os.makedirs("site/villas", exist_ok=True)
-    filename = f"{slug}.html"
-    filepath = os.path.join("site/villas", filename)
-    
-    with open(filepath, "w", encoding="utf-8") as f:
-        f.write(final_html)
-
     _save_villa_json(slug, title, listing, url, image_paths)
 
-    print(f"✅ Success! Page created at: {filepath}")
-    return {"path": f"/villas/{filename}", "thin_scrape": thin_scrape}
+    print(f"✅ Success! Villa data saved")
+    return {"path": f"/villas/{slug}", "thin_scrape": thin_scrape}
 
 
 _MD_IMAGE_RE = re.compile(r"!\[[^\]]*\]\((https?://[^\s\)]+\.(?:jpe?g|png|webp))\)", re.IGNORECASE)
@@ -605,25 +583,10 @@ async def generate_villa_page_from_paste(
     if image_paths:
         print(f"📸 Saved {len(image_paths)} images")
 
-    final_html = template.render(
-        title=title,
-        listing=listing,
-        original_url=original_url or "",
-        raw_scraped=extraction_md,
-        extraction_sent=extraction_md,
-        images=image_paths,
-    )
-
-    os.makedirs("site/villas", exist_ok=True)
-    filename = f"{slug}.html"
-    filepath = os.path.join("site/villas", filename)
-    with open(filepath, "w", encoding="utf-8") as f:
-        f.write(final_html)
-
     _save_villa_json(slug, title, listing, original_url, image_paths)
 
-    print(f"✅ Success! Page created at: {filepath}")
-    return f"/villas/{filename}"
+    print(f"✅ Success! Villa data saved")
+    return f"/villas/{slug}"
 
 
 if __name__ == "__main__":

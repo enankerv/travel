@@ -93,16 +93,12 @@ async def update_villa(slug: str, updates: dict):
 
 @app.delete("/api/villa/{slug}")
 async def delete_villa(slug: str):
-    """Delete a villa's JSON and HTML files."""
+    """Delete a villa's JSON file."""
     json_path = VILLAS_DIR / f"{slug}.json"
-    html_path = VILLAS_DIR / f"{slug}.html"
     if not json_path.exists():
         raise HTTPException(status_code=404, detail="Villa not found")
     try:
-        if json_path.exists():
-            json_path.unlink()
-        if html_path.exists():
-            html_path.unlink()
+        json_path.unlink()
         return {"ok": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -113,17 +109,13 @@ async def list_villas():
     if not VILLAS_DIR.exists():
         return {"villas": []}
     villas = []
-    for f in sorted(VILLAS_DIR.glob("*.html"), key=lambda p: p.stat().st_mtime, reverse=True):
-        slug = f.stem
-        json_path = VILLAS_DIR / f"{slug}.json"
-        if json_path.exists():
-            try:
-                data = json.loads(json_path.read_text(encoding="utf-8"))
-                villas.append(data)
-                continue
-            except Exception:
-                pass
-        villas.append({"path": f"/villas/{f.name}", "slug": slug})
+    # Find all JSON files (villa data)
+    for json_file in sorted(VILLAS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+        try:
+            data = json.loads(json_file.read_text(encoding="utf-8"))
+            villas.append(data)
+        except Exception:
+            pass
     return {"villas": villas}
 
 
