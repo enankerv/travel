@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, HttpUrl
 
 from scout import generate_villa_page, generate_villa_page_from_paste
+from utils.persistence import save_villa_json, load_villa_json, list_all_villas
 
 logging.basicConfig(level=logging.INFO)
 app = FastAPI(title="Nankervis Scout")
@@ -106,16 +107,7 @@ async def delete_villa(slug: str):
 
 @app.get("/api/villas")
 async def list_villas():
-    if not VILLAS_DIR.exists():
-        return {"villas": []}
-    villas = []
-    # Find all JSON files (villa data)
-    for json_file in sorted(VILLAS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
-        try:
-            data = json.loads(json_file.read_text(encoding="utf-8"))
-            villas.append(data)
-        except Exception:
-            pass
+    villas = list_all_villas()
     return {"villas": villas}
 
 
