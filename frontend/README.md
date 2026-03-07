@@ -1,16 +1,99 @@
-# React + Vite
+# Next.js Frontend - Quick Start
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Installation
 
-Currently, two official plugins are available:
+From the TravelBlog directory:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-## React Compiler
+Frontend will be on http://localhost:3000
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Files Created
 
-## Expanding the ESLint configuration
+```
+frontend/
+├── app/
+│   ├── layout.tsx              # Root layout
+│   ├── page.tsx                # Home (redirects)
+│   ├── auth/
+│   │   ├── signup/page.tsx     # Signup page
+│   │   └── login/page.tsx      # Login page
+│   ├── lists/
+│   │   ├── page.tsx            # Lists dashboard
+│   │   ├── create/page.tsx     # Create list page
+│   │   └── [id]/page.tsx       # Single list view
+│   └── join/[token]/page.tsx   # Accept invite
+├── components/
+│   └── auth/
+│       ├── SignupForm.tsx      # Signup form
+│       └── LoginForm.tsx       # Login form
+├── lib/
+│   ├── supabase.ts             # Supabase client
+│   ├── AuthContext.tsx         # Auth provider
+│   └── api.ts                  # API wrapper
+├── app/
+│   └── globals.css             # Tailwind setup
+├── .env.local                  # Environment variables
+├── package.json                # Dependencies
+├── tsconfig.json               # TypeScript config
+├── next.config.js              # Next.js config
+├── tailwind.config.js          # Tailwind config
+├── postcss.config.js           # PostCSS config
+└── .gitignore
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Usage
+
+### 1. Sign Up
+Go to http://localhost:3000/auth/signup
+
+### 2. Log In
+Go to http://localhost:3000/auth/login
+
+### 3. Create List
+Click "New List" on the dashboard
+
+### 4. Scout Villa
+Enter URL in the "Scout New Villa" form on list page
+
+### 5. Share List
+Click "Share" button to create invite link
+
+## Environment Variables
+
+Already set in `.env.local`:
+- NEXT_PUBLIC_SUPABASE_URL
+- NEXT_PUBLIC_SUPABASE_ANON_KEY
+- NEXT_PUBLIC_API_URL
+
+## Deployment
+
+```bash
+npm run build
+vercel deploy
+```
+
+## Features Implemented
+
+✅ User authentication (signup/login)
+✅ List dashboard
+✅ Create lists
+✅ View lists
+✅ Scout villas from URLs
+✅ Share lists via invite links
+✅ Accept invites
+✅ Display villas in table
+
+## Next Steps
+
+Still to add:
+- [ ] Edit villa details inline
+- [ ] Delete villas
+- [ ] Image gallery
+- [ ] Paste modal for failed scrapes
+- [ ] Member management
+- [ ] Real-time updates

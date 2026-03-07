@@ -1,4 +1,14 @@
 """FastAPI application with collaborative lists support."""
+# Force UTF-8 encoding for Windows compatibility
+import sys
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
+# Load environment variables FIRST, before any other imports
+from dotenv import load_dotenv
+load_dotenv()
+
 import logging
 from pathlib import Path
 

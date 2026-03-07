@@ -22,34 +22,6 @@ CREATE INDEX idx_lists_created_at ON lists(created_at DESC);
 
 ALTER TABLE lists ENABLE ROW LEVEL SECURITY;
 
--- RLS: Users can view lists they own or are members of
-CREATE POLICY "Users can view their own lists"
-  ON lists FOR SELECT
-  USING (
-    auth.uid() = user_id OR
-    EXISTS (
-      SELECT 1 FROM list_members
-      WHERE list_members.list_id = lists.id
-        AND list_members.user_id = auth.uid()
-    )
-  );
-
--- RLS: Only list creator can insert
-CREATE POLICY "Users can create lists"
-  ON lists FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
-
--- RLS: Only list creator can update
-CREATE POLICY "Users can update their own lists"
-  ON lists FOR UPDATE
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
-
--- RLS: Only list creator can delete
-CREATE POLICY "Users can delete their own lists"
-  ON lists FOR DELETE
-  USING (auth.uid() = user_id);
-
 -- ============================================================================
 -- LIST MEMBERS TABLE (who has access to a list)
 -- ============================================================================
@@ -68,68 +40,13 @@ CREATE INDEX idx_list_members_user_id ON list_members(user_id);
 
 ALTER TABLE list_members ENABLE ROW LEVEL SECURITY;
 
--- RLS: Users can view list members of lists they have access to
-CREATE POLICY "Users can view members of their lists"
-  ON list_members FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM lists
-      WHERE lists.id = list_members.list_id
-        AND (lists.user_id = auth.uid() OR
-             EXISTS (
-               SELECT 1 FROM list_members lm
-               WHERE lm.list_id = lists.id
-                 AND lm.user_id = auth.uid()
-             ))
-    )
-  );
-
--- RLS: Only list admin can manage members
-CREATE POLICY "List admins can manage members"
-  ON list_members FOR INSERT
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM lists
-      WHERE lists.id = list_members.list_id
-        AND lists.user_id = auth.uid()
-    ) OR
-    EXISTS (
-      SELECT 1 FROM list_members
-      WHERE list_members.list_id = list_members.list_id
-        AND list_members.user_id = auth.uid()
-        AND list_members.role = 'admin'
-    )
-  );
-
--- RLS: Only list admin can update members
-CREATE POLICY "List admins can update members"
-  ON list_members FOR UPDATE
-  USING (
-    EXISTS (
-      SELECT 1 FROM lists
-      WHERE lists.id = list_members.list_id
-        AND lists.user_id = auth.uid()
-    )
-  );
-
--- RLS: Only list admin can remove members
-CREATE POLICY "List admins can remove members"
-  ON list_members FOR DELETE
-  USING (
-    EXISTS (
-      SELECT 1 FROM lists
-      WHERE lists.id = list_members.list_id
-        AND lists.user_id = auth.uid()
-    )
-  );
-
 -- ============================================================================
 -- VILLAS TABLE (updated to belong to lists)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS villas (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   list_id UUID NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES auth.users(id),
+  user_id UUID,
   slug TEXT NOT NULL,
   title TEXT,
   villa_name TEXT,
@@ -164,7 +81,120 @@ CREATE INDEX idx_villas_created_at ON villas(created_at DESC);
 
 ALTER TABLE villas ENABLE ROW LEVEL SECURITY;
 
--- RLS: Users can view villas in lists they have access to
+-- ============================================================================
+-- VILLA IMAGES TABLE
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS villa_images (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  villa_id UUID NOT NULL REFERENCES villas(id) ON DELETE CASCADE,
+  image_url TEXT NOT NULL,
+  position INTEGER DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_villa_images_villa_id ON villa_images(villa_id);
+
+ALTER TABLE villa_images ENABLE ROW LEVEL SECURITY;
+
+-- ============================================================================
+-- INVITE TOKENS TABLE (for shareable links)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS invite_tokens (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  list_id UUID NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
+  token TEXT NOT NULL UNIQUE,
+  created_by UUID NOT NULL REFERENCES auth.users(id),
+  role TEXT NOT NULL CHECK (role IN ('editor', 'viewer')),
+  expires_at TIMESTAMP WITH TIME ZONE,
+  max_uses INTEGER,
+  uses_count INTEGER DEFAULT 0,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_invite_tokens_list_id ON invite_tokens(list_id);
+CREATE INDEX idx_invite_tokens_token ON invite_tokens(token);
+
+ALTER TABLE invite_tokens ENABLE ROW LEVEL SECURITY;
+
+-- ============================================================================
+-- ROW LEVEL SECURITY POLICIES (defined after all tables created)
+-- ============================================================================
+
+-- LISTS POLICIES
+-- RLS: Users can view lists they own or are members of
+-- Note: We use a separate policy for viewing as a member to avoid recursion
+CREATE POLICY "Users can view their own lists"
+  ON lists FOR SELECT
+  USING (
+    auth.uid() = user_id
+  );
+
+-- Members query lists through list_members table (which has its own RLS)
+
+-- RLS: Only list creator can insert
+CREATE POLICY "Users can create lists"
+  ON lists FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+-- RLS: Only list creator can update
+CREATE POLICY "Users can update their own lists"
+  ON lists FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+-- RLS: Only list creator can delete
+CREATE POLICY "Users can delete their own lists"
+  ON lists FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- LIST MEMBERS POLICIES
+-- RLS: Users can view list members of lists they own (list creator)
+CREATE POLICY "List creators can view members"
+  ON list_members FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM lists
+      WHERE lists.id = list_members.list_id
+        AND lists.user_id = auth.uid()
+    )
+  );
+
+-- RLS: Only list creator can add members
+CREATE POLICY "List creators can add members"
+  ON list_members FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM lists
+      WHERE lists.id = list_members.list_id
+        AND lists.user_id = auth.uid()
+    )
+  );
+
+-- RLS: Only list creator can update members
+CREATE POLICY "List creators can update members"
+  ON list_members FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM lists
+      WHERE lists.id = list_members.list_id
+        AND lists.user_id = auth.uid()
+    )
+  );
+
+-- RLS: Only list creator can remove members
+CREATE POLICY "List creators can remove members"
+  ON list_members FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM lists
+      WHERE lists.id = list_members.list_id
+        AND lists.user_id = auth.uid()
+    )
+  );
+
+-- VILLAS POLICIES
+-- RLS: Anyone in a list can view villas in that list
 CREATE POLICY "Users can view villas in their lists"
   ON villas FOR SELECT
   USING (
@@ -180,28 +210,25 @@ CREATE POLICY "Users can view villas in their lists"
     )
   );
 
--- RLS: Users can insert villas into lists they have edit access to
+-- RLS: Anyone with editor+ role can add villas to a list
 CREATE POLICY "Users can add villas to lists they have access to"
   ON villas FOR INSERT
   WITH CHECK (
-    auth.uid() = user_id AND
-    (
-      EXISTS (
-        SELECT 1 FROM lists
-        WHERE lists.id = villas.list_id
-          AND lists.user_id = auth.uid()
-      ) OR
-      EXISTS (
-        SELECT 1 FROM list_members
-        WHERE list_members.list_id = villas.list_id
-          AND list_members.user_id = auth.uid()
-          AND list_members.role IN ('admin', 'editor')
-      )
+    EXISTS (
+      SELECT 1 FROM lists
+      WHERE lists.id = villas.list_id
+        AND (lists.user_id = auth.uid() OR
+             EXISTS (
+               SELECT 1 FROM list_members
+               WHERE list_members.list_id = lists.id
+                 AND list_members.user_id = auth.uid()
+                 AND list_members.role IN ('admin', 'editor')
+             ))
     )
   );
 
--- RLS: Users can update villas (check both list access and editor/admin role)
-CREATE POLICY "Users can update villas in their lists"
+-- RLS: Anyone with editor+ role can update villas in lists they have access to
+CREATE POLICY "Users can update villas in lists they have access to"
   ON villas FOR UPDATE
   USING (
     EXISTS (
@@ -234,23 +261,9 @@ CREATE POLICY "Admins can delete villas from lists"
     )
   );
 
--- ============================================================================
--- VILLA IMAGES TABLE
--- ============================================================================
-CREATE TABLE IF NOT EXISTS villa_images (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  villa_id UUID NOT NULL REFERENCES villas(id) ON DELETE CASCADE,
-  image_url TEXT NOT NULL,
-  position INTEGER DEFAULT 0,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE INDEX idx_villa_images_villa_id ON villa_images(villa_id);
-
-ALTER TABLE villa_images ENABLE ROW LEVEL SECURITY;
-
--- RLS: Users can view images of villas in their lists
-CREATE POLICY "Users can view images of villas in their lists"
+-- VILLA IMAGES POLICIES
+-- RLS: Anyone in a list can view images of villas in that list
+CREATE POLICY "Users can view images in their villas"
   ON villa_images FOR SELECT
   USING (
     EXISTS (
@@ -269,8 +282,8 @@ CREATE POLICY "Users can view images of villas in their lists"
     )
   );
 
--- RLS: Users can add images to villas in their lists (if they have edit access)
-CREATE POLICY "Users can add images to villas in editable lists"
+-- RLS: Anyone with editor+ role can add images to villas in lists they have access to
+CREATE POLICY "Users can add images to their villas"
   ON villa_images FOR INSERT
   WITH CHECK (
     EXISTS (
@@ -290,27 +303,7 @@ CREATE POLICY "Users can add images to villas in editable lists"
     )
   );
 
--- ============================================================================
--- INVITE TOKENS TABLE (for shareable links)
--- ============================================================================
-CREATE TABLE IF NOT EXISTS invite_tokens (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  list_id UUID NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
-  token TEXT NOT NULL UNIQUE,
-  created_by UUID NOT NULL REFERENCES auth.users(id),
-  role TEXT NOT NULL CHECK (role IN ('editor', 'viewer')),
-  expires_at TIMESTAMP WITH TIME ZONE,
-  max_uses INTEGER,
-  uses_count INTEGER DEFAULT 0,
-  is_active BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE INDEX idx_invite_tokens_list_id ON invite_tokens(list_id);
-CREATE INDEX idx_invite_tokens_token ON invite_tokens(token);
-
-ALTER TABLE invite_tokens ENABLE ROW LEVEL SECURITY;
-
+-- INVITE TOKENS POLICIES
 -- RLS: Only list admins can view/create/manage invite tokens
 CREATE POLICY "List admins can view invite tokens"
   ON invite_tokens FOR SELECT

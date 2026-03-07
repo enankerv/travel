@@ -27,9 +27,10 @@ async def generate_villa_page(
     check_out: str | None = None,
     guests: int | None = None,
     list_id: str | None = None,
+    auth_token: str | None = None,
 ):
     """Scrape a villa listing URL and extract structured data."""
-    print(f"🚀 Scouting: {url}")
+    print(f"[SCOUT] Scouting: {url}")
 
     # Prepare URL with optional parameters
     crawl_url = add_search_params(url, check_in, check_out, guests)
@@ -44,7 +45,7 @@ async def generate_villa_page(
     raw_markdown, media = await crawl_page(crawl_url, js_code, is_js_heavy_site(crawl_url))
     
     if not raw_markdown:
-        print("⚠️ Crawl failed — skipping extraction")
+        print("[WARN] Crawl failed — skipping extraction")
         return {"path": None, "thin_scrape": True}
 
     # Get images from crawl result
@@ -58,7 +59,7 @@ async def generate_villa_page(
 
     # Check if scrape is too thin
     if is_thin_scrape(extraction_md):
-        print("⚠️ Thin scrape — skipping LLM, user will paste manually")
+        print("[WARN] Thin scrape — skipping LLM, user will paste manually")
         return {"path": None, "thin_scrape": True}
 
     # Extract villa data via LLM
@@ -73,7 +74,7 @@ async def generate_villa_page(
 
     slug = generate_slug(title)
     image_paths = await download_images(crawl_image_urls, slug)
-    print(f"📸 Saved {len(image_paths)} images")
+    print(f"[IMG] Saved {len(image_paths)} images")
 
     # Try to import db_lists for Supabase support
     try:
@@ -84,16 +85,16 @@ async def generate_villa_page(
             villa_obj["slug"] = slug
             villa_obj["original_url"] = url
             villa_obj["images"] = image_paths
-            result = insert_villa(list_id, user_id=None, villa_data=villa_obj)
+            result = insert_villa(list_id, user_id=None, villa_data=villa_obj, auth_token=auth_token)
             villa_id = result.get("id") if result else None
-            print(f"✅ Success! Villa saved to Supabase")
+            print(f"[OK] Success! Villa saved to Supabase")
             return {"path": f"/villas/{slug}", "thin_scrape": False, "villa_id": villa_id}
     except Exception as e:
         log.warning("failed to save villa to Supabase: %s, falling back to JSON", e)
     
     # Fallback to JSON
     save_villa_json(slug, title, listing, url, image_paths)
-    print(f"✅ Success! Villa data saved")
+    print(f"[OK] Success! Villa data saved")
     return {"path": f"/villas/{slug}", "thin_scrape": False}
 
 
@@ -101,6 +102,7 @@ async def generate_villa_page_from_paste(
     pasted_text: str,
     original_url: str | None = None,
     list_id: str | None = None,
+    auth_token: str | None = None,
 ) -> str:
     """Build a villa report from pasted listing text (e.g. copied from Airbnb).
     Skips crawling; runs the same two-pass extraction and saves the report.
@@ -123,17 +125,17 @@ async def generate_villa_page_from_paste(
     og_url = await fetch_og_image(original_url)
     if og_url:
         image_candidates = [og_url]
-        print(f"📸 Using og:image from original URL")
+        print(f"[IMG] Using og:image from original URL")
     else:
         image_candidates = extract_image_urls_from_text(extraction_md)
         if image_candidates:
-            print(f"📸 Using {len(image_candidates)} images extracted from paste")
+            print(f"[IMG] Using {len(image_candidates)} images extracted from paste")
         else:
-            print("📸 No images found in paste text")
+            print("[IMG] No images found in paste text")
 
     image_paths = await download_images(image_candidates, slug)
     if image_paths:
-        print(f"📸 Saved {len(image_paths)} images")
+        print(f"[IMG] Saved {len(image_paths)} images")
 
     # Try to save to Supabase
     try:
@@ -144,16 +146,16 @@ async def generate_villa_page_from_paste(
             villa_obj["slug"] = slug
             villa_obj["original_url"] = original_url
             villa_obj["images"] = image_paths
-            result = insert_villa(list_id, user_id=None, villa_data=villa_obj)
+            result = insert_villa(list_id, user_id=None, villa_data=villa_obj, auth_token=auth_token)
             villa_id = result.get("id") if result else None
-            print(f"✅ Success! Villa saved to Supabase")
+            print(f"[OK] Success! Villa saved to Supabase")
             return {"path": f"/villas/{slug}", "villa_id": villa_id}
     except Exception as e:
         log.warning("failed to save villa to Supabase: %s, falling back to JSON", e)
     
     # Fallback to JSON
     save_villa_json(slug, title, listing, original_url, image_paths)
-    print(f"✅ Success! Villa data saved")
+    print(f"[OK] Success! Villa data saved")
     return f"/villas/{slug}"
 
 
