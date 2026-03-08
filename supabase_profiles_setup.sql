@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   first_name TEXT,
   avatar_url TEXT,
+  terms_accepted_at TIMESTAMPTZ,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

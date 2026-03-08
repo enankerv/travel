@@ -21,11 +21,35 @@ from starlette.requests import Request
 
 from routes import router
 from utils.allowlist import get_email_from_token, is_email_allowed
+from utils.terms_guard import check_terms_and_age
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
-app = FastAPI(title="Nankervis Scout - Collaborative Lists")
+app = FastAPI(title="GetawayGather - Collaborative Lists")
+
+
+class TermsGuardMiddleware(BaseHTTPMiddleware):
+    """Block /api/* access for users who haven't accepted terms (after TERMS_UPDATED_AT) or verified age."""
+
+    async def dispatch(self, request: Request, call_next):
+        if not request.url.path.startswith("/api/"):
+            return await call_next(request)
+        if request.url.path == "/api/check-access":
+            return await call_next(request)
+
+        auth = request.headers.get("Authorization")
+        if not auth or not auth.lower().startswith("bearer "):
+            return await call_next(request)
+
+        token = auth.split(maxsplit=1)[1]
+        ok, error_code = check_terms_and_age(token)
+        if not ok:
+            return JSONResponse(
+                status_code=403,
+                content={"detail": error_code, "code": error_code},
+            )
+        return await call_next(request)
 
 
 class AllowlistMiddleware(BaseHTTPMiddleware):
@@ -49,8 +73,9 @@ class AllowlistMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-# Allowlist must run after CORS (middleware order: last added = first to run)
+# Terms guard and allowlist run after CORS (middleware order: last added = first to run)
 app.add_middleware(AllowlistMiddleware)
+app.add_middleware(TermsGuardMiddleware)
 
 # Enable CORS for development
 app.add_middleware(

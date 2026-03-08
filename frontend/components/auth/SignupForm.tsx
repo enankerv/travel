@@ -5,17 +5,44 @@ import { useAuth } from '@/lib/AuthContext'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
+const TERMS_CONSENT_KEY = 'terms_consent_at'
+const TERMS_CONSENT_AGE_KEY = 'terms_consent_age'
+
+function getAgeFromDOB(dobStr: string): number | undefined {
+  const dob = new Date(dobStr)
+  if (isNaN(dob.getTime())) return undefined
+  const today = new Date()
+  let age = today.getFullYear() - dob.getFullYear()
+  const m = today.getMonth() - dob.getMonth()
+  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--
+  return age
+}
+
+function recordTermsConsent(age: number) {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(TERMS_CONSENT_KEY, new Date().toISOString())
+    localStorage.setItem(TERMS_CONSENT_AGE_KEY, String(age))
+  }
+}
+
 export default function SignupForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [dob, setDob] = useState('')
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const { signUp, signInWithGoogle } = useAuth()
   const router = useRouter()
 
+  const ageFromDob = dob.trim() ? getAgeFromDOB(dob) : undefined
+  const ageValid = ageFromDob !== undefined && ageFromDob >= 16
+  const canSubmit = agreedToTerms && ageValid
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!canSubmit || ageFromDob === undefined || ageFromDob < 16) return
     setError('')
 
     if (password !== confirmPassword) {
@@ -29,6 +56,7 @@ export default function SignupForm() {
     }
 
     setLoading(true)
+    recordTermsConsent(ageFromDob)
     try {
       const { error } = await signUp(email, password)
       if (error) throw error
@@ -41,8 +69,10 @@ export default function SignupForm() {
   }
 
   async function handleGoogleSignUp() {
+    if (!canSubmit || ageFromDob === undefined || ageFromDob < 16) return
     setError('')
     setLoading(true)
+    recordTermsConsent(ageFromDob)
     try {
       const { error } = await signInWithGoogle()
       if (error) throw error
@@ -96,7 +126,33 @@ export default function SignupForm() {
           />
         </div>
 
-        <button type="submit" className="auth-submit" disabled={loading}>
+        <div className="auth-field">
+          <label htmlFor="dob">Date of birth</label>
+          <input
+            id="dob"
+            type="date"
+            value={dob}
+            onChange={(e) => setDob(e.target.value)}
+            required
+            max={new Date().toISOString().split('T')[0]}
+            style={{ maxWidth: '100%' }}
+          />
+          {ageFromDob !== undefined && ageFromDob < 16 && (
+            <p style={{ marginTop: '0.25rem', color: 'var(--red)', fontSize: '0.85rem' }}>You must be at least 16 to sign up.</p>
+          )}
+        </div>
+
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer', marginBottom: '1rem', fontSize: '0.9rem', color: 'var(--light)' }}>
+          <input
+            type="checkbox"
+            checked={agreedToTerms}
+            onChange={(e) => setAgreedToTerms(e.target.checked)}
+            style={{ marginTop: 3, width: 16, height: 16, accentColor: 'var(--accent)' }}
+          />
+          <span>I agree to the <Link href="/terms" target="_blank">Terms of Service</Link> and <Link href="/privacy" target="_blank">Privacy Policy</Link></span>
+        </label>
+
+        <button type="submit" className="auth-submit" disabled={loading || !canSubmit}>
           {loading ? 'Creating Account...' : 'Sign Up'}
         </button>
       </form>
@@ -108,7 +164,7 @@ export default function SignupForm() {
       <button
         type="button"
         onClick={handleGoogleSignUp}
-        disabled={loading}
+        disabled={loading || !canSubmit}
         className="auth-google"
       >
         <svg viewBox="0 0 24 24" style={{ width: 18, height: 18 }}>

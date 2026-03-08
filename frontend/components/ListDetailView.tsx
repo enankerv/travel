@@ -252,18 +252,18 @@ export default function ListDetailView({ list, onBack }: any) {
         setLastFailedUrl(url);
         if (Notification.permission === "granted") {
           new Notification("Scouting Failed", {
-            body: result.error || "Failed to scout villa",
+            body: result.error || "Failed to scout getaway",
             icon: "✕",
           });
         }
-        setError(result.error || "Failed to scout villa");
+        setError(result.error || "Failed to scout getaway");
       }
     } catch (err: any) {
       setLastFailedUrl(url);
-      setError(err.message || "Failed to scout villa");
+      setError(err.message || "Failed to scout getaway");
       if (Notification.permission === "granted") {
         new Notification("Error", {
-          body: err.message || "Failed to scout villa",
+          body: err.message || "Failed to scout getaway",
           icon: "✕",
         });
       }
@@ -279,7 +279,7 @@ export default function ListDetailView({ list, onBack }: any) {
       if (result.ok) {
         if (Notification.permission === "granted") {
           new Notification("Processing Paste...", {
-            body: "Extracting villa details...",
+            body: "Extracting getaway details...",
             icon: "⏳",
           });
         }
@@ -324,7 +324,7 @@ export default function ListDetailView({ list, onBack }: any) {
   }
 
   async function handleDeleteVilla(villaId: string) {
-    if (!confirm("Delete this villa?")) return;
+    if (!confirm("Delete this getaway?")) return;
 
     try {
       const villa = villas.find((v: any) => v.id === villaId);
@@ -333,7 +333,7 @@ export default function ListDetailView({ list, onBack }: any) {
         setVillas(villas.filter((v: any) => v.id !== villaId));
       }
     } catch (err: any) {
-      setError(err.message || "Failed to delete villa");
+      setError(err.message || "Failed to delete getaway");
     }
   }
 
@@ -345,7 +345,7 @@ export default function ListDetailView({ list, onBack }: any) {
         await loadData(true); // silent - Realtime will also fire
       }
     } catch (err: any) {
-      setError(err.message || "Failed to update villa");
+      setError(err.message || "Failed to update getaway");
     }
   }
 

@@ -44,7 +44,7 @@ export default function DropZone({ onUrlSubmit, isLoading }) {
         type="text"
         value={url}
         onChange={(e) => setUrl(e.target.value)}
-        placeholder="Paste villa listing URL here..."
+        placeholder="Paste getaway listing URL here..."
         disabled={isLoading}
       />
       <span className="hint">or drag and drop</span>

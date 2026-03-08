@@ -1,10 +1,11 @@
 import type { Metadata } from 'next'
 import { AuthProvider } from '@/lib/AuthContext'
+import Footer from '@/components/Footer'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Nankervis Scout',
-  description: 'Collaborative villa research platform',
+  title: 'GetawayGather',
+  description: 'Collaborative getaway research platform',
 }
 
 export default function RootLayout({
@@ -14,9 +15,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>
+      <body style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
         <AuthProvider>
-          {children}
+          <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            {children}
+          </main>
+          <Footer />
         </AuthProvider>
       </body>
     </html>

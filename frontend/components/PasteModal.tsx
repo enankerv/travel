@@ -25,11 +25,11 @@ export default function PasteModal({ isOpen, onClose, onSubmit, isLoading, initi
     <div className={`modal-overlay ${isOpen ? 'open' : ''}`}>
       <div className="modal">
         <h2>Paste Listing Details</h2>
-        <p>Paste the villa listing text or HTML below. We'll extract the key information.</p>
+        <p>Paste the getaway listing text or HTML below. We'll extract the key information.</p>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Paste villa listing text here..."
+          placeholder="Paste getaway listing text here..."
           disabled={isLoading}
         />
         <div className="modal-actions">

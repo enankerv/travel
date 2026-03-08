@@ -21,7 +21,7 @@ export default function VillaTable({ villas, isLoading, onDelete, onUpdate, onIm
     return (
       <div className="sheet-wrap" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
         <div className="spinner"></div>
-        <p style={{ marginTop: '1rem', color: 'var(--muted)' }}>Loading villas...</p>
+        <p style={{ marginTop: '1rem', color: 'var(--muted)' }}>Loading getaways...</p>
       </div>
     )
   }
@@ -31,7 +31,7 @@ export default function VillaTable({ villas, isLoading, onDelete, onUpdate, onIm
       <div className="sheet-wrap">
         <div className="empty-state">
           <div className="icon">🏠</div>
-          <p>No villas yet. Scout some listings to get started!</p>
+          <p>No getaways yet. Scout some listings to get started!</p>
         </div>
       </div>
     )
@@ -44,7 +44,7 @@ export default function VillaTable({ villas, isLoading, onDelete, onUpdate, onIm
           <thead>
             <tr>
               <th className="col-thumb">Image</th>
-              <th className="col-name">Villa Name</th>
+              <th className="col-name">Getaway Name</th>
               <th className="col-loc">Location</th>
               <th className="col-beds">Beds</th>
               <th className="col-baths">Baths</th>

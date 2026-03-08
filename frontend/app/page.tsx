@@ -3,14 +3,16 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/AuthContext'
 import { useRouter } from 'next/navigation'
-import { getLists, createList, checkAccess } from '@/lib/api'
+import { getLists, createList, checkAccess, getMyProfile } from '@/lib/api'
+import { TERMS_UPDATED_AT } from '@/lib/constants'
 import ListsView from '@/components/ListsView'
 import ListDetailView from '@/components/ListDetailView'
+import TermsConsentModal from '@/components/TermsConsentModal'
 
 export default function Home() {
   const { user, loading: authLoading, signOut } = useAuth()
   const router = useRouter()
-  const [lists, setLists] = useState([])
+  const [lists, setLists] = useState<{ id: string; [key: string]: unknown }[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedListId, setSelectedListId] = useState<string | null>(null)
   const [createModalOpen, setCreateModalOpen] = useState(false)
@@ -19,16 +21,61 @@ export default function Home() {
   const [createLoading, setCreateLoading] = useState(false)
   const [error, setError] = useState('')
   const [allowlistDenied, setAllowlistDenied] = useState(false)
+  const [showTermsModal, setShowTermsModal] = useState(false)
+  const [termsIsReAccept, setTermsIsReAccept] = useState(false)
+  const [termsRequiresAge, setTermsRequiresAge] = useState(false)
+  const [underAgeDenied, setUnderAgeDenied] = useState(false)
 
   useEffect(() => {
-    if (!authLoading && !user && !allowlistDenied) {
+    if (!authLoading && !user && !allowlistDenied && !underAgeDenied) {
       router.push('/auth/login')
       return
     }
 
     if (user && !allowlistDenied) {
       checkAccess()
-        .then(() => loadLists())
+        .then(() => getMyProfile())
+        .then(async (profile) => {
+          const acceptedAt = profile?.terms_accepted_at ? new Date(profile.terms_accepted_at).getTime() : 0
+          const termsUpdatedAt = new Date(TERMS_UPDATED_AT).getTime()
+          const needsAcceptance = !profile?.terms_accepted_at || acceptedAt < termsUpdatedAt
+          const needsAge = !profile?.age_verified_at
+
+          if (!needsAcceptance) {
+            loadLists()
+            return
+          }
+          // Consent + age in localStorage from login/signup? Use if recent.
+          const consentAt = typeof window !== 'undefined' ? localStorage.getItem('terms_consent_at') : null
+          const consentAge = typeof window !== 'undefined' ? localStorage.getItem('terms_consent_age') : null
+          if (consentAt) {
+            const consentTime = new Date(consentAt).getTime()
+            const age = Date.now() - consentTime
+            if (age < 10 * 60 * 1000 && consentTime >= termsUpdatedAt) {
+              const ageNum = consentAge ? parseInt(consentAge, 10) : undefined
+              if (needsAge && ageNum !== undefined && !isNaN(ageNum) && ageNum >= 16) {
+                const { acceptTerms } = await import('@/lib/api')
+                await acceptTerms(ageNum)
+                localStorage.removeItem('terms_consent_at')
+                localStorage.removeItem('terms_consent_age')
+                loadLists()
+                return
+              }
+              if (!needsAge) {
+                const { acceptTerms } = await import('@/lib/api')
+                await acceptTerms()
+                localStorage.removeItem('terms_consent_at')
+                localStorage.removeItem('terms_consent_age')
+                loadLists()
+                return
+              }
+            }
+          }
+          setTermsIsReAccept(!!profile?.terms_accepted_at)
+          setTermsRequiresAge(needsAge)
+          setShowTermsModal(true)
+        })
+        .finally(() => setIsLoading(false))
         .catch((err: Error & { code?: string }) => {
           if (err.code === 'NOT_ON_ALLOWLIST') {
             setAllowlistDenied(true)
@@ -39,7 +86,7 @@ export default function Home() {
           setIsLoading(false)
         })
     }
-  }, [user, authLoading, router, allowlistDenied])
+  }, [user, authLoading, router, allowlistDenied, underAgeDenied])
 
   async function loadLists() {
     try {
@@ -108,6 +155,53 @@ export default function Home() {
 
   if (!user) return null
 
+  if (underAgeDenied) {
+    return (
+      <div className="app" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', flexDirection: 'column', gap: '1rem', padding: '2rem' }}>
+        <h2 style={{ margin: 0, color: 'var(--light)' }}>You must be 16+ to use GetawayGather</h2>
+        <p style={{ margin: 0, color: 'var(--muted)', textAlign: 'center' }}>
+          GetawayGather requires users to be at least 16 years old.
+        </p>
+        <button
+          onClick={() => {
+            signOut()
+            setUnderAgeDenied(false)
+            router.push('/auth/login')
+          }}
+          style={{
+            background: 'var(--accent)',
+            color: '#fff',
+            border: 'none',
+            padding: '0.6rem 1.25rem',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontWeight: 600,
+          }}
+        >
+          Back to Login
+        </button>
+      </div>
+    )
+  }
+
+  if (showTermsModal) {
+    return (
+      <TermsConsentModal
+        isReAccept={termsIsReAccept}
+        requiresAge={termsRequiresAge}
+        onAccepted={() => {
+          setShowTermsModal(false)
+          loadLists()
+        }}
+        onUnderAge={() => {
+          setShowTermsModal(false)
+          setUnderAgeDenied(true)
+          signOut()
+        }}
+      />
+    )
+  }
+
   const selectedList = lists.find(l => l.id === selectedListId)
 
   return (
@@ -161,7 +255,7 @@ export default function Home() {
       <div className={`modal-overlay ${createModalOpen ? 'open' : ''}`}>
         <div className="modal" style={{ width: '400px' }}>
           <h2>Create New List</h2>
-          <p>Create a collaborative list for tracking villas</p>
+          <p>Create a collaborative list for tracking getaways</p>
 
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--light)' }}>

@@ -30,7 +30,7 @@ import { AuthProvider } from '@/lib/AuthContext'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Nankervis Scout',
+  title: 'GetawayGather',
   description: 'Collaborative villa research platform',
 }
 

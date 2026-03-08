@@ -84,7 +84,7 @@ export default function ListsView({
               <tr>
                 <th style={{ width: '30%' }}>List Name</th>
                 <th style={{ width: '40%' }}>Description</th>
-                <th style={{ width: '15%', textAlign: 'center' }}>Villas</th>
+                <th style={{ width: '15%', textAlign: 'center' }}>Getaways</th>
                 <th style={{ width: '15%', textAlign: 'center' }}>Members</th>
               </tr>
             </thead>

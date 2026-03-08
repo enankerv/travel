@@ -20,6 +20,32 @@ async function getAuthHeaders() {
   }
 }
 
+/** Get current user's profile (terms_accepted_at, age_verified_at, etc.) */
+export async function getMyProfile(): Promise<{ terms_accepted_at: string | null; age_verified_at: string | null } | null> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+  const { data } = await supabase.from('profiles').select('terms_accepted_at, age_verified_at').eq('id', user.id).single()
+  return data
+}
+
+/** Record that user accepted Terms and Privacy Policy. For first-time users, pass age (must be 16+). */
+export async function acceptTerms(age?: number): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  if (age !== undefined && age < 16) throw new Error('You must be at least 16 to use this service')
+  const now = new Date().toISOString()
+  const updates: Record<string, string> = {
+    id: user.id,
+    terms_accepted_at: now,
+    updated_at: now,
+  }
+  if (age !== undefined && age >= 16) {
+    updates.age_verified_at = now
+  }
+  const { error } = await supabase.from('profiles').upsert(updates, { onConflict: 'id' })
+  if (error) throw new Error(error.message)
+}
+
 /** Check if user is on allowlist. Throws with code 'NOT_ON_ALLOWLIST' if blocked. */
 export async function checkAccess(): Promise<void> {
   const headers = await getAuthHeaders()
@@ -80,11 +106,11 @@ export async function deleteList(listId: string) {
   return res.json()
 }
 
-// Villas
+// Getaways
 export async function getVillas(listId: string) {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_URL}/api/lists/${listId}/villas`, { headers })
-  if (!res.ok) throw new Error('Failed to fetch villas')
+  if (!res.ok) throw new Error('Failed to fetch getaways')
   return res.json()
 }
 
@@ -95,7 +121,7 @@ export async function updateVilla(listId: string, slug: string, updates: any) {
     headers,
     body: JSON.stringify(updates),
   })
-  if (!res.ok) throw new Error('Failed to update villa')
+  if (!res.ok) throw new Error('Failed to update getaway')
   return res.json()
 }
 
@@ -105,7 +131,7 @@ export async function deleteVilla(listId: string, slug: string) {
     method: 'DELETE',
     headers,
   })
-  if (!res.ok) throw new Error('Failed to delete villa')
+  if (!res.ok) throw new Error('Failed to delete getaway')
   return res.json()
 }
 

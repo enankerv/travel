@@ -1,43 +1,42 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useAuth } from '@/lib/AuthContext'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { useState } from "react";
+import { useAuth } from "@/lib/AuthContext";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function LoginForm() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const { signIn, signInWithGoogle } = useAuth()
-  const router = useRouter()
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const { signIn, signInWithGoogle } = useAuth();
+  const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
-
+    e.preventDefault();
+    setError("");
+    setLoading(true);
     try {
-      const { error } = await signIn(email, password)
-      if (error) throw error
-      router.push('/')
+      const { error } = await signIn(email, password);
+      if (error) throw error;
+      router.push("/");
     } catch (err: any) {
-      setError(err.message || 'Failed to sign in')
+      setError(err.message || "Failed to sign in");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   async function handleGoogleSignIn() {
-    setError('')
-    setLoading(true)
+    setError("");
+    setLoading(true);
     try {
-      const { error } = await signInWithGoogle()
-      if (error) throw error
+      const { error } = await signInWithGoogle();
+      if (error) throw error;
     } catch (err: any) {
-      setError(err.message || 'Failed to sign in with Google')
-      setLoading(false)
+      setError(err.message || "Failed to sign in with Google");
+      setLoading(false);
     }
   }
 
@@ -74,7 +73,7 @@ export default function LoginForm() {
         </div>
 
         <button type="submit" className="auth-submit" disabled={loading}>
-          {loading ? 'Signing In...' : 'Sign In'}
+          {loading ? "Signing In..." : "Sign In"}
         </button>
       </form>
 
@@ -88,7 +87,11 @@ export default function LoginForm() {
         disabled={loading}
         className="auth-google"
       >
-        <svg className="w-5 h-5" viewBox="0 0 24 24" style={{ width: 18, height: 18 }}>
+        <svg
+          className="w-5 h-5"
+          viewBox="0 0 24 24"
+          style={{ width: 18, height: 18 }}
+        >
           <path
             fill="currentColor"
             d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -113,5 +116,6 @@ export default function LoginForm() {
         Don&apos;t have an account? <Link href="/auth/signup">Sign up</Link>
       </p>
     </div>
-  )
+  );
 }
+
