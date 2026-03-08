@@ -27,7 +27,8 @@ export default function VillaRow({
     }
   }
 
-  const handleImageClick = () => {
+  const handleImageClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
     if (villa.images && villa.images.length > 0) {
       if (onImageClick) {
         onImageClick(villa.images, 0)
@@ -37,9 +38,19 @@ export default function VillaRow({
     }
   }
 
+  const handleRowClick = () => {
+    if (!isEditing && villa.original_url) {
+      window.open(villa.original_url, '_blank')
+    }
+  }
+
   if (villa.scrap_status === 'loading') {
     return (
-      <tr style={{ opacity: 0.6 }}>
+      <tr
+        style={{ opacity: 0.6, cursor: villa.original_url ? 'pointer' : undefined }}
+        onClick={() => villa.original_url && window.open(villa.original_url, '_blank')}
+        title={villa.original_url ? 'Open listing' : undefined}
+      >
         <td className="col-thumb">
           <div className="spinner" style={{ width: '2rem', height: '2rem' }}></div>
         </td>
@@ -53,7 +64,15 @@ export default function VillaRow({
 
   if (villa.scrap_status === 'thin') {
     return (
-      <tr style={{ opacity: 0.7, backgroundColor: 'var(--orange-soft)' }}>
+      <tr
+        style={{ opacity: 0.7, backgroundColor: 'var(--orange-soft)', cursor: villa.original_url ? 'pointer' : undefined }}
+        onClick={(e) => {
+          if (villa.original_url && !(e.target as HTMLElement).closest('button')) {
+            window.open(villa.original_url, '_blank')
+          }
+        }}
+        title={villa.original_url ? 'Open listing' : undefined}
+      >
         <td className="col-thumb">
           <div className="thumb-placeholder">⚠️</div>
         </td>
@@ -62,7 +81,7 @@ export default function VillaRow({
             Unable to extract full data. Click here to paste listing details manually.
           </span>
         </td>
-        <td className="col-catch">
+        <td className="col-catch" onClick={(e) => e.stopPropagation()}>
           <button
             className="row-action-btn trash"
             onClick={() => onDelete && onDelete()}
@@ -77,14 +96,22 @@ export default function VillaRow({
 
   if (villa.scrap_status === 'error') {
     return (
-      <tr style={{ opacity: 0.7, backgroundColor: 'var(--red-soft)' }}>
+      <tr
+        style={{ opacity: 0.7, backgroundColor: 'var(--red-soft)', cursor: villa.original_url ? 'pointer' : undefined }}
+        onClick={(e) => {
+          if (villa.original_url && !(e.target as HTMLElement).closest('button')) {
+            window.open(villa.original_url, '_blank')
+          }
+        }}
+        title={villa.original_url ? 'Open listing' : undefined}
+      >
         <td className="col-thumb">
           <div className="thumb-placeholder">❌</div>
         </td>
         <td className="col-name" colSpan={7} style={{ color: 'var(--red)' }}>
           {villa.scrap_error || 'Error while processing listing'}
         </td>
-        <td className="col-catch">
+        <td className="col-catch" onClick={(e) => e.stopPropagation()}>
           <div className="row-actions">
             {villa.original_url && onRetry && (
               <button
@@ -204,7 +231,11 @@ export default function VillaRow({
   }
 
   return (
-    <tr>
+    <tr
+      onClick={handleRowClick}
+      style={villa.original_url ? { cursor: 'pointer' } : undefined}
+      title={villa.original_url ? 'Open listing' : undefined}
+    >
       <td className="col-thumb">
         {villa.images && villa.images.length > 0 ? (
           <div className="thumb-link" onClick={handleImageClick} title="Click to view images">
@@ -221,7 +252,7 @@ export default function VillaRow({
       <td className="col-guests">{villa.max_guests || '—'}</td>
       <td className="col-price">${villa.price_weekly_usd || '—'}</td>
       <td className="col-pool">{villa.pool_features?.[0] || '—'}</td>
-      <td className="col-catch">
+      <td className="col-catch" onClick={(e) => e.stopPropagation()}>
         <div className="row-actions">
           <button
             className="row-action-btn"
