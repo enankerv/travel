@@ -175,8 +175,6 @@ export default function ListDetailView({ list, onBack }: any) {
           const oldRow = payload.old;
           setVillas((prev) => {
             if (event === "INSERT" && newRow) {
-              const existing = prev.find((v) => v.id === newRow.id);
-              if (existing) return prev.map((v) => (v.id === newRow.id ? newRow : v));
               return [newRow, ...prev];
             }
             if (event === "UPDATE" && newRow) {
@@ -244,24 +242,14 @@ export default function ListDetailView({ list, onBack }: any) {
     setLastFailedUrl("");
     try {
       const result = await scoutUrl(url, list.id, villaId);
-      if (result.ok && result.villa_id) {
-        setVillas((prev) => {
-          if (villaId) {
-            return prev.map((v) =>
+      if (result.ok) {
+        if (villaId) {
+          setVillas((prev) =>
+            prev.map((v) =>
               v.id === villaId ? { ...v, scrap_status: "loading" } : v
-            );
-          }
-          return [
-            {
-              id: result.villa_id,
-              list_id: list.id,
-              slug: `loading-${result.villa_id.slice(0, 8)}`,
-              original_url: url,
-              scrap_status: "loading",
-            },
-            ...prev,
-          ];
-        });
+            )
+          );
+        }
         if (Notification.permission === "granted") {
           new Notification("Scouting...", {
             body: "Processing listing...",
@@ -298,25 +286,15 @@ export default function ListDetailView({ list, onBack }: any) {
     const originalUrl = pasteVilla?.original_url ?? undefined;
     try {
       const result = await scoutPaste(text, list.id, originalUrl, villaId);
-      if (result.ok && result.villa_id) {
+      if (result.ok) {
         setPasteVilla(null);
-        setVillas((prev) => {
-          if (villaId) {
-            return prev.map((v) =>
+        if (villaId) {
+          setVillas((prev) =>
+            prev.map((v) =>
               v.id === villaId ? { ...v, scrap_status: "loading" } : v
-            );
-          }
-          return [
-            {
-              id: result.villa_id,
-              list_id: list.id,
-              slug: `loading-${result.villa_id.slice(0, 8)}`,
-              original_url: originalUrl || "paste",
-              scrap_status: "loading",
-            },
-            ...prev,
-          ];
-        });
+            )
+          );
+        }
         if (Notification.permission === "granted") {
           new Notification("Processing Paste...", {
             body: "Extracting getaway details...",
