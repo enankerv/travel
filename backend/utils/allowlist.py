@@ -1,59 +1,26 @@
-"""Allowlist middleware: block API access for users not in allowed_emails table or ALLOWED_EMAILS env."""
+"""Allowlist middleware: block API access for users not in ALLOWED_EMAILS env."""
 import base64
 import json
 import logging
 import os
-import time
 from typing import Optional
 
 log = logging.getLogger("allowlist")
 
 _ALLOWED_EMAILS: Optional[set[str]] = None
-_CACHE_EXPIRY: float = 0
-
-
-def _fetch_allowed_emails_from_supabase() -> Optional[set[str]]:
-    """Fetch allowed emails from Supabase allowed_emails table (service role)."""
-    try:
-        from db import get_supabase
-        client = get_supabase()
-        resp = client.table("allowed_emails").select("email").execute()
-        if not resp.data:
-            return set()
-        emails = {str(r.get("email", "")).strip().lower() for r in resp.data if r.get("email")}
-        return emails
-    except Exception as e:
-        log.warning("Could not fetch allowed_emails from Supabase: %s", e)
-        return None
 
 
 def _get_allowed_emails() -> Optional[set[str]]:
-    """Get allowlist: Supabase table first, then ALLOWED_EMAILS env, then allow all."""
-    global _ALLOWED_EMAILS, _CACHE_EXPIRY
-    now = time.time()
-    if _ALLOWED_EMAILS is not None and now < _CACHE_EXPIRY:
+    """Get allowlist from ALLOWED_EMAILS env (comma-separated). None = allow all."""
+    global _ALLOWED_EMAILS
+    if _ALLOWED_EMAILS is not None:
         return _ALLOWED_EMAILS
-
-    # Try Supabase table first (single source of truth with auth hook)
-    from_db = _fetch_allowed_emails_from_supabase()
-    if from_db is not None:
-        _ALLOWED_EMAILS = from_db
-        _CACHE_EXPIRY = now + 60  # Cache 60 seconds
-        if _ALLOWED_EMAILS:
-            log.info("Allowlist from Supabase: %d emails", len(_ALLOWED_EMAILS))
-        else:
-            log.info("Allowlist from Supabase: empty (deny all)")
-        return _ALLOWED_EMAILS
-
-    # Fallback: env var (when table doesn't exist yet)
     raw = os.getenv("ALLOWED_EMAILS", "").strip()
     if not raw:
         _ALLOWED_EMAILS = None
-        _CACHE_EXPIRY = 0
         return None
     emails = {e.strip().lower() for e in raw.split(",") if e.strip()}
     _ALLOWED_EMAILS = emails
-    _CACHE_EXPIRY = now + 60
     log.info("Allowlist from env: %d emails", len(emails))
     return emails
 

@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 from typing import Optional
 
-from db import get_supabase
+from db_lists import get_supabase_client
 
 # Bump this when you update Terms/Privacy. Must match frontend lib/constants.ts
 TERMS_UPDATED_AT = os.getenv("TERMS_UPDATED_AT", "2025-03-07T00:00:00Z")
@@ -28,14 +28,14 @@ def _get_user_id_from_token(token: str) -> Optional[str]:
         return None
 
 
-def get_profile_terms_status(user_id: str) -> tuple[bool, Optional[str]]:
+def get_profile_terms_status(user_id: str, auth_token: str) -> tuple[bool, Optional[str]]:
     """
     Check if user has accepted terms (after TERMS_UPDATED_AT) and verified age.
     Returns (is_verified, error_code).
     error_code: 'TERMS_NOT_ACCEPTED' | 'AGE_NOT_VERIFIED' | None
     """
     try:
-        client = get_supabase()
+        client = get_supabase_client(auth_token)
         resp = client.table("profiles").select("terms_accepted_at, age_verified_at").eq("id", user_id).single().execute()
         if not resp.data:
             return False, "TERMS_NOT_ACCEPTED"
@@ -70,4 +70,4 @@ def check_terms_and_age(token: str) -> tuple[bool, Optional[str]]:
     user_id = _get_user_id_from_token(token)
     if not user_id:
         return False, "TERMS_NOT_ACCEPTED"
-    return get_profile_terms_status(user_id)
+    return get_profile_terms_status(user_id, token)
