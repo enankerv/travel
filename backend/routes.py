@@ -147,11 +147,11 @@ async def delete_list_endpoint(list_id: str, authorization: Optional[str] = Head
 
 @router.get("/lists/{list_id}/members")
 async def get_members_endpoint(list_id: str, authorization: Optional[str] = Header(None)):
-    """Get all members of a list."""
+    """Get all members of a list with profiles (full_name, avatar_url, email)."""
     try:
         token = extract_auth_token(authorization)
-        members = get_list_members(list_id, token)
-        return {"members": members}
+        data = get_list_members(list_id, token)
+        return data
     except HTTPException:
         raise
     except Exception as e:

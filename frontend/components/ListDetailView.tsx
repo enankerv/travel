@@ -1,6 +1,61 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+
+function MemberRow({ user_id, profile, role, subtitle }: { user_id: string; profile?: { first_name?: string; avatar_url?: string }; role: string; subtitle: string }) {
+  const displayName = profile?.first_name || user_id.slice(0, 8) + '…'
+  return (
+    <div
+      style={{
+        padding: '0.75rem',
+        background: 'var(--surface)',
+        borderRadius: '6px',
+        border: '1px solid var(--border)',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <div
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: '50%',
+            overflow: 'hidden',
+            background: 'var(--border)',
+            flexShrink: 0,
+          }}
+        >
+          {profile?.avatar_url ? (
+            <img src={profile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : (
+            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: '1rem' }}>
+              {displayName.charAt(0).toUpperCase()}
+            </div>
+          )}
+        </div>
+        <div>
+          <p style={{ margin: 0, color: 'var(--light)', fontSize: '0.9rem', fontWeight: '600' }}>{displayName}</p>
+          <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.8rem' }}>{subtitle}</p>
+        </div>
+      </div>
+      <span
+        style={{
+          background: 'var(--accent-soft)',
+          color: 'var(--accent)',
+          padding: '0.25rem 0.75rem',
+          borderRadius: '4px',
+          fontSize: '0.75rem',
+          fontWeight: '600',
+          textTransform: 'capitalize',
+        }}
+      >
+        {role}
+      </span>
+    </div>
+  )
+}
 import { getVillas, scoutUrl, scoutPaste, deleteVilla, updateVilla, createInvite, getListMembers } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import DropZone from './DropZone'
@@ -282,7 +337,7 @@ export default function ListDetailView({ list, onBack }: any) {
             fontWeight: '600',
           }}
         >
-          Members ({members.length + 1})
+            Members ({members.length})
         </button>
       </div>
 
@@ -418,44 +473,19 @@ export default function ListDetailView({ list, onBack }: any) {
 
             {/* Members List */}
             <div>
-              <h3 style={{ marginBottom: '1rem', color: 'var(--light)' }}>Members ({members.length + 1})</h3>
+              <h3 style={{ marginBottom: '1rem', color: 'var(--light)' }}>Members ({members.length})</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {members.map((member: any) => (
-                  <div
-                    key={member.user_id}
-                    style={{
-                      padding: '0.75rem',
-                      background: 'var(--surface)',
-                      borderRadius: '6px',
-                      border: '1px solid var(--border)',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <div>
-                      <p style={{ margin: 0, color: 'var(--light)', fontSize: '0.9rem', fontWeight: '600' }}>
-                        {member.user_id}
-                      </p>
-                      <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.8rem' }}>
-                        Joined {new Date(member.joined_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <span
-                      style={{
-                        background: 'var(--accent-soft)',
-                        color: 'var(--accent)',
-                        padding: '0.25rem 0.75rem',
-                        borderRadius: '4px',
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                        textTransform: 'capitalize',
-                      }}
-                    >
-                      {member.role}
-                    </span>
-                  </div>
-                ))}
+                {[...members]
+                  .sort((a, b) => (b.is_creator ? 1 : 0) - (a.is_creator ? 1 : 0))
+                  .map((member: any) => (
+                    <MemberRow
+                      key={member.user_id}
+                      user_id={member.user_id}
+                      profile={member.profile}
+                      role={member.is_creator ? 'Owner' : member.role}
+                      subtitle={member.is_creator ? 'Owner' : (member.joined_at ? `Joined ${new Date(member.joined_at).toLocaleDateString()}` : '—')}
+                    />
+                  ))}
               </div>
             </div>
           </div>
