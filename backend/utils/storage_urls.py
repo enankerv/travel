@@ -11,8 +11,11 @@ _STORAGE_PATH_RE = re.compile(r"/storage/v1/object/(?:public|sign)/[^/]+/(.+)$")
 
 
 def _extract_storage_path(url_or_path: str) -> str | None:
-    """If url_or_path is a Supabase storage URL, extract the storage path. Else return as-is if it looks like a path."""
+    """If url_or_path is a Supabase storage URL, extract the storage path. Else return as-is if it looks like a storage path."""
     if not url_or_path:
+        return None
+    # Legacy local paths (/images/slug/00.jpg) - no longer served; exclude
+    if url_or_path.startswith("/images/"):
         return None
     if url_or_path.startswith("http"):
         m = _STORAGE_PATH_RE.search(url_or_path)
@@ -40,8 +43,7 @@ def sign_image_paths(paths: list[str] | None) -> list[str]:
     for p in paths:
         storage_path = _extract_storage_path(p)
         if not storage_path:
-            signed.append(p)
-            continue
+            continue  # Skip legacy /images/ paths and invalid entries
         try:
             r = bucket.create_signed_url(storage_path, EXPIRE_SEC)
             url = r.get("signedUrl") or r.get("path") or p

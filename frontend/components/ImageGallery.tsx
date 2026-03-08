@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { resolveImageUrl } from "@/lib/api";
 
 export default function ImageGallery({ images, initialIndex = 0, onClose }) {
+  const validImages = (images || []).filter((img) => resolveImageUrl(img))
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
 
   useEffect(() => {
@@ -12,9 +13,9 @@ export default function ImageGallery({ images, initialIndex = 0, onClose }) {
 
   const handleKeyDown = (e) => {
     if (e.key === "ArrowLeft") {
-      setCurrentIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
+      setCurrentIndex((prev) => (prev === 0 ? validImages.length - 1 : prev - 1));
     } else if (e.key === "ArrowRight") {
-      setCurrentIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
+      setCurrentIndex((prev) => (prev === validImages.length - 1 ? 0 : prev + 1));
     } else if (e.key === "Escape") {
       onClose();
     }
@@ -23,13 +24,12 @@ export default function ImageGallery({ images, initialIndex = 0, onClose }) {
   useEffect(() => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [images.length]);
-
-  if (!images || images.length === 0) {
+  }, [validImages.length]);
+  if (validImages.length === 0) {
     return null;
   }
 
-  const currentImage = images[currentIndex];
+  const currentImage = validImages[Math.min(currentIndex, validImages.length - 1)]
 
   return (
     <div className="gallery-modal-overlay open">
@@ -44,12 +44,12 @@ export default function ImageGallery({ images, initialIndex = 0, onClose }) {
           ✕
         </button>
 
-        {images.length > 1 && (
+        {validImages.length > 1 && (
           <div className="gallery-nav">
             <button
               onClick={() =>
                 setCurrentIndex((prev) =>
-                  prev === 0 ? images.length - 1 : prev - 1,
+                  prev === 0 ? validImages.length - 1 : prev - 1,
                 )
               }
               title="Previous (← key)"
@@ -59,12 +59,12 @@ export default function ImageGallery({ images, initialIndex = 0, onClose }) {
             <span
               style={{ color: "rgba(255, 255, 255, 0.6)", paddingTop: "8px" }}
             >
-              {currentIndex + 1} / {images.length}
+              {currentIndex + 1} / {validImages.length}
             </span>
             <button
               onClick={() =>
                 setCurrentIndex((prev) =>
-                  prev === images.length - 1 ? 0 : prev + 1,
+                  prev === validImages.length - 1 ? 0 : prev + 1,
                 )
               }
               title="Next (→ key)"

@@ -237,11 +237,16 @@ export default function VillaRow({
       title={villa.original_url ? 'Open listing' : undefined}
     >
       <td className="col-thumb">
-        {villa.images && villa.images.length > 0 ? (
-          <div className="thumb-link" onClick={handleImageClick} title="Click to view images">
-            <img src={resolveImageUrl(villa.images[0])} alt={villa.villa_name} className="thumb" />
-          </div>
-        ) : (
+        {villa.images && villa.images.length > 0 ? (() => {
+          const src = resolveImageUrl(villa.images[0])
+          return src ? (
+            <div className="thumb-link" onClick={handleImageClick} title="Click to view images">
+              <img src={src} alt={villa.villa_name} className="thumb" />
+            </div>
+          ) : (
+            <div className="thumb-placeholder">—</div>
+          )
+        })() : (
           <div className="thumb-placeholder">—</div>
         )}
       </td>

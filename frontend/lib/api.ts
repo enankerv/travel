@@ -2,10 +2,12 @@ import { supabase } from './supabase'
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-/** Resolve image URL - Supabase Storage URLs work as-is; relative paths use API origin */
+/** Resolve image URL - Supabase Storage URLs work as-is; legacy /images/ paths are no longer served */
 export function resolveImageUrl(url: string): string {
   if (!url) return ''
   if (url.startsWith('http://') || url.startsWith('https://')) return url
+  // Legacy local paths removed; don't try to load
+  if (url.startsWith('/images/')) return ''
   return `${API_URL}${url.startsWith('/') ? '' : '/'}${url}`
 }
 
