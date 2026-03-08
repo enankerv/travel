@@ -807,3 +807,47 @@ button:focus-visible {
 .auth-card .auth-footer a:hover {
   color: #d17c3b;
 }
+
+.oauth-consent-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+}
+
+.oauth-consent-list li {
+  padding: 0.5rem 0;
+  padding-left: 1.5rem;
+  color: var(--light);
+  font-size: 0.9rem;
+  position: relative;
+}
+
+.oauth-consent-list li::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+}
+
+.auth-card .auth-cancel {
+  width: 100%;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.65rem 1.25rem;
+  font-size: 0.9rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.auth-card .auth-cancel:hover:not(:disabled) {
+  color: var(--light);
+  border-color: var(--border-strong);
+}
+
+.auth-card .auth-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

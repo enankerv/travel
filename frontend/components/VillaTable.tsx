@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import VillaRow from './VillaRow'
 
-export default function VillaTable({ villas, isLoading, onDelete, onUpdate, onImageClick, onRetry }: any) {
+export default function VillaTable({ villas, isLoading, onDelete, onUpdate, onImageClick, onRetry, onPasteClick }: any) {
   const [editingId, setEditingId] = useState(null)
 
   const handleEditStart = (villaId: any) => {
@@ -65,6 +65,7 @@ export default function VillaTable({ villas, isLoading, onDelete, onUpdate, onIm
                 onDelete={() => onDelete && onDelete(villa.id)}
                 onImageClick={onImageClick}
                 onRetry={villa.original_url ? () => onRetry && onRetry(villa) : undefined}
+                onPasteClick={onPasteClick}
               />
             ))}
           </tbody>

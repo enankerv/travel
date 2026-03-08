@@ -127,6 +127,7 @@ export default function ListDetailView({ list, onBack }: any) {
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [showPasteModal, setShowPasteModal] = useState(false);
+  const [pasteVilla, setPasteVilla] = useState<any>(null); // When set, paste updates this villa (thin/error)
   const [lastFailedUrl, setLastFailedUrl] = useState("");
   const [lastFailedPaste, setLastFailedPaste] = useState("");
 
@@ -236,11 +237,11 @@ export default function ListDetailView({ list, onBack }: any) {
     }
   }
 
-  async function handleScoutUrl(url: string) {
+  async function handleScoutUrl(url: string, villaId?: string) {
     setError("");
     setLastFailedUrl("");
     try {
-      const result = await scoutUrl(url, list.id);
+      const result = await scoutUrl(url, list.id, villaId);
       if (result.ok) {
         if (Notification.permission === "granted") {
           new Notification("Scouting...", {
@@ -274,9 +275,12 @@ export default function ListDetailView({ list, onBack }: any) {
     setError("");
     setLastFailedPaste("");
     setShowPasteModal(false);
+    const villaId = pasteVilla?.id ?? undefined;
+    const originalUrl = pasteVilla?.original_url ?? undefined;
     try {
-      const result = await scoutPaste(text, list.id);
+      const result = await scoutPaste(text, list.id, originalUrl, villaId);
       if (result.ok) {
+        setPasteVilla(null);
         if (Notification.permission === "granted") {
           new Notification("Processing Paste...", {
             body: "Extracting getaway details...",
@@ -286,6 +290,7 @@ export default function ListDetailView({ list, onBack }: any) {
       } else {
         setLastFailedPaste(text);
         setError(result.error || "Failed to process paste");
+        setShowPasteModal(true);
         if (Notification.permission === "granted") {
           new Notification("Error", {
             body: result.error || "Failed to process paste",
@@ -296,6 +301,7 @@ export default function ListDetailView({ list, onBack }: any) {
     } catch (err: any) {
       setLastFailedPaste(text);
       setError(err.message || "Failed to process paste");
+      setShowPasteModal(true);
       if (Notification.permission === "granted") {
         new Notification("Error", {
           body: err.message || "Failed to process paste",
@@ -315,9 +321,8 @@ export default function ListDetailView({ list, onBack }: any) {
   async function handleRetryVilla(villa: any) {
     if (!villa?.original_url) return;
     try {
-      await deleteVilla(list.id, villa.slug);
-      await handleScoutUrl(villa.original_url);
-      // Realtime will fire for delete + new insert, no need to loadData
+      await handleScoutUrl(villa.original_url, villa.id);
+      // Realtime will update the existing row
     } catch (err: any) {
       setError(err.message || "Failed to retry");
     }
@@ -361,6 +366,12 @@ export default function ListDetailView({ list, onBack }: any) {
   function handleImageClick(images: string[], index: number) {
     setGalleryImages(images);
     setGalleryIndex(index);
+  }
+
+  function handlePasteClick(villa: any) {
+    setPasteVilla(villa);
+    setLastFailedPaste("");
+    setShowPasteModal(true);
   }
 
   return (
@@ -586,6 +597,7 @@ export default function ListDetailView({ list, onBack }: any) {
                 onUpdate={handleUpdateVilla}
                 onImageClick={handleImageClick}
                 onRetry={handleRetryVilla}
+                onPasteClick={handlePasteClick}
               />
             </div>
           </div>
@@ -716,6 +728,7 @@ export default function ListDetailView({ list, onBack }: any) {
         isOpen={showPasteModal}
         onClose={() => {
           setShowPasteModal(false);
+          setPasteVilla(null);
           setLastFailedPaste("");
         }}
         onSubmit={handleScoutPaste}

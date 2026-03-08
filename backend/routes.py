@@ -367,8 +367,8 @@ async def delete_villa_endpoint(list_id: str, villa_slug: str, authorization: Op
 async def scout_listing(req: ScoutRequest, authorization: Optional[str] = Header(None)):
     """Scout a URL and save to a list.
     
-    Creates a loading villa row immediately, then processes in background.
-    Returns villa_id so frontend can track the loading row via Supabase Realtime.
+    If villa_id is provided, updates that existing villa (retry).
+    Otherwise creates a loading villa row, then processes in background.
     """
     url = str(req.url)
     list_id = req.list_id
@@ -376,13 +376,18 @@ async def scout_listing(req: ScoutRequest, authorization: Optional[str] = Header
     try:
         token = extract_auth_token(authorization)
         
-        # Create a loading villa placeholder immediately
-        from db_lists import create_loading_villa
-        loading_villa = create_loading_villa(list_id, url, auth_token=token)
-        if not loading_villa:
-            raise Exception("Failed to create loading villa")
-        
-        villa_id = loading_villa.get("id")
+        if req.villa_id:
+            # Update existing villa (retry)
+            villa_id = req.villa_id
+            from db_lists import update_villa
+            update_villa(villa_id, {"scrap_status": "loading"}, auth_token=token)
+        else:
+            # Create a loading villa placeholder
+            from db_lists import create_loading_villa
+            loading_villa = create_loading_villa(list_id, url, auth_token=token)
+            if not loading_villa:
+                raise Exception("Failed to create loading villa")
+            villa_id = loading_villa.get("id")
         
         # Process scout in background (fire and forget)
         import asyncio
@@ -435,21 +440,28 @@ async def _process_scout(url: str, list_id: str, villa_id: str, check_in: str, c
 async def scout_from_paste(req: ScoutPasteRequest, authorization: Optional[str] = Header(None)):
     """Build a villa report from pasted listing text.
     
-    Creates a loading villa row immediately, then processes in background.
+    If villa_id is provided, updates that existing villa (e.g. thin scrape).
+    Otherwise creates a loading villa row, then processes in background.
     """
     list_id = req.list_id
     
     try:
         token = extract_auth_token(authorization)
         
-        # Create a loading villa placeholder immediately
-        from db_lists import create_loading_villa
-        url = req.original_url or "paste"
-        loading_villa = create_loading_villa(list_id, url, auth_token=token)
-        if not loading_villa:
-            raise Exception("Failed to create loading villa")
-        
-        villa_id = loading_villa.get("id")
+        if req.villa_id:
+            # Update existing villa (thin scrape / resubmit)
+            villa_id = req.villa_id
+            # Mark as loading while we process
+            from db_lists import update_villa
+            update_villa(villa_id, {"scrap_status": "loading"}, auth_token=token)
+        else:
+            # Create a loading villa placeholder
+            from db_lists import create_loading_villa
+            url = req.original_url or "paste"
+            loading_villa = create_loading_villa(list_id, url, auth_token=token)
+            if not loading_villa:
+                raise Exception("Failed to create loading villa")
+            villa_id = loading_villa.get("id")
         
         # Process scout in background (fire and forget)
         import asyncio

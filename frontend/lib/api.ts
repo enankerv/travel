@@ -136,23 +136,27 @@ export async function deleteVilla(listId: string, slug: string) {
 }
 
 // Scout
-export async function scoutUrl(url: string, listId: string) {
+export async function scoutUrl(url: string, listId: string, villaId?: string) {
   const headers = await getAuthHeaders()
+  const body: Record<string, unknown> = { url, list_id: listId }
+  if (villaId) body.villa_id = villaId
   const res = await fetch(`${API_URL}/api/scout`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ url, list_id: listId }),
+    body: JSON.stringify(body),
   })
   if (!res.ok) throw new Error('Scout failed')
   return res.json()
 }
 
-export async function scoutPaste(pasted_text: string, listId: string, original_url?: string) {
+export async function scoutPaste(pasted_text: string, listId: string, original_url?: string, villaId?: string) {
   const headers = await getAuthHeaders()
+  const body: Record<string, unknown> = { pasted_text, list_id: listId, original_url }
+  if (villaId) body.villa_id = villaId
   const res = await fetch(`${API_URL}/api/scout-paste`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ pasted_text, list_id: listId, original_url }),
+    body: JSON.stringify(body),
   })
   if (!res.ok) throw new Error('Scout paste failed')
   return res.json()

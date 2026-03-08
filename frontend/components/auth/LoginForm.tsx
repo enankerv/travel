@@ -10,7 +10,7 @@ export default function LoginForm() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const { signIn, signInWithGoogle } = useAuth();
+  const { signIn } = useAuth();
   const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent) {
@@ -24,18 +24,6 @@ export default function LoginForm() {
     } catch (err: any) {
       setError(err.message || "Failed to sign in");
     } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleGoogleSignIn() {
-    setError("");
-    setLoading(true);
-    try {
-      const { error } = await signInWithGoogle();
-      if (error) throw error;
-    } catch (err: any) {
-      setError(err.message || "Failed to sign in with Google");
       setLoading(false);
     }
   }
@@ -83,7 +71,7 @@ export default function LoginForm() {
 
       <button
         type="button"
-        onClick={handleGoogleSignIn}
+        onClick={() => router.push("/oauth/consent")}
         disabled={loading}
         className="auth-google"
       >

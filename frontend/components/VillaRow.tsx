@@ -11,6 +11,7 @@ export default function VillaRow({
   onDelete,
   onImageClick,
   onRetry,
+  onPasteClick,
 }: any) {
   const [editData, setEditData] = useState(villa)
   const signedUrls = useSignedImageUrls(villa.images || [])
@@ -67,13 +68,13 @@ export default function VillaRow({
   if (villa.scrap_status === 'thin') {
     return (
       <tr
-        style={{ opacity: 0.7, backgroundColor: 'var(--orange-soft)', cursor: villa.original_url ? 'pointer' : undefined }}
+        style={{ opacity: 0.7, backgroundColor: 'var(--orange-soft)', cursor: onPasteClick ? 'pointer' : undefined }}
         onClick={(e) => {
-          if (villa.original_url && !(e.target as HTMLElement).closest('button')) {
-            window.open(villa.original_url, '_blank')
+          if (onPasteClick && !(e.target as HTMLElement).closest('button')) {
+            onPasteClick(villa)
           }
         }}
-        title={villa.original_url ? 'Open listing' : undefined}
+        title={onPasteClick ? 'Click to paste listing details' : undefined}
       >
         <td className="col-thumb">
           <div className="thumb-placeholder">⚠️</div>
@@ -99,13 +100,13 @@ export default function VillaRow({
   if (villa.scrap_status === 'error') {
     return (
       <tr
-        style={{ opacity: 0.7, backgroundColor: 'var(--red-soft)', cursor: villa.original_url ? 'pointer' : undefined }}
+        style={{ opacity: 0.7, backgroundColor: 'var(--red-soft)', cursor: onPasteClick ? 'pointer' : undefined }}
         onClick={(e) => {
-          if (villa.original_url && !(e.target as HTMLElement).closest('button')) {
-            window.open(villa.original_url, '_blank')
+          if (onPasteClick && !(e.target as HTMLElement).closest('button')) {
+            onPasteClick(villa)
           }
         }}
-        title={villa.original_url ? 'Open listing' : undefined}
+        title={onPasteClick ? 'Click to paste listing details' : undefined}
       >
         <td className="col-thumb">
           <div className="thumb-placeholder">❌</div>

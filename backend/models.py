@@ -131,12 +131,14 @@ class ScoutRequest(BaseModel):
     check_in: Optional[str] = None
     check_out: Optional[str] = None
     guests: Optional[int] = None
+    villa_id: Optional[str] = None  # When provided, update this villa instead of creating new (retry)
 
 
 class ScoutPasteRequest(BaseModel):
     pasted_text: str
     list_id: str  # Required: which list to save to
     original_url: Optional[str] = None
+    villa_id: Optional[str] = None  # When provided, update this villa instead of creating new
 
 
 class ScoutResponse(BaseModel):
