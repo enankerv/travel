@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/AuthContext'
 import { useRouter } from 'next/navigation'
-import { getLists, createList } from '@/lib/api'
+import { getLists, createList, checkAccess } from '@/lib/api'
 import ListsView from '@/components/ListsView'
 import ListDetailView from '@/components/ListDetailView'
 
@@ -18,17 +18,28 @@ export default function Home() {
   const [newListDescription, setNewListDescription] = useState('')
   const [createLoading, setCreateLoading] = useState(false)
   const [error, setError] = useState('')
+  const [allowlistDenied, setAllowlistDenied] = useState(false)
 
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (!authLoading && !user && !allowlistDenied) {
       router.push('/auth/login')
       return
     }
 
-    if (user) {
-      loadLists()
+    if (user && !allowlistDenied) {
+      checkAccess()
+        .then(() => loadLists())
+        .catch((err: Error & { code?: string }) => {
+          if (err.code === 'NOT_ON_ALLOWLIST') {
+            setAllowlistDenied(true)
+            signOut()
+          } else {
+            setError('Failed to load')
+          }
+          setIsLoading(false)
+        })
     }
-  }, [user, authLoading, router])
+  }, [user, authLoading, router, allowlistDenied])
 
   async function loadLists() {
     try {
@@ -66,6 +77,31 @@ export default function Home() {
           <div className="spinner"></div>
           <p>Loading...</p>
         </div>
+      </div>
+    )
+  }
+
+  if (allowlistDenied) {
+    return (
+      <div className="app" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', flexDirection: 'column', gap: '1rem', padding: '2rem' }}>
+        <h2 style={{ margin: 0, color: 'var(--light)' }}>You&apos;re not on the invite list yet</h2>
+        <p style={{ margin: 0, color: 'var(--muted)', textAlign: 'center' }}>
+          This app is currently invite-only. Ask the owner to add your email.
+        </p>
+        <button
+          onClick={() => router.push('/auth/login')}
+          style={{
+            background: 'var(--accent)',
+            color: '#fff',
+            border: 'none',
+            padding: '0.6rem 1.25rem',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontWeight: 600,
+          }}
+        >
+          Back to Login
+        </button>
       </div>
     )
   }

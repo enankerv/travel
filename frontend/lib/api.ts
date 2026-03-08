@@ -20,6 +20,19 @@ async function getAuthHeaders() {
   }
 }
 
+/** Check if user is on allowlist. Throws with code 'NOT_ON_ALLOWLIST' if blocked. */
+export async function checkAccess(): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_URL}/api/check-access`, { headers })
+  if (res.status === 403) {
+    const body = await res.json().catch(() => ({}))
+    const err = new Error(body.detail || 'Access denied') as Error & { code?: string }
+    err.code = body.code || 'NOT_ON_ALLOWLIST'
+    throw err
+  }
+  if (!res.ok) throw new Error('Failed to check access')
+}
+
 // Lists
 export async function createList(name: string, description?: string) {
   const headers = await getAuthHeaders()

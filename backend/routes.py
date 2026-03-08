@@ -61,6 +61,18 @@ def extract_user_id_from_token(token: str) -> str:
 
 
 # ============================================================================
+# ACCESS CHECK (allowlist enforced by middleware)
+# ============================================================================
+
+@router.get("/check-access")
+async def check_access(authorization: Optional[str] = Header(None)):
+    """Lightweight endpoint to verify user is on allowlist. Returns 200 if allowed, 403 if not."""
+    token = extract_auth_token(authorization)
+    # If we reach here, middleware already passed (user is on allowlist)
+    return {"ok": True}
+
+
+# ============================================================================
 # LIST ENDPOINTS
 # ============================================================================
 

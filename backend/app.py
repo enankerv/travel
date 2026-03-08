@@ -13,16 +13,44 @@ import logging
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
 
 from routes import router
+from utils.allowlist import get_email_from_token, is_email_allowed
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
 app = FastAPI(title="Nankervis Scout - Collaborative Lists")
+
+
+class AllowlistMiddleware(BaseHTTPMiddleware):
+    """Block /api/* access for users not in ALLOWED_EMAILS (when set)."""
+
+    async def dispatch(self, request: Request, call_next):
+        if not request.url.path.startswith("/api/"):
+            return await call_next(request)
+
+        auth = request.headers.get("Authorization")
+        if not auth or not auth.lower().startswith("bearer "):
+            return await call_next(request)
+
+        token = auth.split(maxsplit=1)[1]
+        email = get_email_from_token(token)
+        if not is_email_allowed(email):
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "not_on_allowlist", "code": "NOT_ON_ALLOWLIST"},
+            )
+        return await call_next(request)
+
+
+# Allowlist must run after CORS (middleware order: last added = first to run)
+app.add_middleware(AllowlistMiddleware)
 
 # Enable CORS for development
 app.add_middleware(

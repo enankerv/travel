@@ -291,7 +291,10 @@ SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY
 GEMINI_API_KEY              # For LLM extraction (get free key at aistudio.google.com/app/apikey)
 
-# 5. Deploy!
+# 5. Allowlist (friends-only): Run supabase_auth_hook_allowlist.sql, add emails to allowed_emails table,
+#    enable the hook in Supabase Dashboard. See AUTH_HOOK_SETUP.md.
+
+# 6. Deploy!
 ```
 
 ### Frontend Deployment (Vercel)
