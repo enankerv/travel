@@ -3,7 +3,13 @@
 import { useState, useEffect } from "react";
 import { useSignedImageUrls } from "@/hooks/useSignedImageUrls";
 
-export default function ImageGallery({ images, initialIndex = 0, onClose }) {
+interface ImageGalleryProps {
+  images: string[] | null | undefined
+  initialIndex?: number
+  onClose: () => void
+}
+
+export default function ImageGallery({ images, initialIndex = 0, onClose }: ImageGalleryProps) {
   const signedUrls = useSignedImageUrls(images || [])
   const validImages = signedUrls.filter(Boolean)
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -12,7 +18,7 @@ export default function ImageGallery({ images, initialIndex = 0, onClose }) {
     setCurrentIndex(initialIndex);
   }, [initialIndex]);
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === "ArrowLeft") {
       setCurrentIndex((prev) => (prev === 0 ? validImages.length - 1 : prev - 1));
     } else if (e.key === "ArrowRight") {

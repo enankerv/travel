@@ -5,14 +5,14 @@ import { useAuth } from '@/lib/AuthContext'
 import { useRouter } from 'next/navigation'
 import { getLists, createList, checkAccess, getMyProfile } from '@/lib/api'
 import { TERMS_UPDATED_AT } from '@/lib/constants'
-import ListsView from '@/components/ListsView'
+import ListsView, { type ListItem } from '@/components/ListsView'
 import ListDetailView from '@/components/ListDetailView'
 import TermsConsentModal from '@/components/TermsConsentModal'
 
 export default function Home() {
   const { user, loading: authLoading, signOut } = useAuth()
   const router = useRouter()
-  const [lists, setLists] = useState<{ id: string; [key: string]: unknown }[]>([])
+  const [lists, setLists] = useState<ListItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedListId, setSelectedListId] = useState<string | null>(null)
   const [createModalOpen, setCreateModalOpen] = useState(false)

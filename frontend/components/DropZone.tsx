@@ -2,11 +2,16 @@
 
 import { useState } from 'react'
 
-export default function DropZone({ onUrlSubmit, isLoading }) {
+interface DropZoneProps {
+  onUrlSubmit: (url: string) => void
+  isLoading: boolean
+}
+
+export default function DropZone({ onUrlSubmit, isLoading }: DropZoneProps) {
   const [url, setUrl] = useState('')
   const [isDragOver, setIsDragOver] = useState(false)
 
-  const handleDragOver = (e) => {
+  const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragOver(true)
   }
@@ -15,7 +20,7 @@ export default function DropZone({ onUrlSubmit, isLoading }) {
     setIsDragOver(false)
   }
 
-  const handleDrop = (e) => {
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragOver(false)
     const text = e.dataTransfer.getData('text/plain')
@@ -24,7 +29,7 @@ export default function DropZone({ onUrlSubmit, isLoading }) {
     }
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (url.trim()) {
       onUrlSubmit(url)

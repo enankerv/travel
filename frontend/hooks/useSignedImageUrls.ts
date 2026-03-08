@@ -36,7 +36,7 @@ export function useSignedImageUrls(images: string[] | null | undefined): string[
           return
         }
         const signedMap = new Map<string, string>()
-        ;(data || []).forEach((d: { path?: string; signedUrl?: string }, i: number) => {
+        ;(data || []).forEach((d: { path?: string | null; signedUrl?: string }, i: number) => {
           const path = pathsToSign[i]
           const url = d?.signedUrl
           if (path && url) signedMap.set(path, url)

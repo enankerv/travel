@@ -1,5 +1,25 @@
 'use client'
 
+import type { User } from '@supabase/supabase-js'
+
+export interface ListItem {
+  id: string
+  name?: string
+  description?: string | null
+  villa_count?: number
+  member_count?: number
+}
+
+interface ListsViewProps {
+  lists: ListItem[]
+  onSelectList: (id: string) => void
+  onCreateList: () => void
+  onSignOut: () => void
+  user: User | null
+  error: string
+  isLoading?: boolean
+}
+
 export default function ListsView({
   lists,
   onSelectList,
@@ -7,8 +27,7 @@ export default function ListsView({
   onSignOut,
   user,
   error,
-  isLoading,
-}) {
+}: ListsViewProps) {
   return (
     <>
       {/* Header */}
@@ -103,7 +122,7 @@ export default function ListsView({
                     onClick={() => onSelectList(list.id)}
                     style={{ cursor: 'pointer' }}
                   >
-                    <td>{list.name}</td>
+                    <td>{list.name ?? '—'}</td>
                     <td style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>
                       {list.description || '—'}
                     </td>

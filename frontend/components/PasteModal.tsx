@@ -2,7 +2,15 @@
 
 import { useState, useEffect } from 'react'
 
-export default function PasteModal({ isOpen, onClose, onSubmit, isLoading, initialText = '' }) {
+interface PasteModalProps {
+  isOpen: boolean
+  onClose: () => void
+  onSubmit: (text: string) => void
+  isLoading: boolean
+  initialText?: string
+}
+
+export default function PasteModal({ isOpen, onClose, onSubmit, isLoading, initialText = '' }: PasteModalProps) {
   const [text, setText] = useState(initialText)
 
   useEffect(() => {
@@ -28,7 +36,7 @@ export default function PasteModal({ isOpen, onClose, onSubmit, isLoading, initi
         <p>Paste the getaway listing text or HTML below. We'll extract the key information.</p>
         <textarea
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setText(e.target.value)}
           placeholder="Paste getaway listing text here..."
           disabled={isLoading}
         />
