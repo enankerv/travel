@@ -1,5 +1,4 @@
 """Villa scouting and data extraction engine."""
-import asyncio
 import logging
 from urllib.parse import urlparse
 
@@ -12,14 +11,12 @@ from utils.text_cleaning import (
 )
 from utils.images import (
     pick_best_images_from_media,
-    download_images,
     upload_images_to_supabase,
     extract_image_urls_from_text,
     fetch_og_image,
 )
 from utils.crawler import crawl_page
 from utils.extraction import extract_villa_two_pass
-from utils.persistence import save_villa_json
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("scout")
@@ -82,32 +79,24 @@ async def generate_villa_page(
 
     slug = generate_slug(title)
 
-    # Prefer Supabase Storage when we have villa_id
+    # Upload images to Supabase Storage (server-only)
     image_urls: list[str] = []
-    if villa_id:
+    if villa_id and crawl_image_urls:
         image_urls = await upload_images_to_supabase(crawl_image_urls, villa_id) or []
-    if not image_urls:
-        image_urls = await download_images(crawl_image_urls, slug)
-    print(f"[IMG] Saved {len(image_urls)} images")
+    if image_urls:
+        print(f"[IMG] Uploaded {len(image_urls)} images to Supabase")
 
-    # Try to import db_lists for Supabase support
-    try:
-        from db_lists import update_villa
-        if villa_id and auth_token:
-            villa_obj = listing.model_dump()
-            villa_obj["title"] = title
-            villa_obj["slug"] = slug
-            villa_obj["original_url"] = url
-            villa_obj["images"] = image_urls
-            result = update_villa(villa_id, villa_obj, auth_token=auth_token)
-            print(f"[OK] Success! Villa updated in Supabase")
-            return {"path": f"/villas/{slug}", "thin_scrape": False, "villa_id": villa_id}
-    except Exception as e:
-        log.warning("failed to update villa in Supabase: %s, falling back to JSON", e)
-    
-    # Fallback to JSON
-    save_villa_json(slug, title, listing, url, image_urls)
-    print(f"[OK] Success! Villa data saved")
+    # Update villa in Supabase
+    from db_lists import update_villa
+    if not villa_id or not auth_token:
+        raise ValueError("villa_id and auth_token required")
+    villa_obj = listing.model_dump()
+    villa_obj["title"] = title
+    villa_obj["slug"] = slug
+    villa_obj["original_url"] = url
+    villa_obj["images"] = image_urls
+    update_villa(villa_id, villa_obj, auth_token=auth_token)
+    print(f"[OK] Success! Villa updated in Supabase")
     return {"path": f"/villas/{slug}", "thin_scrape": False, "villa_id": villa_id}
 
 
@@ -149,35 +138,26 @@ async def generate_villa_page_from_paste(
         else:
             print("[IMG] No images found in paste text")
 
+    # Upload images to Supabase Storage (server-only)
     image_urls: list[str] = []
     if villa_id and image_candidates:
         image_urls = await upload_images_to_supabase(image_candidates, villa_id) or []
-    if not image_urls and image_candidates:
-        image_urls = await download_images(image_candidates, slug)
     if image_urls:
-        print(f"[IMG] Saved {len(image_urls)} images")
+        print(f"[IMG] Uploaded {len(image_urls)} images to Supabase")
 
-    # Try to save/update in Supabase
-    try:
-        from db_lists import update_villa
-        if villa_id and auth_token:
-            villa_obj = listing.model_dump()
-            villa_obj["title"] = title
-            villa_obj["slug"] = slug
-            villa_obj["original_url"] = original_url
-            villa_obj["images"] = image_urls
-            result = update_villa(villa_id, villa_obj, auth_token=auth_token)
-            print(f"[OK] Success! Villa updated in Supabase")
-            return {"path": f"/villas/{slug}", "villa_id": villa_id}
-    except Exception as e:
-        log.warning("failed to update villa in Supabase: %s, falling back to JSON", e)
-    
-    # Fallback to JSON
-    save_villa_json(slug, title, listing, original_url, image_urls)
-    print(f"[OK] Success! Villa data saved")
+    # Update villa in Supabase
+    from db_lists import update_villa
+    if not villa_id or not auth_token:
+        raise ValueError("villa_id and auth_token required")
+    villa_obj = listing.model_dump()
+    villa_obj["title"] = title
+    villa_obj["slug"] = slug
+    villa_obj["original_url"] = original_url
+    villa_obj["images"] = image_urls
+    update_villa(villa_id, villa_obj, auth_token=auth_token)
+    print(f"[OK] Success! Villa updated in Supabase")
     return {"path": f"/villas/{slug}", "villa_id": villa_id}
 
 
 if __name__ == "__main__":
-    link = input("Paste the Airbnb link: ")
-    asyncio.run(generate_villa_page(link))
+    print("Scout is designed to run via the API with list_id and auth. Use POST /api/scout instead.")

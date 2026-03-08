@@ -1,15 +1,13 @@
-"""Image handling, filtering, and downloading utilities."""
+"""Image handling, filtering, and upload utilities."""
 import io
 import re
 import logging
-from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
 
 log = logging.getLogger("scout.images")
 
-IMAGES_DIR = Path("site/images")
 SUPABASE_BUCKET = "villa-images"
 
 # Regex patterns for image extraction
@@ -55,36 +53,6 @@ def is_likely_property_photo(url: str) -> bool:
     if "muscache.com" in low:
         return "/im/pictures/" in low
     return True
-
-
-async def download_images(image_urls: list[str], slug: str, max_images: int = 5) -> list[str]:
-    """Download images to site/images/<slug>/ and return relative web paths."""
-    if not image_urls:
-        return []
-    dest = IMAGES_DIR / slug
-    dest.mkdir(parents=True, exist_ok=True)
-    saved: list[str] = []
-    async with httpx.AsyncClient(follow_redirects=True, timeout=15) as client:
-        for i, url in enumerate(image_urls[:max_images]):
-            try:
-                r = await client.get(url)
-                if r.status_code != 200:
-                    continue
-                ct = r.headers.get("content-type", "")
-                ext = ".jpg"
-                if "png" in ct:
-                    ext = ".png"
-                elif "webp" in ct:
-                    ext = ".webp"
-                elif "gif" in ct:
-                    ext = ".gif"
-                fname = f"{i:02d}{ext}"
-                (dest / fname).write_bytes(r.content)
-                saved.append(f"/images/{slug}/{fname}")
-                log.info("saved image %s", saved[-1])
-            except Exception as e:
-                log.warning("failed to download image %s: %s", url[:80], e)
-    return saved
 
 
 async def upload_images_to_supabase(

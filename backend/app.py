@@ -37,16 +37,9 @@ app.add_middleware(
 app.include_router(router)
 
 SITE_DIR = Path(__file__).resolve().parent / "site"
-VILLAS_DIR = SITE_DIR / "villas"
-IMAGES_DIR = SITE_DIR / "images"
+SITE_DIR.mkdir(parents=True, exist_ok=True)
 
-# Create directories if they don't exist
-IMAGES_DIR.mkdir(parents=True, exist_ok=True)
-VILLAS_DIR.mkdir(parents=True, exist_ok=True)
-
-# Static files
-app.mount("/images", StaticFiles(directory=str(IMAGES_DIR)), name="images")
-app.mount("/villas", StaticFiles(directory=str(VILLAS_DIR), html=True), name="villas")
+# Static files (e.g. index.html if present)
 app.mount("/static", StaticFiles(directory=str(SITE_DIR)), name="static")
 
 
