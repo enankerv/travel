@@ -1,6 +1,6 @@
 crawl4ai
 fastapi
-instructor
+instructor[google-genai]
 ollama
 uvicorn[standard]
 supabase

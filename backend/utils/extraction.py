@@ -1,15 +1,25 @@
 """LLM-based villa data extraction utilities."""
 import asyncio
 import logging
+import os
 import instructor
 from schema import VillaListing, FactSheet
 
 log = logging.getLogger("scout.extraction")
 
+# Provider: "gemini" (prod) or "ollama" (local). Defaults to gemini if GEMINI_API_KEY is set.
+LLM_PROVIDER = os.getenv("LLM_PROVIDER") or ("gemini" if os.getenv("GEMINI_API_KEY") else "ollama")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3-coder:30b")
+
 
 def create_extraction_client():
     """Create an instructor client for LLM extraction."""
-    return instructor.from_provider("ollama/qwen3-coder:30b", mode=instructor.Mode.JSON)
+    if LLM_PROVIDER == "gemini":
+        return instructor.from_provider(
+            f"google/{GEMINI_MODEL}", mode=instructor.Mode.GENAI_STRUCTURED_OUTPUTS
+        )
+    return instructor.from_provider(f"ollama/{OLLAMA_MODEL}", mode=instructor.Mode.JSON)
 
 
 async def extract_fact_sheet(markdown_text: str) -> str:
@@ -30,9 +40,10 @@ async def extract_fact_sheet(markdown_text: str) -> str:
         "<villa_listing>\n" + markdown_text + "\n</villa_listing>"
     )
     
+    model = GEMINI_MODEL if LLM_PROVIDER == "gemini" else OLLAMA_MODEL
     result = await asyncio.to_thread(
         client.create,
-        model="qwen3-coder:30b",
+        model=model,
         messages=[
             {"role": "system", "content": stage1_system},
             {"role": "user", "content": stage1_user},
@@ -66,9 +77,10 @@ async def extract_villa_listing(fact_sheet_markdown: str) -> VillaListing:
         "<fact_sheet>\n" + fact_sheet_markdown + "\n</fact_sheet>"
     )
     
+    model = GEMINI_MODEL if LLM_PROVIDER == "gemini" else OLLAMA_MODEL
     listing = await asyncio.to_thread(
         client.create,
-        model="qwen3-coder:30b",
+        model=model,
         messages=[
             {"role": "system", "content": stage2_system},
             {"role": "user", "content": stage2_user},

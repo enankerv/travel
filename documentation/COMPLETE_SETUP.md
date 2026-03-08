@@ -23,7 +23,8 @@ pip install -r requirements.txt
 
 # Create .env file
 echo "SUPABASE_URL=https://kfrzzbfnbguhrtdmtkka.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key-here>" > .env
+SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key-here>
+GEMINI_API_KEY=<your-gemini-api-key>" > .env
 
 # Run backend
 python app.py
@@ -288,6 +289,7 @@ git push
 # 4. Set environment variables:
 SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY
+GEMINI_API_KEY              # For LLM extraction (get free key at aistudio.google.com/app/apikey)
 
 # 5. Deploy!
 ```
