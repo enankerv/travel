@@ -2,13 +2,12 @@ import { supabase } from './supabase'
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-/** Resolve image URL - Supabase Storage URLs work as-is; legacy /images/ paths are no longer served */
+/** Resolve image URL - only full URLs (e.g. signed Supabase) work; storage paths need signing via API */
 export function resolveImageUrl(url: string): string {
   if (!url) return ''
   if (url.startsWith('http://') || url.startsWith('https://')) return url
-  // Legacy local paths removed; don't try to load
-  if (url.startsWith('/images/')) return ''
-  return `${API_URL}${url.startsWith('/') ? '' : '/'}${url}`
+  // Legacy /images/ and raw storage paths (villa_id/filename) - not loadable without signed URL
+  return ''
 }
 
 async function getAuthHeaders() {

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { resolveImageUrl } from '@/lib/api'
+import { useSignedImageUrls } from '@/hooks/useSignedImageUrls'
 
 export default function VillaRow({
   villa,
@@ -13,6 +13,8 @@ export default function VillaRow({
   onRetry,
 }: any) {
   const [editData, setEditData] = useState(villa)
+  const signedUrls = useSignedImageUrls(villa.images || [])
+  const thumbUrl = signedUrls[0]
 
   const handleSave = () => {
     if (onEditEnd) {
@@ -139,8 +141,8 @@ export default function VillaRow({
     return (
       <tr>
         <td className="col-thumb">
-          {villa.images && villa.images.length > 0 ? (
-            <img src={resolveImageUrl(villa.images[0])} alt={villa.villa_name} className="thumb" />
+          {villa.images && villa.images.length > 0 && thumbUrl ? (
+            <img src={thumbUrl} alt={villa.villa_name} className="thumb" />
           ) : (
             <div className="thumb-placeholder">—</div>
           )}
@@ -237,16 +239,11 @@ export default function VillaRow({
       title={villa.original_url ? 'Open listing' : undefined}
     >
       <td className="col-thumb">
-        {villa.images && villa.images.length > 0 ? (() => {
-          const src = resolveImageUrl(villa.images[0])
-          return src ? (
-            <div className="thumb-link" onClick={handleImageClick} title="Click to view images">
-              <img src={src} alt={villa.villa_name} className="thumb" />
-            </div>
-          ) : (
-            <div className="thumb-placeholder">—</div>
-          )
-        })() : (
+        {villa.images && villa.images.length > 0 && thumbUrl ? (
+          <div className="thumb-link" onClick={handleImageClick} title="Click to view images">
+            <img src={thumbUrl} alt={villa.villa_name} className="thumb" />
+          </div>
+        ) : (
           <div className="thumb-placeholder">—</div>
         )}
       </td>

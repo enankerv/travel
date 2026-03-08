@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { resolveImageUrl } from "@/lib/api";
+import { useSignedImageUrls } from "@/hooks/useSignedImageUrls";
 
 export default function ImageGallery({ images, initialIndex = 0, onClose }) {
-  const validImages = (images || []).filter((img) => resolveImageUrl(img))
+  const signedUrls = useSignedImageUrls(images || [])
+  const validImages = signedUrls.filter(Boolean)
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
 
   useEffect(() => {
@@ -35,7 +36,7 @@ export default function ImageGallery({ images, initialIndex = 0, onClose }) {
     <div className="gallery-modal-overlay open">
       <div className="gallery-container">
         <img
-          src={resolveImageUrl(currentImage)}
+          src={currentImage}
           alt={`Image ${currentIndex + 1}`}
           className="gallery-image"
         />

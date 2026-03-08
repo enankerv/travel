@@ -58,19 +58,18 @@ def is_likely_property_photo(url: str) -> bool:
 async def upload_images_to_supabase(
     image_urls: list[str],
     villa_id: str,
+    auth_token: str,
     max_images: int = 5,
 ) -> list[str] | None:
-    """Download images from URLs and upload to Supabase Storage. Returns storage paths (villa_id/filename) or None on failure."""
-    import os
-    from supabase import create_client
+    """Download images from URLs and upload to Supabase Storage. Returns storage paths (villa_id/filename) or None on failure.
+    Uses auth_token for Storage RLS (authenticated user must have list access)."""
+    from db_lists import get_supabase_client
 
-    url = os.getenv("SUPABASE_URL")
-    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
-    if not url or not key:
-        log.warning("Supabase credentials missing for storage upload")
+    if not auth_token:
+        log.warning("auth_token required for storage upload")
         return None
 
-    client = create_client(url, key)
+    client = get_supabase_client(auth_token)
     bucket = client.storage.from_(SUPABASE_BUCKET)
     public_urls: list[str] = []
 
@@ -89,12 +88,17 @@ async def upload_images_to_supabase(
                 elif "gif" in ct:
                     ext = "gif"
                 path = f"{villa_id}/{i:02d}.{ext}"
-                file_obj = io.BytesIO(r.content)
-                bucket.upload(path, file_obj, file_options={"content-type": ct or f"image/{ext}"})
+                mime = ct or f"image/{ext}"
+                # storage-py: upload(path, file, file_options); file can be bytes
+                bucket.upload(
+                    path,
+                    r.content,
+                    file_options={"content-type": mime, "upsert": "true"},
+                )
                 public_urls.append(path)
                 log.info("uploaded image to Supabase: %s", path)
             except Exception as e:
-                log.warning("failed to upload image %s: %s", img_url[:80], e)
+                log.warning("failed to upload image %s: %s", img_url[:80], e, exc_info=True)
 
     return public_urls if public_urls else None
 

@@ -309,7 +309,7 @@ async def get_villas_endpoint(list_id: str, authorization: Optional[str] = Heade
         from utils.storage_urls import sign_villa_images
         token = extract_auth_token(authorization)
         villas = get_list_villas(list_id, token)
-        return [sign_villa_images(v) for v in villas]
+        return [sign_villa_images(v, token) for v in villas]
     except HTTPException:
         raise
     except Exception as e:
@@ -325,7 +325,7 @@ async def update_villa_endpoint(list_id: str, villa_slug: str, updates: dict, au
         result = update_villa_by_slug(list_id, villa_slug, updates, token)
         if not result:
             raise HTTPException(status_code=404, detail="Villa not found")
-        return {"ok": True, "villa": sign_villa_images(result)}
+        return {"ok": True, "villa": sign_villa_images(result, token)}
     except HTTPException:
         raise
     except Exception as e:

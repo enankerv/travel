@@ -82,7 +82,7 @@ async def generate_villa_page(
     # Upload images to Supabase Storage (server-only)
     image_urls: list[str] = []
     if villa_id and crawl_image_urls:
-        image_urls = await upload_images_to_supabase(crawl_image_urls, villa_id) or []
+        image_urls = await upload_images_to_supabase(crawl_image_urls, villa_id, auth_token) or []
     if image_urls:
         print(f"[IMG] Uploaded {len(image_urls)} images to Supabase")
 
@@ -141,7 +141,7 @@ async def generate_villa_page_from_paste(
     # Upload images to Supabase Storage (server-only)
     image_urls: list[str] = []
     if villa_id and image_candidates:
-        image_urls = await upload_images_to_supabase(image_candidates, villa_id) or []
+        image_urls = await upload_images_to_supabase(image_candidates, villa_id, auth_token) or []
     if image_urls:
         print(f"[IMG] Uploaded {len(image_urls)} images to Supabase")
 

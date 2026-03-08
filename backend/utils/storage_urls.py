@@ -1,7 +1,6 @@
-"""Generate signed URLs for Supabase Storage (private bucket)."""
-import os
+"""Generate signed URLs for Supabase Storage (private bucket).
+Uses user auth_token for RLS - never service role."""
 import re
-from supabase import create_client
 
 BUCKET = "villa-images"
 EXPIRE_SEC = 3600  # 1 hour
@@ -23,19 +22,12 @@ def _extract_storage_path(url_or_path: str) -> str | None:
     return url_or_path if "/" in url_or_path else None
 
 
-def _get_storage_client():
-    url = os.getenv("SUPABASE_URL")
-    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
-    if not url or not key:
-        return None
-    return create_client(url, key)
-
-
-def sign_image_paths(paths: list[str] | None) -> list[str]:
-    """Convert storage paths (or old Supabase URLs) to signed URLs. Returns original if signing fails."""
+def sign_image_paths(paths: list[str] | None, auth_token: str) -> list[str]:
+    """Convert storage paths (or old Supabase URLs) to signed URLs. Uses auth_token for RLS."""
     if not paths:
         return []
-    client = _get_storage_client()
+    from db_lists import get_supabase_client
+    client = get_supabase_client(auth_token)
     if not client:
         return paths
     bucket = client.storage.from_(BUCKET)
@@ -53,10 +45,10 @@ def sign_image_paths(paths: list[str] | None) -> list[str]:
     return signed
 
 
-def sign_villa_images(villa: dict) -> dict:
-    """Return villa with images array replaced by signed URLs."""
+def sign_villa_images(villa: dict, auth_token: str) -> dict:
+    """Return villa with images array replaced by signed URLs. Uses auth_token for RLS."""
     if not villa or "images" not in villa:
         return villa
     images = villa.get("images") or []
-    villa = {**villa, "images": sign_image_paths(images)}
+    villa = {**villa, "images": sign_image_paths(images, auth_token)}
     return villa
