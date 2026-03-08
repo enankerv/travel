@@ -42,7 +42,7 @@ export default function JoinPage() {
     setJoining(true)
     try {
       await acceptInvite(token)
-      router.push('/lists')
+      router.push('/')
     } catch (err: any) {
       setError(err.message || 'Failed to join list')
     } finally {

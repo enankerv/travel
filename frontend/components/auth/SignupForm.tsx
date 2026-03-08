@@ -53,76 +53,65 @@ export default function SignupForm() {
   }
 
   return (
-    <div className="w-full max-w-md mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6 text-white">Create Account</h1>
+    <div className="auth-card">
+      <span className="auth-tag">Travel Scout</span>
+      <h1>Create Account</h1>
 
-      {error && (
-        <div className="bg-red-500/10 border border-red-500 text-red-500 px-4 py-3 rounded mb-4">
-          {error}
-        </div>
-      )}
+      {error && <div className="auth-error">{error}</div>}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">Email</label>
+      <form onSubmit={handleSubmit}>
+        <div className="auth-field">
+          <label htmlFor="email">Email</label>
           <input
+            id="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
-            className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-orange-500"
             required
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">Password</label>
+        <div className="auth-field">
+          <label htmlFor="password">Password</label>
           <input
+            id="password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
-            className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-orange-500"
             required
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">Confirm Password</label>
+        <div className="auth-field">
+          <label htmlFor="confirm">Confirm Password</label>
           <input
+            id="confirm"
             type="password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             placeholder="••••••••"
-            className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-orange-500"
             required
           />
         </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 text-white font-semibold py-2 px-4 rounded transition"
-        >
+        <button type="submit" className="auth-submit" disabled={loading}>
           {loading ? 'Creating Account...' : 'Sign Up'}
         </button>
       </form>
 
-      <div className="relative my-6">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-slate-600"></div>
-        </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="px-2 bg-slate-950 text-gray-400">Or sign up with</span>
-        </div>
+      <div className="auth-divider">
+        <span>Or sign up with</span>
       </div>
 
       <button
+        type="button"
         onClick={handleGoogleSignUp}
         disabled={loading}
-        className="w-full bg-white hover:bg-gray-100 disabled:bg-gray-300 text-slate-900 font-semibold py-2 px-4 rounded transition flex items-center justify-center gap-2"
+        className="auth-google"
       >
-        <svg className="w-5 h-5" viewBox="0 0 24 24">
+        <svg viewBox="0 0 24 24" style={{ width: 18, height: 18 }}>
           <path
             fill="currentColor"
             d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -143,11 +132,8 @@ export default function SignupForm() {
         Google
       </button>
 
-      <p className="mt-4 text-center text-gray-400">
-        Already have an account?{' '}
-        <Link href="/auth/login" className="text-orange-500 hover:underline">
-          Log in
-        </Link>
+      <p className="auth-footer">
+        Already have an account? <Link href="/auth/login">Log in</Link>
       </p>
     </div>
   )

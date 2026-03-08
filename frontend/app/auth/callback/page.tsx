@@ -13,7 +13,7 @@ export default function AuthCallback() {
         // Supabase will handle the callback automatically
         const { data: { session } } = await supabase.auth.getSession()
         if (session) {
-          router.push('/lists')
+          router.push('/')
         } else {
           router.push('/auth/login')
         }
