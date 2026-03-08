@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useAuth } from '@/lib/AuthContext'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { getLists, createList, checkAccess, getMyProfile } from '@/lib/api'
@@ -9,7 +9,7 @@ import ListsView, { type ListItem } from '@/components/ListsView'
 import ListDetailView from '@/components/ListDetailView'
 import TermsConsentModal from '@/components/TermsConsentModal'
 
-export default function Home() {
+function HomeContent() {
   const { user, loading: authLoading, signOut } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -331,5 +331,20 @@ export default function Home() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={
+      <div className="app">
+        <div style={{ padding: '3rem', textAlign: 'center' }}>
+          <div className="spinner"></div>
+          <p>Loading...</p>
+        </div>
+      </div>
+    }>
+      <HomeContent />
+    </Suspense>
   )
 }
