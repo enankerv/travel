@@ -19,6 +19,8 @@ export default function ListDetailView({ list, onBack }: any) {
   const [galleryIndex, setGalleryIndex] = useState(0)
   const [dataLoaded, setDataLoaded] = useState(false)
   const [showPasteModal, setShowPasteModal] = useState(false)
+  const [lastFailedUrl, setLastFailedUrl] = useState('')
+  const [lastFailedPaste, setLastFailedPaste] = useState('')
 
   // Lazy load data only when component mounts (view is active)
   useEffect(() => {
@@ -41,10 +43,23 @@ export default function ListDetailView({ list, onBack }: any) {
           table: 'villas',
           filter: `list_id=eq.${list.id}`,
         },
-        (payload) => {
-          console.log('Villa update received:', payload)
-          // Reload villas when any change occurs
-          loadData()
+        (payload: { eventType?: string; event?: string; new?: any; old?: { id?: string } | Record<string, unknown> }) => {
+          const event = payload.eventType ?? payload.event
+          const newRow = payload.new
+          const oldRow = payload.old
+          setVillas((prev) => {
+            if (event === 'INSERT' && newRow) {
+              return [newRow, ...prev]
+            }
+            if (event === 'UPDATE' && newRow) {
+              return prev.map((v) => (v.id === newRow.id ? newRow : v))
+            }
+            if (event === 'DELETE' && oldRow) {
+              const id = (oldRow as { id?: string }).id
+              if (id != null) return prev.filter((v) => v.id !== id)
+            }
+            return prev
+          })
         }
       )
       .subscribe()
@@ -54,8 +69,8 @@ export default function ListDetailView({ list, onBack }: any) {
     }
   }, [list.id, dataLoaded])
 
-  async function loadData() {
-    setIsLoading(true)
+  async function loadData(silent = false) {
+    if (!silent) setIsLoading(true)
     try {
       const [villasData, membersData] = await Promise.all([
         getVillas(list.id),
@@ -68,12 +83,13 @@ export default function ListDetailView({ list, onBack }: any) {
       console.error('Failed to load data:', err)
       setError('Failed to load data')
     } finally {
-      setIsLoading(false)
+      if (!silent) setIsLoading(false)
     }
   }
 
   async function handleScoutUrl(url: string) {
     setError('')
+    setLastFailedUrl('')
     try {
       const result = await scoutUrl(url, list.id)
       if (result.ok) {
@@ -84,6 +100,7 @@ export default function ListDetailView({ list, onBack }: any) {
           })
         }
       } else {
+        setLastFailedUrl(url)
         if (Notification.permission === 'granted') {
           new Notification('Scouting Failed', {
             body: result.error || 'Failed to scout villa',
@@ -93,6 +110,7 @@ export default function ListDetailView({ list, onBack }: any) {
         setError(result.error || 'Failed to scout villa')
       }
     } catch (err: any) {
+      setLastFailedUrl(url)
       setError(err.message || 'Failed to scout villa')
       if (Notification.permission === 'granted') {
         new Notification('Error', {
@@ -105,6 +123,7 @@ export default function ListDetailView({ list, onBack }: any) {
 
   async function handleScoutPaste(text: string) {
     setError('')
+    setLastFailedPaste('')
     setShowPasteModal(false)
     try {
       const result = await scoutPaste(text, list.id)
@@ -116,6 +135,7 @@ export default function ListDetailView({ list, onBack }: any) {
           })
         }
       } else {
+        setLastFailedPaste(text)
         setError(result.error || 'Failed to process paste')
         if (Notification.permission === 'granted') {
           new Notification('Error', {
@@ -125,6 +145,7 @@ export default function ListDetailView({ list, onBack }: any) {
         }
       }
     } catch (err: any) {
+      setLastFailedPaste(text)
       setError(err.message || 'Failed to process paste')
       if (Notification.permission === 'granted') {
         new Notification('Error', {
@@ -141,6 +162,17 @@ export default function ListDetailView({ list, onBack }: any) {
       Notification.requestPermission()
     }
   }, [])
+
+  async function handleRetryVilla(villa: any) {
+    if (!villa?.original_url) return
+    try {
+      await deleteVilla(list.id, villa.slug)
+      await handleScoutUrl(villa.original_url)
+      // Realtime will fire for delete + new insert, no need to loadData
+    } catch (err: any) {
+      setError(err.message || 'Failed to retry')
+    }
+  }
 
   async function handleDeleteVilla(villaId: string) {
     if (!confirm('Delete this villa?')) return
@@ -161,7 +193,7 @@ export default function ListDetailView({ list, onBack }: any) {
       const villa = villas.find((v: any) => v.id === villaId)
       if (villa) {
         await updateVilla(list.id, villa.slug, updatedData)
-        await loadData()
+        await loadData(true)  // silent - Realtime will also fire
       }
     } catch (err: any) {
       setError(err.message || 'Failed to update villa')
@@ -272,9 +304,40 @@ export default function ListDetailView({ list, onBack }: any) {
                   borderRadius: '8px',
                   color: 'var(--red)',
                   flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '1rem',
                 }}
               >
-                {error}
+                <span>{error}</span>
+                {(lastFailedUrl || lastFailedPaste) && (
+                  <button
+                    onClick={() => {
+                      if (lastFailedUrl) {
+                        setLastFailedUrl('')
+                        setError('')
+                        handleScoutUrl(lastFailedUrl)
+                      } else if (lastFailedPaste) {
+                        setShowPasteModal(true)
+                        setError('')
+                      }
+                    }}
+                    style={{
+                      background: 'var(--red)',
+                      color: '#fff',
+                      border: 'none',
+                      padding: '0.35rem 0.75rem',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                      flexShrink: 0,
+                    }}
+                  >
+                    Retry
+                  </button>
+                )}
               </div>
             )}
 
@@ -285,6 +348,7 @@ export default function ListDetailView({ list, onBack }: any) {
                 onDelete={handleDeleteVilla}
                 onUpdate={handleUpdateVilla}
                 onImageClick={handleImageClick}
+                onRetry={handleRetryVilla}
               />
             </div>
           </div>
@@ -410,9 +474,10 @@ export default function ListDetailView({ list, onBack }: any) {
       {/* Paste Modal */}
       <PasteModal
         isOpen={showPasteModal}
-        onClose={() => setShowPasteModal(false)}
+        onClose={() => { setShowPasteModal(false); setLastFailedPaste('') }}
         onSubmit={handleScoutPaste}
         isLoading={false}
+        initialText={lastFailedPaste}
       />
     </>
   )

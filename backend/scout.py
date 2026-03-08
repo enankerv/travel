@@ -11,7 +11,11 @@ from utils.text_cleaning import (
     strip_other_villas_block, extract_main_property_only, is_thin_scrape
 )
 from utils.images import (
-    pick_best_images_from_media, download_images, extract_image_urls_from_text, fetch_og_image
+    pick_best_images_from_media,
+    download_images,
+    upload_images_to_supabase,
+    extract_image_urls_from_text,
+    fetch_og_image,
 )
 from utils.crawler import crawl_page
 from utils.extraction import extract_villa_two_pass
@@ -77,8 +81,14 @@ async def generate_villa_page(
         title = listing.villa_name
 
     slug = generate_slug(title)
-    image_paths = await download_images(crawl_image_urls, slug)
-    print(f"[IMG] Saved {len(image_paths)} images")
+
+    # Prefer Supabase Storage when we have villa_id
+    image_urls: list[str] = []
+    if villa_id:
+        image_urls = await upload_images_to_supabase(crawl_image_urls, villa_id) or []
+    if not image_urls:
+        image_urls = await download_images(crawl_image_urls, slug)
+    print(f"[IMG] Saved {len(image_urls)} images")
 
     # Try to import db_lists for Supabase support
     try:
@@ -88,7 +98,7 @@ async def generate_villa_page(
             villa_obj["title"] = title
             villa_obj["slug"] = slug
             villa_obj["original_url"] = url
-            villa_obj["images"] = image_paths
+            villa_obj["images"] = image_urls
             result = update_villa(villa_id, villa_obj, auth_token=auth_token)
             print(f"[OK] Success! Villa updated in Supabase")
             return {"path": f"/villas/{slug}", "thin_scrape": False, "villa_id": villa_id}
@@ -96,7 +106,7 @@ async def generate_villa_page(
         log.warning("failed to update villa in Supabase: %s, falling back to JSON", e)
     
     # Fallback to JSON
-    save_villa_json(slug, title, listing, url, image_paths)
+    save_villa_json(slug, title, listing, url, image_urls)
     print(f"[OK] Success! Villa data saved")
     return {"path": f"/villas/{slug}", "thin_scrape": False, "villa_id": villa_id}
 
@@ -139,9 +149,13 @@ async def generate_villa_page_from_paste(
         else:
             print("[IMG] No images found in paste text")
 
-    image_paths = await download_images(image_candidates, slug)
-    if image_paths:
-        print(f"[IMG] Saved {len(image_paths)} images")
+    image_urls: list[str] = []
+    if villa_id and image_candidates:
+        image_urls = await upload_images_to_supabase(image_candidates, villa_id) or []
+    if not image_urls and image_candidates:
+        image_urls = await download_images(image_candidates, slug)
+    if image_urls:
+        print(f"[IMG] Saved {len(image_urls)} images")
 
     # Try to save/update in Supabase
     try:
@@ -151,7 +165,7 @@ async def generate_villa_page_from_paste(
             villa_obj["title"] = title
             villa_obj["slug"] = slug
             villa_obj["original_url"] = original_url
-            villa_obj["images"] = image_paths
+            villa_obj["images"] = image_urls
             result = update_villa(villa_id, villa_obj, auth_token=auth_token)
             print(f"[OK] Success! Villa updated in Supabase")
             return {"path": f"/villas/{slug}", "villa_id": villa_id}
@@ -159,7 +173,7 @@ async def generate_villa_page_from_paste(
         log.warning("failed to update villa in Supabase: %s, falling back to JSON", e)
     
     # Fallback to JSON
-    save_villa_json(slug, title, listing, original_url, image_paths)
+    save_villa_json(slug, title, listing, original_url, image_urls)
     print(f"[OK] Success! Villa data saved")
     return {"path": f"/villas/{slug}", "villa_id": villa_id}
 

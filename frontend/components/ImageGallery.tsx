@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { resolveImageUrl } from "@/lib/api";
 
 export default function ImageGallery({ images, initialIndex = 0, onClose }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -34,7 +35,7 @@ export default function ImageGallery({ images, initialIndex = 0, onClose }) {
     <div className="gallery-modal-overlay open">
       <div className="gallery-container">
         <img
-          src={currentImage}
+          src={resolveImageUrl(currentImage)}
           alt={`Image ${currentIndex + 1}`}
           className="gallery-image"
         />

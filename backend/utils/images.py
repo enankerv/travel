@@ -1,4 +1,5 @@
 """Image handling, filtering, and downloading utilities."""
+import io
 import re
 import logging
 from pathlib import Path
@@ -9,6 +10,7 @@ import httpx
 log = logging.getLogger("scout.images")
 
 IMAGES_DIR = Path("site/images")
+SUPABASE_BUCKET = "villa-images"
 
 # Regex patterns for image extraction
 MD_IMAGE_RE = re.compile(r"!\[[^\]]*\]\((https?://[^\s\)]+\.(?:jpe?g|png|webp))\)", re.IGNORECASE)
@@ -83,6 +85,50 @@ async def download_images(image_urls: list[str], slug: str, max_images: int = 5)
             except Exception as e:
                 log.warning("failed to download image %s: %s", url[:80], e)
     return saved
+
+
+async def upload_images_to_supabase(
+    image_urls: list[str],
+    villa_id: str,
+    max_images: int = 5,
+) -> list[str] | None:
+    """Download images from URLs and upload to Supabase Storage. Returns storage paths (villa_id/filename) or None on failure."""
+    import os
+    from supabase import create_client
+
+    url = os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
+    if not url or not key:
+        log.warning("Supabase credentials missing for storage upload")
+        return None
+
+    client = create_client(url, key)
+    bucket = client.storage.from_(SUPABASE_BUCKET)
+    public_urls: list[str] = []
+
+    async with httpx.AsyncClient(follow_redirects=True, timeout=15) as client_http:
+        for i, img_url in enumerate(image_urls[:max_images]):
+            try:
+                r = await client_http.get(img_url)
+                if r.status_code != 200:
+                    continue
+                ct = r.headers.get("content-type", "")
+                ext = "jpg"
+                if "png" in ct:
+                    ext = "png"
+                elif "webp" in ct:
+                    ext = "webp"
+                elif "gif" in ct:
+                    ext = "gif"
+                path = f"{villa_id}/{i:02d}.{ext}"
+                file_obj = io.BytesIO(r.content)
+                bucket.upload(path, file_obj, file_options={"content-type": ct or f"image/{ext}"})
+                public_urls.append(path)
+                log.info("uploaded image to Supabase: %s", path)
+            except Exception as e:
+                log.warning("failed to upload image %s: %s", img_url[:80], e)
+
+    return public_urls if public_urls else None
 
 
 def pick_best_images_from_media(media: dict, villa_name: str = "", base_url: str = "", max_images: int = 1) -> list[str]:

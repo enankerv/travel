@@ -1,6 +1,13 @@
 import { supabase } from './supabase'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
+/** Resolve image URL - Supabase Storage URLs work as-is; relative paths use API origin */
+export function resolveImageUrl(url: string): string {
+  if (!url) return ''
+  if (url.startsWith('http://') || url.startsWith('https://')) return url
+  return `${API_URL}${url.startsWith('/') ? '' : '/'}${url}`
+}
 
 async function getAuthHeaders() {
   const { data: { session } } = await supabase.auth.getSession()

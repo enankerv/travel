@@ -304,11 +304,12 @@ async def revoke_invite_endpoint(token: str, authorization: Optional[str] = Head
 
 @router.get("/lists/{list_id}/villas", response_model=list[VillaResponse])
 async def get_villas_endpoint(list_id: str, authorization: Optional[str] = Header(None)):
-    """Get all villas in a list."""
+    """Get all villas in a list. Image paths are signed for private bucket access."""
     try:
+        from utils.storage_urls import sign_villa_images
         token = extract_auth_token(authorization)
         villas = get_list_villas(list_id, token)
-        return villas
+        return [sign_villa_images(v) for v in villas]
     except HTTPException:
         raise
     except Exception as e:
@@ -319,11 +320,12 @@ async def get_villas_endpoint(list_id: str, authorization: Optional[str] = Heade
 async def update_villa_endpoint(list_id: str, villa_slug: str, updates: dict, authorization: Optional[str] = Header(None)):
     """Update villa fields."""
     try:
+        from utils.storage_urls import sign_villa_images
         token = extract_auth_token(authorization)
         result = update_villa_by_slug(list_id, villa_slug, updates, token)
         if not result:
             raise HTTPException(status_code=404, detail="Villa not found")
-        return {"ok": True, "villa": result}
+        return {"ok": True, "villa": sign_villa_images(result)}
     except HTTPException:
         raise
     except Exception as e:

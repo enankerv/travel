@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { resolveImageUrl } from '@/lib/api'
 
 export default function VillaRow({
   villa,
@@ -9,6 +10,7 @@ export default function VillaRow({
   onEditEnd,
   onDelete,
   onImageClick,
+  onRetry,
 }: any) {
   const [editData, setEditData] = useState(villa)
 
@@ -83,13 +85,24 @@ export default function VillaRow({
           {villa.scrap_error || 'Error while processing listing'}
         </td>
         <td className="col-catch">
-          <button
-            className="row-action-btn trash"
-            onClick={() => onDelete && onDelete()}
-            title="Delete"
-          >
-            🗑
-          </button>
+          <div className="row-actions">
+            {villa.original_url && onRetry && (
+              <button
+                className="row-action-btn"
+                onClick={() => onRetry()}
+                title="Retry"
+              >
+                ↻
+              </button>
+            )}
+            <button
+              className="row-action-btn trash"
+              onClick={() => onDelete && onDelete()}
+              title="Delete"
+            >
+              🗑
+            </button>
+          </div>
         </td>
       </tr>
     )
@@ -100,7 +113,7 @@ export default function VillaRow({
       <tr>
         <td className="col-thumb">
           {villa.images && villa.images.length > 0 ? (
-            <img src={villa.images[0]} alt={villa.villa_name} className="thumb" />
+            <img src={resolveImageUrl(villa.images[0])} alt={villa.villa_name} className="thumb" />
           ) : (
             <div className="thumb-placeholder">—</div>
           )}
@@ -195,7 +208,7 @@ export default function VillaRow({
       <td className="col-thumb">
         {villa.images && villa.images.length > 0 ? (
           <div className="thumb-link" onClick={handleImageClick} title="Click to view images">
-            <img src={villa.images[0]} alt={villa.villa_name} className="thumb" />
+            <img src={resolveImageUrl(villa.images[0])} alt={villa.villa_name} className="thumb" />
           </div>
         ) : (
           <div className="thumb-placeholder">—</div>

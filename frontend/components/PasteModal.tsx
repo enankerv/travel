@@ -1,9 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
-export default function PasteModal({ isOpen, onClose, onSubmit, isLoading }) {
-  const [text, setText] = useState('')
+export default function PasteModal({ isOpen, onClose, onSubmit, isLoading, initialText = '' }) {
+  const [text, setText] = useState(initialText)
+
+  useEffect(() => {
+    if (isOpen) setText(initialText)
+  }, [isOpen, initialText])
 
   const handleSubmit = () => {
     if (text.trim()) {
