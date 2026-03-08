@@ -108,10 +108,10 @@ export default function ListsView({
                       {list.description || '—'}
                     </td>
                     <td style={{ textAlign: 'center' }}>
-                      {list.villas?.length || 0}
+                      {list.villa_count}
                     </td>
                     <td style={{ textAlign: 'center' }}>
-                      {(list.list_members?.length || 0) + 1}
+                      {list.member_count}
                     </td>
                   </tr>
                 ))

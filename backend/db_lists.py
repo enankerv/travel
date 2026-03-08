@@ -48,15 +48,50 @@ def create_list(user_id: str, name: str, description: str = None, auth_token: st
 def get_user_lists(auth_token: str) -> list[dict]:
     """Get all lists for a user (owned + member of).
     RLS automatically filters to user's accessible lists.
+    Includes villa_count and member_count for each list.
     """
     client = get_supabase_client(auth_token)
     response = (
         client.table("lists")
-        .select("*, list_members(user_id, role)")
+        .select("*")
         .order("created_at", desc=True)
         .execute()
     )
-    return response.data or []
+    data = response.data or []
+    if not data:
+        return data
+
+    list_ids = [lst["id"] for lst in data]
+
+    # Fetch list_members in one query
+    members_resp = (
+        client.table("list_members")
+        .select("list_id, user_id, role")
+        .in_("list_id", list_ids)
+        .execute()
+    )
+    members_by_list: dict[str, list] = {lid: [] for lid in list_ids}
+    for m in members_resp.data or []:
+        lid = m.get("list_id")
+        if lid:
+            members_by_list.setdefault(lid, []).append(m)
+
+    # Fetch villa counts per list
+    for lst in data:
+        members = members_by_list.get(lst["id"], [])
+        lst["member_count"] = len(members) + 1  # +1 for list creator (admin); creator is not in list_members
+        try:
+            count_resp = (
+                client.table("villas")
+                .select("id", count="exact")
+                .eq("list_id", lst["id"])
+                .limit(0)
+                .execute()
+            )
+            lst["villa_count"] = getattr(count_resp, "count", None) or 0
+        except Exception:
+            lst["villa_count"] = 0
+    return data
 
 
 def get_list_by_id(list_id: str, auth_token: str) -> dict:

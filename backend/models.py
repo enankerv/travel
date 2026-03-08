@@ -30,7 +30,8 @@ class ListResponse(BaseModel):
     description: Optional[str] = None
     created_at: str
     updated_at: str
-    list_members: Optional[list[ListMember]] = None
+    villa_count: int = 0
+    member_count: int = 0
 
 
 # ============================================================================
