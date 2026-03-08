@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/AuthContext'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { getLists, createList, checkAccess, getMyProfile } from '@/lib/api'
 import { TERMS_UPDATED_AT } from '@/lib/constants'
 import ListsView, { type ListItem } from '@/components/ListsView'
@@ -12,6 +12,8 @@ import TermsConsentModal from '@/components/TermsConsentModal'
 export default function Home() {
   const { user, loading: authLoading, signOut } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const listParam = searchParams.get('list')
   const [lists, setLists] = useState<ListItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedListId, setSelectedListId] = useState<string | null>(null)
@@ -92,6 +94,10 @@ export default function Home() {
     try {
       const data = await getLists()
       setLists(data || [])
+      if (listParam && data?.some((l: ListItem) => l.id === listParam)) {
+        setSelectedListId(listParam)
+        router.replace('/', { scroll: false })
+      }
     } catch (err) {
       console.error('Failed to load lists:', err)
       setError('Failed to load lists')
