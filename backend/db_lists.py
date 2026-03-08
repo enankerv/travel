@@ -221,7 +221,7 @@ def create_invite_token(
 
 
 def get_invite_token(token: str, auth_token: str = None) -> dict:
-    """Get invite token details (for accepting invites)."""
+    """Get invite token details. For invitees (accept flow), use get_invite_for_accept_rpc instead."""
     client = get_supabase_client(auth_token)
     response = (
         client.table("invite_tokens")
@@ -248,25 +248,28 @@ def get_invite_token(token: str, auth_token: str = None) -> dict:
     return token_data
 
 
-def accept_invite(token: str, user_id: str, auth_token: str) -> dict:
-    """Accept an invite and add user to list."""
-    token_data = get_invite_token(token, auth_token)
-    if not token_data:
-        raise ValueError("Invalid or expired invite token")
-
-    list_id = token_data["lists"]["id"]
-    role = token_data["role"]
-
-    # Add user to list
-    member = add_list_member(list_id, user_id, role, invited_by=token_data["created_by"], auth_token=auth_token)
-
-    # Increment token uses
+def get_invite_for_accept_rpc(token: str, auth_token: str) -> dict | None:
+    """Get invite details via RPC - returns one row only, no enumeration. For invitee flow."""
     client = get_supabase_client(auth_token)
-    client.table("invite_tokens").update({"uses_count": token_data["uses_count"] + 1}).eq(
-        "token", token
-    ).execute()
+    response = client.rpc("get_invite_for_accept", {"lookup_token": token}).execute()
+    data = response.data
+    if data is None or (isinstance(data, list) and not data):
+        return None
+    if isinstance(data, list):
+        return data[0] if data else None
+    return data
 
-    return member
+
+def accept_invite(token: str, user_id: str, auth_token: str) -> dict:
+    """Accept an invite via RPC (bypasses RLS so invitee can add themselves)."""
+    client = get_supabase_client(auth_token)
+    response = client.rpc("accept_invite_rpc", {"lookup_token": token, "joining_user_id": user_id}).execute()
+    data = response.data
+    if not data:
+        raise ValueError("Invalid or expired invite token")
+    result = data[0] if isinstance(data, list) else data
+    member = result.get("member") if isinstance(result, dict) else result
+    return member or result
 
 
 def list_invite_tokens(list_id: str, auth_token: str) -> list[dict]:

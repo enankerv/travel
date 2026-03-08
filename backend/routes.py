@@ -10,7 +10,7 @@ from models import (
 from db_lists import (
     create_list, get_user_lists, get_list_by_id, update_list, delete_list,
     add_list_member, get_list_members, update_member_role, remove_list_member,
-    create_invite_token, get_invite_token, accept_invite, list_invite_tokens, revoke_invite_token,
+    create_invite_token, get_invite_token, get_invite_for_accept_rpc, accept_invite, list_invite_tokens, revoke_invite_token,
     insert_villa, get_list_villas, get_villa_by_slug, update_villa, update_villa_by_slug, delete_villa, delete_villa_by_slug,
 )
 
@@ -243,17 +243,18 @@ async def create_invite_endpoint(list_id: str, req: CreateInvite, created_by: st
 
 
 @router.get("/invites/{token}", response_model=InviteTokenDetails)
-async def get_invite_endpoint(token: str):
-    """Get invite details (for accepting)."""
+async def get_invite_endpoint(token: str, authorization: Optional[str] = Header(None)):
+    """Get invite details via RPC - returns one row only, no token enumeration."""
     try:
-        invite = get_invite_token(token)
+        token_auth = extract_auth_token(authorization)
+        invite = get_invite_for_accept_rpc(token, token_auth)
         if not invite:
             raise HTTPException(status_code=404, detail="Invalid or expired invite token")
         return {
             "token": token,
             "role": invite["role"],
             "list_id": invite["list_id"],
-            "list_name": invite["lists"]["name"],
+            "list_name": invite["list_name"],
             "expires_at": invite.get("expires_at"),
             "uses_count": invite["uses_count"],
             "max_uses": invite.get("max_uses"),
