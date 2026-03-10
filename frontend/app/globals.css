@@ -257,8 +257,9 @@ button:focus-visible {
 .col-price {
   width: 14%;
 }
-.col-pool {
-  width: 10%;
+.col-amenities {
+  width: 18%;
+  max-width: 200px;
 }
 .col-catch {
   width: auto;

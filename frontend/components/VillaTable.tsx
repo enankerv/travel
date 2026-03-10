@@ -50,7 +50,7 @@ export default function VillaTable({ villas, isLoading, onDelete, onUpdate, onIm
               <th className="col-baths">Baths</th>
               <th className="col-guests">Guests</th>
               <th className="col-price">Price/Week</th>
-              <th className="col-pool">Pool</th>
+              <th className="col-amenities">Amenities</th>
               <th className="col-catch">Actions</th>
             </tr>
           </thead>

@@ -13,7 +13,8 @@ SUPABASE_BUCKET = "villa-images"
 # Regex patterns for image extraction
 MD_IMAGE_RE = re.compile(r"!\[[^\]]*\]\((https?://[^\s\)]+\.(?:jpe?g|png|webp))\)", re.IGNORECASE)
 BARE_IMAGE_RE = re.compile(r"(?<!\()(?<!\])\b(https?://[^\s\)\]]+\.(?:jpe?g|png|webp))(?:\?[^\s\)\]]*)?", re.IGNORECASE)
-AIRBNB_PHOTO_RE = re.compile(r"(https?://a0\.muscache\.com/im/pictures/[^\s\)\]\"'<>]+)", re.IGNORECASE)
+# Airbnb uses a0, a1, a2 muscache subdomains
+AIRBNB_PHOTO_RE = re.compile(r"(https?://a[0-9]?\.?muscache\.com/im/pictures/[^\s\)\]\"'<>]+)", re.IGNORECASE)
 
 SIZE_SUFFIX_RE = re.compile(r"[-_]\d+x\d+")
 URL_DIMS_RE = re.compile(r"[-_](\d+)x(\d+)")
