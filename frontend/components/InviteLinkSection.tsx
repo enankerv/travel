@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getListInvites, createInvite } from "@/lib/api";
+import { getListInvites, createInvite, revokeInvite } from "@/lib/api";
 
 type InviteLinkSectionProps = {
   listId: string;
@@ -10,8 +10,10 @@ type InviteLinkSectionProps = {
 
 export default function InviteLinkSection({ listId, onError }: InviteLinkSectionProps) {
   const [inviteLink, setInviteLink] = useState("");
+  const [inviteToken, setInviteToken] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isRevoking, setIsRevoking] = useState(false);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -23,6 +25,7 @@ export default function InviteLinkSection({ listId, onError }: InviteLinkSection
         const invites = data?.invites || [];
         const active = invites.find((i: any) => i.is_active !== false);
         if (active?.token && typeof window !== "undefined") {
+          setInviteToken(active.token);
           setInviteLink(`${window.location.origin}/join/${active.token}`);
         }
       })
@@ -39,11 +42,27 @@ export default function InviteLinkSection({ listId, onError }: InviteLinkSection
     setIsRegenerating(true);
     try {
       const invite = await createInvite(listId, "editor");
+      setInviteToken(invite.token);
       setInviteLink(`${window.location.origin}/join/${invite.token}`);
     } catch (err: any) {
       onError(err.message || "Failed to create invite");
     } finally {
       setIsRegenerating(false);
+    }
+  }
+
+  async function handleRevoke() {
+    if (!inviteToken) return;
+    if (!confirm("Revoke this invite link? Anyone with the link will no longer be able to join.")) return;
+    setIsRevoking(true);
+    try {
+      await revokeInvite(inviteToken);
+      setInviteLink("");
+      setInviteToken("");
+    } catch (err: any) {
+      onError(err.message || "Failed to revoke invite");
+    } finally {
+      setIsRevoking(false);
     }
   }
 
@@ -81,6 +100,9 @@ export default function InviteLinkSection({ listId, onError }: InviteLinkSection
                 >
                   Regenerate invite link
                 </button>
+                <button type="button" disabled className="invite-link-section__btn-delete">
+                  Delete link
+                </button>
               </div>
             </>
           ) : (
@@ -100,9 +122,18 @@ export default function InviteLinkSection({ listId, onError }: InviteLinkSection
                 <button
                   type="button"
                   onClick={handleRegenerate}
+                  disabled={isRevoking}
                   className="invite-link-section__btn-regen"
                 >
                   Regenerate invite link
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRevoke}
+                  disabled={isRevoking}
+                  className="invite-link-section__btn-delete"
+                >
+                  {isRevoking ? "Revoking…" : "Delete link"}
                 </button>
               </div>
             </>

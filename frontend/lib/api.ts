@@ -183,6 +183,13 @@ export async function getListInvites(listId: string): Promise<{ invites: Array<{
   return res.json()
 }
 
+/** Revoke an invite token (admin). After this, the link will no longer work. */
+export async function revokeInvite(token: string) {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_URL}/api/invites/${token}`, { method: 'DELETE', headers })
+  if (!res.ok) throw new Error('Failed to revoke invite')
+}
+
 export async function getInviteDetails(token: string) {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_URL}/api/invites/${token}`, { headers })

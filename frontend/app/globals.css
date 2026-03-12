@@ -687,6 +687,26 @@ button:focus-visible {
   cursor: not-allowed;
 }
 
+.invite-link-section__btn-delete {
+  background: transparent;
+  border: 1px solid var(--light);
+  color: var(--light);
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.invite-link-section__btn-delete:hover:not(:disabled) {
+  border-color: #c53030;
+  color: #c53030;
+}
+
+.invite-link-section__btn-delete:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .invite-link-section__btn-generate {
   background: var(--accent);
   color: #fff;
