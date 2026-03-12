@@ -1,6 +1,6 @@
 -- RLS: Require terms_accepted_at and age_verified_at for all data access.
 -- Run after supabase_age_verified.sql. Users without both are denied.
--- The API also enforces terms_accepted_at >= TERMS_UPDATED_AT.
+-- terms_accepted_at must be >= TERMS_CUTOFF (bump when you update Terms/Privacy; keep in sync with app TERMS_UPDATED_AT).
 
 CREATE OR REPLACE FUNCTION public.user_has_verified_terms_and_age()
 RETURNS boolean
@@ -10,7 +10,11 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
   SELECT COALESCE(
-    (SELECT (p.terms_accepted_at IS NOT NULL AND p.age_verified_at IS NOT NULL)
+    (SELECT (
+       p.terms_accepted_at IS NOT NULL
+       AND p.age_verified_at IS NOT NULL
+       AND p.terms_accepted_at >= '2025-03-07T00:00:00+00'::timestamptz
+     )
      FROM profiles p WHERE p.id = auth.uid()),
     false
   );
