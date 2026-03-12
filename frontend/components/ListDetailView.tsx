@@ -100,6 +100,7 @@ import {
   updateVilla,
   createInvite,
   getListMembers,
+  removeListMember,
 } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
 import { useListVillasRealtime, useListPresence, PresenceUser } from "@/lib/realtime";
@@ -126,6 +127,7 @@ export default function ListDetailView({ list, onBack }: any) {
   const [pasteVilla, setPasteVilla] = useState<any>(null); // When set, paste updates this villa (thin/error)
   const [lastFailedUrl, setLastFailedUrl] = useState("");
   const [lastFailedPaste, setLastFailedPaste] = useState("");
+  const [isLeaving, setIsLeaving] = useState(false);
 
   // Lazy load data only when component mounts (view is active)
   useEffect(() => {
@@ -305,6 +307,20 @@ export default function ListDetailView({ list, onBack }: any) {
       setInviteLink(`${window.location.origin}/join/${invite.token}`);
     } catch (err: any) {
       setError(err.message || "Failed to create invite");
+    }
+  }
+
+  async function handleLeaveList() {
+    if (!user) return;
+    if (!confirm("Leave this list? You can rejoin later with an invite link.")) return;
+    setIsLeaving(true);
+    try {
+      await removeListMember(list.id, user.id);
+      onBack();
+    } catch (err: any) {
+      setError(err.message || "Failed to leave list");
+    } finally {
+      setIsLeaving(false);
     }
   }
 
@@ -654,6 +670,30 @@ export default function ListDetailView({ list, onBack }: any) {
                     />
                   ))}
               </div>
+              {(() => {
+                const currentMember = members.find((m: any) => m.user_id === user?.id);
+                const canLeave = currentMember && !currentMember.is_creator;
+                if (!canLeave) return null;
+                return (
+                  <div style={{ marginTop: "1.5rem", paddingTop: "1rem", borderTop: "1px solid var(--border)" }}>
+                    <button
+                      onClick={handleLeaveList}
+                      disabled={isLeaving}
+                      style={{
+                        background: "transparent",
+                        border: "1px solid var(--muted)",
+                        color: "var(--muted)",
+                        padding: "0.5rem 1rem",
+                        borderRadius: "6px",
+                        cursor: isLeaving ? "not-allowed" : "pointer",
+                        fontSize: "0.9rem",
+                      }}
+                    >
+                      {isLeaving ? "Leaving…" : "Leave list"}
+                    </button>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         )}

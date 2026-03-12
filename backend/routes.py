@@ -202,7 +202,7 @@ async def update_member_endpoint(list_id: str, user_id: str, req: UpdateMemberRo
 
 @router.delete("/lists/{list_id}/members/{user_id}")
 async def remove_member_endpoint(list_id: str, user_id: str, authorization: Optional[str] = Header(None)):
-    """Remove a user from a list. Only admin can do this."""
+    """Remove a user from a list. Caller can remove themselves (leave list) or list owner can remove any member."""
     try:
         token = extract_auth_token(authorization)
         success = remove_list_member(list_id, user_id, token)

@@ -137,6 +137,12 @@ CREATE POLICY "List creators can remove members"
     )
   );
 
+-- Allow users to remove themselves (leave list)
+DROP POLICY IF EXISTS "Users can remove themselves from a list" ON list_members;
+CREATE POLICY "Users can remove themselves from a list"
+  ON list_members FOR DELETE
+  USING (user_has_verified_terms_and_age() AND user_id = auth.uid());
+
 -- Villas: require verification (use SECURITY DEFINER helpers to avoid recursion)
 DROP POLICY IF EXISTS "Users can view villas in their lists" ON villas;
 CREATE POLICY "Users can view villas in their lists"
