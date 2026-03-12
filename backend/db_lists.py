@@ -203,7 +203,7 @@ def create_invite_token(
     max_uses: int = None,
     auth_token: str = None,
 ) -> dict:
-    """Create a shareable invite link token."""
+    """Create a shareable invite link token. Revokes any other active tokens for this list."""
     client = get_supabase_client(auth_token)
     token = secrets.token_urlsafe(32)
     expires_at = (datetime.utcnow() + timedelta(days=expires_in_days)).isoformat()
@@ -217,7 +217,16 @@ def create_invite_token(
         "max_uses": max_uses,
     }
     response = client.table("invite_tokens").insert(data).execute()
-    return response.data[0] if response.data else None
+    new_row = response.data[0] if response.data else None
+    if not new_row:
+        return None
+
+    # Revoke all other tokens for this list so only one link is valid at a time
+    client.table("invite_tokens").update({"is_active": False}).eq(
+        "list_id", list_id
+    ).neq("id", new_row["id"]).execute()
+
+    return new_row
 
 
 def get_invite_token(token: str, auth_token: str = None) -> dict:

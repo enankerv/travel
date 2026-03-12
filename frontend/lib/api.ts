@@ -175,6 +175,14 @@ export async function createInvite(listId: string, role: string = 'viewer') {
   return res.json()
 }
 
+/** List invite tokens for a list (admin). Used to show current link on Members page. */
+export async function getListInvites(listId: string): Promise<{ invites: Array<{ token: string; is_active: boolean; expires_at?: string }> }> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_URL}/api/lists/${listId}/invites`, { headers })
+  if (!res.ok) throw new Error('Failed to fetch invites')
+  return res.json()
+}
+
 export async function getInviteDetails(token: string) {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_URL}/api/invites/${token}`, { headers })

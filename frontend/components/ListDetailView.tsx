@@ -99,6 +99,7 @@ import {
   deleteVilla,
   updateVilla,
   createInvite,
+  getListInvites,
   getListMembers,
   removeListMember,
 } from "@/lib/api";
@@ -108,6 +109,7 @@ import DropZone from "./DropZone";
 import VillaTable from "./VillaTable";
 import PasteModal from "./PasteModal";
 import ImageGallery from "./ImageGallery";
+import InviteLinkSection from "./InviteLinkSection";
 
 
 export default function ListDetailView({ list, onBack }: any) {
@@ -128,6 +130,8 @@ export default function ListDetailView({ list, onBack }: any) {
   const [lastFailedUrl, setLastFailedUrl] = useState("");
   const [lastFailedPaste, setLastFailedPaste] = useState("");
   const [isLeaving, setIsLeaving] = useState(false);
+  const [inviteLinkCopied, setInviteLinkCopied] = useState(false);
+  const [isRegeneratingInvite, setIsRegeneratingInvite] = useState(false);
 
   // Lazy load data only when component mounts (view is active)
   useEffect(() => {
@@ -155,13 +159,22 @@ export default function ListDetailView({ list, onBack }: any) {
   async function loadData(silent = false) {
     if (!silent) setIsLoading(true);
     try {
-      const [villasData, membersData] = await Promise.all([
+      const [villasData, membersData, invitesData] = await Promise.all([
         getVillas(list.id),
         getListMembers(list.id),
+        getListInvites(list.id),
       ]);
       setVillas(villasData || []);
       setMembers(membersData?.members || []);
       setDataLoaded(true);
+      // Show current invite link if there is an active one
+      const invites = invitesData?.invites || [];
+      const active = invites.find((i: any) => i.is_active !== false);
+      if (active?.token && typeof window !== "undefined") {
+        setInviteLink(`${window.location.origin}/join/${active.token}`);
+      } else {
+        setInviteLink("");
+      }
     } catch (err) {
       console.error("Failed to load data:", err);
       setError("Failed to load data");
@@ -302,11 +315,14 @@ export default function ListDetailView({ list, onBack }: any) {
   }
 
   async function handleCreateInvite() {
+    setIsRegeneratingInvite(true);
     try {
       const invite = await createInvite(list.id, "editor");
       setInviteLink(`${window.location.origin}/join/${invite.token}`);
     } catch (err: any) {
       setError(err.message || "Failed to create invite");
+    } finally {
+      setIsRegeneratingInvite(false);
     }
   }
 
@@ -575,68 +591,17 @@ export default function ListDetailView({ list, onBack }: any) {
             }}
           >
             {/* Share Section */}
-            <div style={{ marginBottom: "2rem" }}>
-              <h3 style={{ marginBottom: "1rem", color: "var(--light)" }}>
-                Share This List
-              </h3>
-              {inviteLink ? (
-                <div
-                  style={{
-                    padding: "1rem",
-                    background: "var(--green-soft)",
-                    border: "1px solid var(--green)",
-                    borderRadius: "8px",
-                    color: "var(--green)",
-                  }}
-                >
-                  <p style={{ marginBottom: "0.5rem", fontSize: "0.9rem" }}>
-                    Share this link:
-                  </p>
-                  <code
-                    style={{
-                      fontSize: "0.8rem",
-                      wordBreak: "break-all",
-                      display: "block",
-                      marginBottom: "0.75rem",
-                    }}
-                  >
-                    {inviteLink}
-                  </code>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(inviteLink);
-                      setInviteLink("");
-                    }}
-                    style={{
-                      background: "transparent",
-                      border: "1px solid var(--green)",
-                      color: "var(--green)",
-                      padding: "0.25rem 0.75rem",
-                      borderRadius: "4px",
-                      cursor: "pointer",
-                      fontSize: "0.85rem",
-                    }}
-                  >
-                    Copied!
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={handleCreateInvite}
-                  style={{
-                    background: "var(--accent)",
-                    color: "#fff",
-                    padding: "0.6rem 1.25rem",
-                    borderRadius: "8px",
-                    border: "none",
-                    cursor: "pointer",
-                    fontWeight: "600",
-                  }}
-                >
-                  Generate Invite Link
-                </button>
-              )}
-            </div>
+            <InviteLinkSection
+              inviteLink={inviteLink}
+              isRegenerating={isRegeneratingInvite}
+              copied={inviteLinkCopied}
+              onCopy={() => {
+                navigator.clipboard.writeText(inviteLink);
+                setInviteLinkCopied(true);
+                setTimeout(() => setInviteLinkCopied(false), 2000);
+              }}
+              onRegenerate={handleCreateInvite}
+            />
 
             {/* Members List */}
             <div>
