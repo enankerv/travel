@@ -101,21 +101,17 @@ import {
   createInvite,
   getListMembers,
 } from "@/lib/api";
-import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthContext";
+import { useListVillasRealtime, useListPresence, PresenceUser } from "@/lib/realtime";
 import DropZone from "./DropZone";
 import VillaTable from "./VillaTable";
 import PasteModal from "./PasteModal";
 import ImageGallery from "./ImageGallery";
 
-type PresenceUser = {
-  user_id: string;
-  first_name?: string;
-  avatar_url?: string;
-};
 
 export default function ListDetailView({ list, onBack }: any) {
   const { user } = useAuth();
+
   const [activeTab, setActiveTab] = useState<"places" | "members">("places");
   const [villas, setVillas] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
@@ -138,86 +134,21 @@ export default function ListDetailView({ list, onBack }: any) {
     }
   }, []);
 
-  // Subscribe to realtime villa updates + presence (who's viewing)
-  useEffect(() => {
-    if (!dataLoaded || !user) return;
 
-    const meta = user.user_metadata || {};
-    const first_name =
-      meta.full_name ||
-      meta.name ||
-      (user.email ? user.email.split("@")[0] : "") ||
-      user.id.slice(0, 8);
-    const avatar_url = meta.avatar_url || meta.picture || undefined;
-    const presencePayload = { user_id: user.id, first_name, avatar_url };
+  useListVillasRealtime({
+    listId: list.id,
+    enabled: dataLoaded && !!user,
+    onInsert: (row) => setVillas((prev) => [row, ...prev]),
+    onUpdate: (row) => setVillas((prev) => prev.map((v) => (v.id === row.id ? row : v))),
+    onDelete: (id) => setVillas((prev) => prev.filter((v) => v.id !== id)),
+  });
 
-    const channel = supabase.channel(`list:${list.id}`, {
-      config: { presence: { key: user.id } },
-    });
-
-    channel
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "villas",
-          filter: `list_id=eq.${list.id}`,
-        },
-        (payload: {
-          eventType?: string;
-          event?: string;
-          new?: any;
-          old?: { id?: string } | Record<string, unknown>;
-        }) => {
-          const event = payload.eventType ?? payload.event;
-          const newRow = payload.new;
-          const oldRow = payload.old;
-          setVillas((prev) => {
-            if (event === "INSERT" && newRow) {
-              return [newRow, ...prev];
-            }
-            if (event === "UPDATE" && newRow) {
-              return prev.map((v) => (v.id === newRow.id ? newRow : v));
-            }
-            if (event === "DELETE" && oldRow) {
-              const id = (oldRow as { id?: string }).id;
-              if (id != null) return prev.filter((v) => v.id !== id);
-            }
-            return prev;
-          });
-        },
-      )
-      .on("presence", { event: "sync" }, () => {
-        const state = channel.presenceState();
-        const users: PresenceUser[] = [];
-        for (const key of Object.keys(state)) {
-          const presences = state[key] as {
-            user_id?: string;
-            first_name?: string;
-            avatar_url?: string;
-          }[];
-          for (const p of presences) {
-            if (p?.user_id)
-              users.push({
-                user_id: p.user_id,
-                first_name: p.first_name,
-                avatar_url: p.avatar_url,
-              });
-          }
-        }
-        setViewingUsers(users);
-      })
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          channel.track(presencePayload);
-        }
-      });
-
-    return () => {
-      channel.untrack().then(() => channel.unsubscribe());
-    };
-  }, [list.id, dataLoaded, user]);
+  useListPresence({
+    listId: list.id,
+    enabled: dataLoaded && !!user,
+    user,
+    onUsersChange: setViewingUsers,
+  });
 
   async function loadData(silent = false) {
     if (!silent) setIsLoading(true);
@@ -246,8 +177,8 @@ export default function ListDetailView({ list, onBack }: any) {
         if (villaId) {
           setVillas((prev) =>
             prev.map((v) =>
-              v.id === villaId ? { ...v, scrap_status: "loading" } : v
-            )
+              v.id === villaId ? { ...v, scrap_status: "loading" } : v,
+            ),
           );
         }
         if (Notification.permission === "granted") {
@@ -291,8 +222,8 @@ export default function ListDetailView({ list, onBack }: any) {
         if (villaId) {
           setVillas((prev) =>
             prev.map((v) =>
-              v.id === villaId ? { ...v, scrap_status: "loading" } : v
-            )
+              v.id === villaId ? { ...v, scrap_status: "loading" } : v,
+            ),
           );
         }
         if (Notification.permission === "granted") {
@@ -752,4 +683,3 @@ export default function ListDetailView({ list, onBack }: any) {
     </>
   );
 }
-
