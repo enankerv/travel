@@ -1,20 +1,53 @@
 "use client";
 
+import { useState, useEffect } from "react";
+import { getListInvites, createInvite } from "@/lib/api";
+
 type InviteLinkSectionProps = {
-  inviteLink: string;
-  isRegenerating: boolean;
-  copied: boolean;
-  onCopy: () => void;
-  onRegenerate: () => void;
+  listId: string;
+  onError: (message: string) => void;
 };
 
-export default function InviteLinkSection({
-  inviteLink,
-  isRegenerating,
-  copied,
-  onCopy,
-  onRegenerate,
-}: InviteLinkSectionProps) {
+export default function InviteLinkSection({ listId, onError }: InviteLinkSectionProps) {
+  const [inviteLink, setInviteLink] = useState("");
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getListInvites(listId)
+      .then((data) => {
+        if (cancelled) return;
+        const invites = data?.invites || [];
+        const active = invites.find((i: any) => i.is_active !== false);
+        if (active?.token && typeof window !== "undefined") {
+          setInviteLink(`${window.location.origin}/join/${active.token}`);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [listId]);
+
+  async function handleRegenerate() {
+    setIsRegenerating(true);
+    try {
+      const invite = await createInvite(listId, "editor");
+      setInviteLink(`${window.location.origin}/join/${invite.token}`);
+    } catch (err: any) {
+      onError(err.message || "Failed to create invite");
+    } finally {
+      setIsRegenerating(false);
+    }
+  }
+
+  function handleCopy() {
+    navigator.clipboard.writeText(inviteLink);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   return (
     <div className="invite-link-section">
       <h3 className="invite-link-section__title">Share This List</h3>
@@ -54,14 +87,14 @@ export default function InviteLinkSection({
               <div className="invite-link-section__actions invite-link-section__actions--with-link">
                 <button
                   type="button"
-                  onClick={onCopy}
+                  onClick={handleCopy}
                   className="invite-link-section__btn-copy"
                 >
                   {copied ? "Copied!" : "Copy link"}
                 </button>
                 <button
                   type="button"
-                  onClick={onRegenerate}
+                  onClick={handleRegenerate}
                   className="invite-link-section__btn-regen"
                 >
                   Regenerate invite link
@@ -73,7 +106,7 @@ export default function InviteLinkSection({
       ) : (
         <button
           type="button"
-          onClick={onRegenerate}
+          onClick={handleRegenerate}
           disabled={isRegenerating}
           className="invite-link-section__btn-generate"
         >
