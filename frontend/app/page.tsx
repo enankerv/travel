@@ -251,7 +251,10 @@ function HomeContent() {
         {selectedList && (
           <ListDetailView
             list={selectedList}
-            onBack={() => setSelectedListId(null)}
+            onBack={() => {
+              setSelectedListId(null)
+              loadLists()
+            }}
             onUpdate={() => loadLists()}
           />
         )}

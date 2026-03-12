@@ -739,6 +739,16 @@ button:focus-visible {
   opacity: 0.7;
 }
 
+.list-members-tab__delete-btn {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.list-members-tab__delete-btn:hover {
+  color: var(--red);
+  background: var(--red-soft);
+}
+
 /* Member row (in list members tab) */
 .member-row {
   padding: 0.75rem;
