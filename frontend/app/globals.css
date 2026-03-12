@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap");
 
 :root {
   --dark: #111317;
@@ -429,9 +429,13 @@ button:focus-visible {
   border: none;
   cursor: pointer;
   padding: 0;
-  font-size: 0.8rem;
-  color: var(--muted);
+  font-size: 1.2rem;
+  color: var(--light);
   transition: color 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .row-action-btn:hover {
@@ -951,7 +955,6 @@ button:focus-visible {
   flex-direction: column;
 }
 
-
 .img-badge-modal {
   display: inline-block;
   background: var(--green-soft);
@@ -1132,7 +1135,9 @@ button:focus-visible {
   color: var(--light);
   font-size: 0.95rem;
   font-family: inherit;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
 
 .auth-card input:focus {
@@ -1208,7 +1213,9 @@ button:focus-visible {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 
 .auth-card .auth-google:hover:not(:disabled) {
@@ -1268,7 +1275,9 @@ button:focus-visible {
   font-size: 0.9rem;
   font-family: inherit;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 }
 
 .auth-card .auth-cancel:hover:not(:disabled) {
@@ -1280,3 +1289,4 @@ button:focus-visible {
   opacity: 0.6;
   cursor: not-allowed;
 }
+

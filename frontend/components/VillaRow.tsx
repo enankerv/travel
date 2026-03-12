@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls'
 import AmenitiesCell from '@/components/AmenitiesCell'
+import TrashIcon from '@/components/TrashIcon'
 
 export default function VillaRow({
   villa,
@@ -91,7 +92,7 @@ export default function VillaRow({
             onClick={() => onDelete && onDelete()}
             title="Delete"
           >
-            🗑
+            <TrashIcon />
           </button>
         </td>
       </tr>
@@ -130,9 +131,9 @@ export default function VillaRow({
               className="row-action-btn trash"
               onClick={() => onDelete && onDelete()}
               title="Delete"
-            >
-              🗑
-            </button>
+          >
+            <TrashIcon />
+          </button>
           </div>
         </td>
       </tr>
@@ -270,7 +271,7 @@ export default function VillaRow({
             onClick={() => onDelete && onDelete()}
             title="Delete"
           >
-            🗑
+            <TrashIcon />
           </button>
         </div>
       </td>
