@@ -2,13 +2,7 @@
 
 import { useState } from 'react'
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls'
-
-function formatAmenities(arr: string[] | null | undefined): string {
-  if (!arr?.length) return '—'
-  const max = 4
-  const shown = arr.slice(0, max).join(', ')
-  return arr.length > max ? `${shown} +${arr.length - max}` : shown
-}
+import AmenitiesCell from '@/components/AmenitiesCell'
 
 export default function VillaRow({
   villa,
@@ -203,9 +197,7 @@ export default function VillaRow({
             }}
           />
         </td>
-        <td className="col-amenities" title={editData.amenities?.join(', ')}>
-          {formatAmenities(editData.amenities)}
-        </td>
+        <AmenitiesCell amenities={editData.amenities} readOnly />
         <td className="col-catch">
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button
@@ -263,9 +255,7 @@ export default function VillaRow({
       <td className="col-baths">{villa.bathrooms || '—'}</td>
       <td className="col-guests">{villa.max_guests || '—'}</td>
       <td className="col-price">${villa.price_weekly_usd || '—'}</td>
-      <td className="col-amenities" title={villa.amenities?.join(', ')}>
-        {formatAmenities(villa.amenities)}
-      </td>
+      <AmenitiesCell amenities={villa.amenities} />
       <td className="col-catch" onClick={(e) => e.stopPropagation()}>
         <div className="row-actions">
           <button

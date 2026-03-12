@@ -261,6 +261,38 @@ button:focus-visible {
   width: 18%;
   max-width: 200px;
 }
+/* Let the row grow in height and show full text when expanded */
+.sheet td.col-amenities.amenities-expanded {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  vertical-align: top;
+}
+.amenities-expand-btn,
+.amenities-collapse-btn {
+  margin-left: 0.15rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: inherit;
+  vertical-align: baseline;
+}
+.amenities-expand-btn .amenities-arrow {
+  display: none;
+}
+.amenities-expand-btn:hover .amenities-ellipsis {
+  display: none;
+}
+.amenities-expand-btn:hover .amenities-arrow {
+  display: inline;
+}
+.amenities-expand-btn:hover,
+.amenities-collapse-btn:hover {
+  color: var(--light);
+  text-decoration: underline;
+}
 .col-catch {
   width: auto;
 }
