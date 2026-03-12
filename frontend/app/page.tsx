@@ -35,6 +35,7 @@ function HomeContent() {
     }
 
     if (user && !allowlistDenied) {
+      setIsLoading(true)
       checkAccess()
         .then(() => getMyProfile())
         .then(async (profile) => {
@@ -76,8 +77,8 @@ function HomeContent() {
           setTermsIsReAccept(!!profile?.terms_accepted_at)
           setTermsRequiresAge(needsAge)
           setShowTermsModal(true)
+          setIsLoading(false)
         })
-        .finally(() => setIsLoading(false))
         .catch((err: Error & { code?: string }) => {
           if (err.code === 'NOT_ON_ALLOWLIST') {
             setAllowlistDenied(true)
@@ -137,11 +138,11 @@ function HomeContent() {
 
   if (authLoading || isLoading) {
     return (
-      <div className="app">
-        <div style={{ padding: '3rem', textAlign: 'center' }}>
-          <div className="spinner"></div>
-          <p>Loading...</p>
-        </div>
+      <div className="app" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', flexDirection: 'column', gap: '1rem' }}>
+        <div className="spinner" style={{ width: '2.5rem', height: '2.5rem' }} />
+        <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.95rem' }}>
+          {authLoading ? 'Checking session…' : 'Loading your lists…'}
+        </p>
       </div>
     )
   }
@@ -209,6 +210,7 @@ function HomeContent() {
         requiresAge={termsRequiresAge}
         onAccepted={() => {
           setShowTermsModal(false)
+          setIsLoading(true)
           loadLists()
         }}
         onUnderAge={() => {
@@ -352,11 +354,9 @@ function HomeContent() {
 export default function Home() {
   return (
     <Suspense fallback={
-      <div className="app">
-        <div style={{ padding: '3rem', textAlign: 'center' }}>
-          <div className="spinner"></div>
-          <p>Loading...</p>
-        </div>
+      <div className="app" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', flexDirection: 'column', gap: '1rem' }}>
+        <div className="spinner" style={{ width: '2.5rem', height: '2.5rem' }} />
+        <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.95rem' }}>Loading…</p>
       </div>
     }>
       <HomeContent />
