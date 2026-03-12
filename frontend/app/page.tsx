@@ -90,12 +90,15 @@ function HomeContent() {
     }
   }, [user, authLoading, router, allowlistDenied, underAgeDenied])
 
-  async function loadLists() {
+  async function loadLists(applyListFromUrl = true) {
     try {
       const data = await getLists()
       setLists(data || [])
-      if (listParam && data?.some((l: ListItem) => l.id === listParam)) {
+      if (applyListFromUrl && listParam && data?.some((l: ListItem) => l.id === listParam)) {
         setSelectedListId(listParam)
+        // Keep URL as ?list=id so refresh reopens this list
+      } else if (listParam) {
+        // Invalid or deleted list id in URL – clear it
         router.replace('/', { scroll: false })
       }
     } catch (err) {
@@ -103,6 +106,15 @@ function HomeContent() {
       setError('Failed to load lists')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  function handleSelectList(id: string | null) {
+    setSelectedListId(id)
+    if (id) {
+      router.replace('/?list=' + encodeURIComponent(id), { scroll: false })
+    } else {
+      router.replace('/', { scroll: false })
     }
   }
 
@@ -227,7 +239,7 @@ function HomeContent() {
         {/* Lists View */}
         <ListsView
           lists={lists}
-          onSelectList={setSelectedListId}
+          onSelectList={handleSelectList}
           onCreateList={() => setCreateModalOpen(true)}
           onSignOut={signOut}
           user={user}
@@ -252,8 +264,8 @@ function HomeContent() {
           <ListDetailView
             list={selectedList}
             onBack={() => {
-              setSelectedListId(null)
-              loadLists()
+              handleSelectList(null)
+              loadLists(false)
             }}
             onUpdate={() => loadLists()}
           />
