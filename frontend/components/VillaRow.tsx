@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls'
 import AmenitiesCell from '@/components/AmenitiesCell'
+import { parseAmenitiesInput } from '@/components/AmenitiesCell'
+import EditableCell from '@/components/EditableCell'
 import TrashIcon from '@/components/TrashIcon'
 
 export default function VillaRow({
@@ -20,9 +22,14 @@ export default function VillaRow({
   const thumbUrl = signedUrls[0]
 
   const handleSave = () => {
-    if (onEditEnd) {
-      onEditEnd(editData)
+    const toSend = { ...editData }
+    if (toSend.amenities != null && typeof toSend.amenities === 'string') {
+      toSend.amenities = parseAmenitiesInput(toSend.amenities)
     }
+    if (toSend.amenities != null && !Array.isArray(toSend.amenities)) {
+      toSend.amenities = [String(toSend.amenities)]
+    }
+    if (onEditEnd) onEditEnd(toSend)
   }
 
   const handleCancel = () => {
@@ -150,83 +157,54 @@ export default function VillaRow({
             <div className="thumb-placeholder">—</div>
           )}
         </td>
-        <td className="col-name">
-          <input
-            type="text"
-            value={editData.villa_name || ''}
-            onChange={(e) => setEditData({ ...editData, villa_name: e.target.value })}
-            style={{
-              width: '100%',
-              background: 'var(--surface)',
-              border: '1px solid var(--border-strong)',
-              borderRadius: '4px',
-              padding: '0.3rem',
-              color: 'var(--light)',
-            }}
-          />
-        </td>
-        <td className="col-loc">
-          <input
-            type="text"
-            value={editData.location || ''}
-            onChange={(e) => setEditData({ ...editData, location: e.target.value })}
-            style={{
-              width: '100%',
-              background: 'var(--surface)',
-              border: '1px solid var(--border-strong)',
-              borderRadius: '4px',
-              padding: '0.3rem',
-              color: 'var(--light)',
-            }}
-          />
-        </td>
-        <td className="col-beds">{editData.bedrooms || '—'}</td>
-        <td className="col-baths">{editData.bathrooms || '—'}</td>
-        <td className="col-guests">{editData.max_guests || '—'}</td>
-        <td className="col-price">
-          <input
-            type="text"
-            value={editData.price_weekly_usd || ''}
-            onChange={(e) => setEditData({ ...editData, price_weekly_usd: parseFloat(e.target.value) || null })}
-            style={{
-              width: '100%',
-              background: 'var(--surface)',
-              border: '1px solid var(--border-strong)',
-              borderRadius: '4px',
-              padding: '0.3rem',
-              color: 'var(--light)',
-            }}
-          />
-        </td>
-        <AmenitiesCell amenities={editData.amenities} readOnly />
+        <EditableCell
+          type="text"
+          cellClassName="col-name"
+          value={editData.villa_name}
+          onChange={(v) => setEditData({ ...editData, villa_name: v as string })}
+        />
+        <EditableCell
+          type="text"
+          cellClassName="col-loc"
+          value={editData.location}
+          onChange={(v) => setEditData({ ...editData, location: v as string })}
+        />
+        <EditableCell
+          type="number"
+          cellClassName="col-beds"
+          value={editData.bedrooms}
+          onChange={(v) => setEditData({ ...editData, bedrooms: v })}
+        />
+        <EditableCell
+          type="number"
+          cellClassName="col-baths"
+          value={editData.bathrooms}
+          onChange={(v) => setEditData({ ...editData, bathrooms: v })}
+        />
+        <EditableCell
+          type="number"
+          cellClassName="col-guests"
+          value={editData.max_guests}
+          onChange={(v) => setEditData({ ...editData, max_guests: v })}
+        />
+        <EditableCell
+          type="price"
+          cellClassName="col-price"
+          value={editData.price_weekly_usd}
+          onChange={(v) => setEditData({ ...editData, price_weekly_usd: v })}
+        />
+        <EditableCell
+          type="amenities"
+          cellClassName="col-amenities"
+          value={editData.amenities}
+          onChange={(v) => setEditData({ ...editData, amenities: v as string[] })}
+        />
         <td className="col-catch">
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button
-              onClick={handleSave}
-              style={{
-                background: 'var(--green)',
-                color: '#fff',
-                border: 'none',
-                padding: '0.25rem 0.5rem',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '0.75rem',
-              }}
-            >
+            <button type="button" className="sheet-edit-btn sheet-edit-btn-save" onClick={handleSave}>
               Save
             </button>
-            <button
-              onClick={handleCancel}
-              style={{
-                background: 'var(--muted)',
-                color: '#fff',
-                border: 'none',
-                padding: '0.25rem 0.5rem',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '0.75rem',
-              }}
-            >
+            <button type="button" className="sheet-edit-btn sheet-edit-btn-cancel" onClick={handleCancel}>
               Cancel
             </button>
           </div>

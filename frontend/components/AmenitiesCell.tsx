@@ -23,6 +23,12 @@ export function normalizeAmenitiesDisplay(
   return '—'
 }
 
+/** Parse comma-separated string into array of trimmed non-empty strings (for editing amenities). */
+export function parseAmenitiesInput(value: string): string[] {
+  if (!value || typeof value !== 'string') return []
+  return value.split(',').map((s) => s.trim()).filter(Boolean)
+}
+
 type AmenitiesCellProps = {
   amenities: string[] | string | null | undefined
   truncateLen?: number

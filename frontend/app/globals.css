@@ -261,6 +261,33 @@ button:focus-visible {
   width: 18%;
   max-width: 200px;
 }
+
+/* Shared styles for villa row edit inputs */
+.sheet-edit-input {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  padding: 0.3rem;
+  color: var(--light);
+}
+
+.sheet-edit-btn {
+  border: none;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+.sheet-edit-btn-save {
+  background: var(--green);
+  color: #fff;
+}
+.sheet-edit-btn-cancel {
+  background: var(--muted);
+  color: #fff;
+}
+
 /* Let the row grow in height and show full text when expanded */
 .sheet td.col-amenities.amenities-expanded {
   white-space: normal;
