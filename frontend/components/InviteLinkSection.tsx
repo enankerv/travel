@@ -10,11 +10,13 @@ type InviteLinkSectionProps = {
 
 export default function InviteLinkSection({ listId, onError }: InviteLinkSectionProps) {
   const [inviteLink, setInviteLink] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    setIsLoading(true);
     getListInvites(listId)
       .then((data) => {
         if (cancelled) return;
@@ -24,7 +26,10 @@ export default function InviteLinkSection({ listId, onError }: InviteLinkSection
           setInviteLink(`${window.location.origin}/join/${active.token}`);
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -103,6 +108,15 @@ export default function InviteLinkSection({ listId, onError }: InviteLinkSection
             </>
           )}
         </div>
+      ) : isLoading ? (
+        <button
+          type="button"
+          disabled
+          className="invite-link-section__btn-generate"
+        >
+          <span className="spinner" />
+          Loading…
+        </button>
       ) : (
         <button
           type="button"
