@@ -460,6 +460,14 @@ button:focus-visible {
   margin-bottom: 1rem;
 }
 
+.modal kbd {
+  padding: 0.15rem 0.4rem;
+  font-size: 0.85em;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
 .modal textarea {
   width: 100%;
   background: var(--surface);

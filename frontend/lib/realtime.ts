@@ -56,16 +56,28 @@ export function useListVillasRealtime({
     const channel = supabase
       .channel(`list:${listId}`, { config: { private: true } })
       .on("broadcast", { event: "INSERT" }, (p: any) =>
-        applyChange("INSERT", p.payload?.record, null))
+        applyChange("INSERT", p.payload?.record, null),
+      )
       .on("broadcast", { event: "UPDATE" }, (p: any) =>
-        applyChange("UPDATE", p.payload?.record, p.payload?.old_record ?? null))
+        applyChange("UPDATE", p.payload?.record, p.payload?.old_record ?? null),
+      )
       .on("broadcast", { event: "DELETE" }, (p: any) =>
-        applyChange("DELETE", null, p.payload?.old_record ?? null))
+        applyChange("DELETE", null, p.payload?.old_record ?? null),
+      )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "villas", filter: `list_id=eq.${listId}` },
+        {
+          event: "*",
+          schema: "public",
+          table: "villas",
+          filter: `list_id=eq.${listId}`,
+        },
         (payload: { eventType?: string; new?: any; old?: any }) => {
-          applyChange(payload.eventType ?? "", payload.new, payload.old ?? null);
+          applyChange(
+            payload.eventType ?? "",
+            payload.new,
+            payload.old ?? null,
+          );
         },
       )
       .subscribe();
@@ -79,7 +91,11 @@ export function useListVillasRealtime({
 type UseListPresenceOptions = {
   listId: string;
   enabled: boolean;
-  user: { id: string; email?: string | null; user_metadata?: Record<string, any> } | null;
+  user: {
+    id: string;
+    email?: string | null;
+    user_metadata?: Record<string, any>;
+  } | null;
   onUsersChange: (users: PresenceUser[]) => void;
 };
 
@@ -102,7 +118,8 @@ export function useListPresence({
       meta.name ||
       (user.email ? user.email.split("@")[0] : "") ||
       user.id.slice(0, 8);
-    const avatar_url: string | undefined = meta.avatar_url || meta.picture || undefined;
+    const avatar_url: string | undefined =
+      meta.avatar_url || meta.picture || undefined;
 
     const channel = supabase.channel(`presence:${listId}`, {
       config: { presence: { key: user.id } },
@@ -113,9 +130,18 @@ export function useListPresence({
         const state = channel.presenceState();
         const users: PresenceUser[] = [];
         for (const key of Object.keys(state)) {
-          const presences = state[key] as PresenceUser[];
+          const presences = state[key] as Array<{
+            user_id?: string;
+            first_name?: string;
+            avatar_url?: string;
+          }>;
           for (const p of presences) {
-            if (p?.user_id) users.push({ user_id: p.user_id, first_name: p.first_name, avatar_url: p.avatar_url });
+            if (p?.user_id)
+              users.push({
+                user_id: p.user_id,
+                first_name: p.first_name,
+                avatar_url: p.avatar_url,
+              });
           }
         }
         onUsersChange(users);

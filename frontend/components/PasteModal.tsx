@@ -8,6 +8,8 @@ interface PasteModalProps {
   onSubmit: (text: string) => void
   isLoading: boolean
   initialText?: string
+  /** When set (e.g. thin scrape), show a link to open the listing in a new tab */
+  listingUrl?: string | null
 }
 
 const JUNK = ['favicon', 'icon', 'logo', 'avatar', 'badge', 'pixel', '1x1', 'tracking', 'placeholder', '/user/', 'profile_pic', 'airbnb-logo']
@@ -40,7 +42,7 @@ function extractImageUrlsFromHtml(html: string): string[] {
   }
 }
 
-export default function PasteModal({ isOpen, onClose, onSubmit, isLoading, initialText = '' }: PasteModalProps) {
+export default function PasteModal({ isOpen, onClose, onSubmit, isLoading, initialText = '', listingUrl }: PasteModalProps) {
   const [text, setText] = useState(initialText)
   const [extractedImages, setExtractedImages] = useState<string[]>([])
 
@@ -83,7 +85,28 @@ export default function PasteModal({ isOpen, onClose, onSubmit, isLoading, initi
     <div className={`modal-overlay ${isOpen ? 'open' : ''}`}>
       <div className="modal">
         <h2>Paste Listing Details</h2>
-        <p>Paste the getaway listing text or HTML below. We'll extract the key information.</p>
+        {listingUrl ? (
+          <>
+            <p style={{ margin: '0 0 0.5rem', fontWeight: 600 }}>How to paste from the listing:</p>
+            <ol style={{ margin: '0 0 1rem', paddingLeft: '1.25rem', fontSize: '0.9rem', lineHeight: 1.6, color: 'var(--muted)' }}>
+              <li>
+                <a
+                  href={listingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: 'var(--accent)', fontWeight: 500 }}
+                >
+                  Open the listing in a new tab
+                </a>
+              </li>
+              <li>Select all: <kbd>Ctrl+A</kbd> (Windows) or <kbd>⌘A</kbd> (Mac)</li>
+              <li>Copy: <kbd>Ctrl+C</kbd> (Windows) or <kbd>⌘C</kbd> (Mac)</li>
+              <li>Come back here and paste into the box below</li>
+            </ol>
+          </>
+        ) : (
+          <p>Paste the getaway listing text or HTML below. We'll extract the key information.</p>
+        )}
         <textarea
           value={text}
           onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setText(e.target.value)}

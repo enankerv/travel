@@ -679,6 +679,7 @@ export default function ListDetailView({ list, onBack }: any) {
         onSubmit={handleScoutPaste}
         isLoading={false}
         initialText={lastFailedPaste}
+        listingUrl={pasteVilla?.original_url ?? undefined}
       />
     </>
   );
