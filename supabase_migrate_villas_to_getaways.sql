@@ -342,18 +342,32 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('getaway-images', 'getaway-images', false)
 ON CONFLICT (id) DO UPDATE SET public = false;
 
+-- SECURITY DEFINER so storage INSERT policy can read getaways/lists without RLS blocking
+CREATE OR REPLACE FUNCTION public.can_upload_getaway_image(object_path text, check_user_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM getaways g
+    JOIN lists l ON l.id = g.list_id
+    WHERE g.id::text = split_part(object_path, '/', 1)
+      AND (l.user_id = check_user_id
+           OR EXISTS (
+             SELECT 1 FROM list_members lm
+             WHERE lm.list_id = g.list_id AND lm.user_id = check_user_id AND lm.role IN ('admin', 'editor')
+           ))
+  );
+$$;
+
 CREATE POLICY "Allow getaway image uploads" ON storage.objects
 FOR INSERT TO authenticated
 WITH CHECK (
   bucket_id = 'getaway-images'
-  AND EXISTS (
-    SELECT 1 FROM getaways g
-    WHERE g.id::text = (storage.foldername(name))[1]
-    AND (
-      EXISTS (SELECT 1 FROM lists l WHERE l.id = g.list_id AND l.user_id = auth.uid())
-      OR EXISTS (SELECT 1 FROM list_members lm WHERE lm.list_id = g.list_id AND lm.user_id = auth.uid())
-    )
-  )
+  AND public.can_upload_getaway_image(name, auth.uid())
 );
 
 CREATE POLICY "List members can view getaway images" ON storage.objects

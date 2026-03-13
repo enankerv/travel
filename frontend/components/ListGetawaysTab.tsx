@@ -44,11 +44,16 @@ export default function ListGetawaysTab({
       if (result.ok) {
         if (getawayId) {
           setGetaways((prev) =>
-            prev.map((g) => (g.id === getawayId ? { ...g, import_status: "loading" } : g))
+            prev.map((g) =>
+              g.id === getawayId ? { ...g, import_status: "loading" } : g,
+            ),
           );
         }
         if (Notification.permission === "granted") {
-          new Notification("Scouting...", { body: "Processing listing...", icon: "⏳" });
+          new Notification("Scouting...", {
+            body: "Processing listing...",
+            icon: "⏳",
+          });
         }
       } else if (!result.ok) {
         setLastFailedUrl(url);
@@ -84,7 +89,9 @@ export default function ListGetawaysTab({
         setPasteGetaway(null);
         if (getawayId) {
           setGetaways((prev) =>
-            prev.map((g) => (g.id === getawayId ? { ...g, import_status: "loading" } : g))
+            prev.map((g) =>
+              g.id === getawayId ? { ...g, import_status: "loading" } : g,
+            ),
           );
         }
         if (Notification.permission === "granted") {

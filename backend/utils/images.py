@@ -72,6 +72,7 @@ async def upload_images_to_supabase(
 
     client = get_supabase_client(auth_token)
     bucket = client.storage.from_(SUPABASE_BUCKET)
+    bucket._headers["authorization"] = f"Bearer {auth_token}"
     public_urls: list[str] = []
 
     async with httpx.AsyncClient(follow_redirects=True, timeout=15) as client_http:
