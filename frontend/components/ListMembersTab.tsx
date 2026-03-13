@@ -59,7 +59,7 @@ export default function ListMembersTab({
 
   return (
     <div className="list-members-tab">
-      <InviteLinkSection listId={listId} onError={onError} />
+      {isOwner && <InviteLinkSection listId={listId} onError={onError} />}
 
       <div>
         <h3 className="list-members-tab__title">Members ({members.length})</h3>
