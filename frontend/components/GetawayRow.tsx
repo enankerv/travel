@@ -20,6 +20,11 @@ export default function GetawayRow({
   onImageClick,
   onRetry,
   onPasteClick,
+  votesByGetaway,
+  currentUserId,
+  canVote,
+  onVote,
+  onUnvote,
 }: any) {
   const [editData, setEditData] = useState(getaway)
   const signedUrls = useSignedImageUrls(getaway.images || [])
@@ -76,11 +81,17 @@ export default function GetawayRow({
     onImageClick: handleImageClick,
     handleSave,
     handleCancel,
+    votesByGetaway,
+    currentUserId,
+    canVote,
+    onVote,
+    onUnvote,
   }
 
   if (getaway.import_status === 'loading') {
     return (
       <tr style={{ opacity: 0.6 }}>
+        {visibleKeys.includes('votes') && <td className="col-votes" />}
         {visibleKeys.includes('image') && (
           <td className="col-thumb">
             <div className="spinner" style={{ width: '2rem', height: '2rem' }}></div>
@@ -104,6 +115,7 @@ export default function GetawayRow({
         }}
         title={onPasteClick ? 'Click to paste listing details' : undefined}
       >
+        {visibleKeys.includes('votes') && <td className="col-votes" />}
         {visibleKeys.includes('image') && (
           <td className="col-thumb">
             <div className="thumb-placeholder">⚠️</div>
@@ -134,6 +146,7 @@ export default function GetawayRow({
         }}
         title={onPasteClick ? 'Click to paste listing details' : undefined}
       >
+        {visibleKeys.includes('votes') && <td className="col-votes" />}
         {visibleKeys.includes('image') && (
           <td className="col-thumb">
             <div className="thumb-placeholder">❌</div>

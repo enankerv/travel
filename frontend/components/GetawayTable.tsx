@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { useListDetailContext } from '@/lib/ListDetailContext'
 import GetawayRow from './GetawayRow'
 import ColumnPopover from './ColumnPopover'
 import {
@@ -14,7 +15,16 @@ import {
 
 export { COLUMN_KEYS, type ColumnKey, type VisibleColumns }
 
-export default function GetawayTable({ getaways, isLoading, onDelete, onUpdate, onImageClick, onRetry, onPasteClick }: any) {
+export default function GetawayTable({
+  getaways,
+  isLoading,
+  onDelete,
+  onUpdate,
+  onImageClick,
+  onRetry,
+  onPasteClick,
+}: any) {
+  const { votesByGetaway, currentUserId, isListMember, onVote, onUnvote } = useListDetailContext();
   const [editingId, setEditingId] = useState(null)
   const [visibleColumns, setVisibleColumns] = useState<VisibleColumns>(DEFAULT_VISIBLE)
   const [showColumnMenu, setShowColumnMenu] = useState(false)
@@ -99,6 +109,11 @@ export default function GetawayTable({ getaways, isLoading, onDelete, onUpdate, 
                 onImageClick={onImageClick}
                 onRetry={getaway.source_url ? () => onRetry && onRetry(getaway) : undefined}
                 onPasteClick={onPasteClick}
+                votesByGetaway={votesByGetaway}
+                currentUserId={currentUserId}
+                canVote={isListMember}
+                onVote={onVote}
+                onUnvote={onUnvote}
               />
             ))}
           </tbody>

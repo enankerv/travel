@@ -103,6 +103,149 @@ export function useListGetawaysRealtime({
   }, [listId, enabled]);
 }
 
+type UseListVotesRealtimeOptions = {
+  listId: string;
+  enabled: boolean;
+  onVoteInsert: (voter: { getaway_id: string; user_id: string; first_name?: string; avatar_url?: string }) => void;
+  onVoteDelete: (getaway_id: string, user_id: string) => void;
+};
+
+type UseListRealtimeOptions = UseListGetawaysRealtimeOptions & UseListVotesRealtimeOptions;
+
+/**
+ * Single subscription to list channel for both getaways and votes.
+ * Multiple channel() calls with the same name can conflict; one subscription handles both.
+ */
+export function useListRealtime({
+  listId,
+  enabled,
+  onInsert,
+  onUpdate,
+  onDelete,
+  onImagesChange,
+  onVoteInsert,
+  onVoteDelete,
+}: UseListRealtimeOptions) {
+  useEffect(() => {
+    if (!enabled) return;
+
+    const recentIds = new Set<string>();
+    const markSeen = (key: string) => {
+      recentIds.add(key);
+      setTimeout(() => recentIds.delete(key), 5000);
+    };
+
+    const applyGetawayChange = (event: string, newRow: any, oldRow: any) => {
+      const dedupeKey = `${event}:${newRow?.id ?? oldRow?.id ?? "?"}:${newRow?.updated_at ?? oldRow?.updated_at ?? Date.now()}`;
+      if (recentIds.has(dedupeKey)) return;
+      markSeen(dedupeKey);
+
+      if (event === "INSERT" && newRow) onInsert(newRow);
+      else if (event === "UPDATE" && newRow) onUpdate(newRow);
+      else if (event === "DELETE" && oldRow?.id) onDelete(oldRow.id);
+    };
+
+    const channel = supabase
+      .channel(`list:${listId}`, { config: { private: true } })
+      .on("broadcast", { event: "INSERT" }, (p: any) =>
+        applyGetawayChange("INSERT", p.payload?.record, null),
+      )
+      .on("broadcast", { event: "UPDATE" }, (p: any) =>
+        applyGetawayChange("UPDATE", p.payload?.record, p.payload?.old_record ?? null),
+      )
+      .on("broadcast", { event: "DELETE" }, (p: any) => {
+        const oldRecord = p.payload?.old_record ?? p.payload?.record;
+        applyGetawayChange("DELETE", null, oldRecord);
+      })
+      .on("broadcast", { event: "VOTE_INSERT" }, (p: any) => {
+        const r = p.payload?.record;
+        if (r?.getaway_id && r?.user_id) {
+          onVoteInsert({
+            getaway_id: r.getaway_id,
+            user_id: r.user_id,
+            first_name: r.first_name || undefined,
+            avatar_url: r.avatar_url || undefined,
+          });
+        }
+      })
+      .on("broadcast", { event: "VOTE_DELETE" }, (p: any) => {
+        const r = p.payload?.old_record;
+        if (r?.getaway_id && r?.user_id) {
+          onVoteDelete(r.getaway_id, r.user_id);
+        }
+      })
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "getaways",
+          filter: `list_id=eq.${listId}`,
+        },
+        (payload: { eventType?: string; new?: any; old?: any }) => {
+          applyGetawayChange(
+            payload.eventType ?? "",
+            payload.new,
+            payload.old ?? null,
+          );
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "getaway_images",
+        },
+        () => {
+          onImagesChange?.();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [listId, enabled, onInsert, onUpdate, onDelete, onImagesChange, onVoteInsert, onVoteDelete]);
+}
+
+/** @deprecated Use useListRealtime instead. Kept for backwards compat. */
+export function useListVotesRealtime({
+  listId,
+  enabled,
+  onVoteInsert,
+  onVoteDelete,
+}: UseListVotesRealtimeOptions) {
+  useEffect(() => {
+    if (!enabled) return;
+
+    const channel = supabase
+      .channel(`list:${listId}`, { config: { private: true } })
+      .on("broadcast", { event: "VOTE_INSERT" }, (p: any) => {
+        const r = p.payload?.record;
+        if (r?.getaway_id && r?.user_id) {
+          onVoteInsert({
+            getaway_id: r.getaway_id,
+            user_id: r.user_id,
+            first_name: r.first_name || undefined,
+            avatar_url: r.avatar_url || undefined,
+          });
+        }
+      })
+      .on("broadcast", { event: "VOTE_DELETE" }, (p: any) => {
+        const r = p.payload?.old_record;
+        if (r?.getaway_id && r?.user_id) {
+          onVoteDelete(r.getaway_id, r.user_id);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [listId, enabled, onVoteInsert, onVoteDelete]);
+}
+
 type UseListPresenceOptions = {
   listId: string;
   enabled: boolean;

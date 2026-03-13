@@ -1,13 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getGetaways, getListMembers } from "@/lib/api";
+import { getGetaways, getListMembers, getListVotes } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
-import {
-  useListGetawaysRealtime,
-  useListPresence,
-  PresenceUser,
-} from "@/lib/realtime";
+import { useListRealtime, useListPresence, PresenceUser } from "@/lib/realtime";
+import { useListVotes } from "@/hooks/useListVotes";
+import { ListDetailProvider } from "@/lib/ListDetailContext";
 import ListGetawaysTab from "./ListGetawaysTab";
 import ListMembersTab from "./ListMembersTab";
 
@@ -22,11 +20,18 @@ export default function ListDetailView({ list, onBack }: any) {
   const [error, setError] = useState("");
   const [dataLoaded, setDataLoaded] = useState(false);
 
+  const votes = useListVotes({
+    listId: list.id,
+    user,
+    members,
+    setError,
+  });
+
   useEffect(() => {
     if (!dataLoaded) loadData();
   }, []);
 
-  useListGetawaysRealtime({
+  useListRealtime({
     listId: list.id,
     enabled: dataLoaded && !!user,
     onInsert: (row) => setGetaways((prev) => [row, ...prev]),
@@ -34,6 +39,8 @@ export default function ListDetailView({ list, onBack }: any) {
       setGetaways((prev) => prev.map((g) => (g.id === row.id ? row : g))),
     onDelete: (id) => setGetaways((prev) => prev.filter((g) => g.id !== id)),
     onImagesChange: () => loadData(true),
+    onVoteInsert: votes.onVoteInsert,
+    onVoteDelete: votes.onVoteDelete,
   });
 
   useListPresence({
@@ -43,15 +50,41 @@ export default function ListDetailView({ list, onBack }: any) {
     onUsersChange: setViewingUsers,
   });
 
+  const contextValue = {
+    list,
+    members,
+    getaways,
+    setGetaways,
+    votesByGetaway: votes.votesByGetaway,
+    onVote: votes.onVote,
+    onUnvote: votes.onUnvote,
+    isListMember: votes.isListMember,
+    currentUserId: votes.currentUserId,
+    currentUserProfile: votes.currentUserProfile,
+    isLoading,
+    error,
+    setError,
+    onRefresh: () => loadData(true),
+  };
+
   async function loadData(silent = false) {
     if (!silent) setIsLoading(true);
     try {
-      const [getawaysData, membersData] = await Promise.all([
+      const [getawaysData, membersData, votesData] = await Promise.all([
         getGetaways(list.id),
         getListMembers(list.id),
+        getListVotes(list.id),
       ]);
       setGetaways(getawaysData || []);
       setMembers(membersData?.members || []);
+      const votesList = votesData?.votes || [];
+      const byGetaway: Record<string, { user_id: string; first_name?: string; avatar_url?: string }[]> = {};
+      for (const v of votesList) {
+        const gid = v.getaway_id;
+        if (!byGetaway[gid]) byGetaway[gid] = [];
+        byGetaway[gid].push({ user_id: v.user_id, first_name: v.first_name, avatar_url: v.avatar_url });
+      }
+      votes.setVotesByGetaway(byGetaway);
       setDataLoaded(true);
     } catch (err) {
       console.error("Failed to load data:", err);
@@ -64,7 +97,7 @@ export default function ListDetailView({ list, onBack }: any) {
   const presenceOthers = viewingUsers.filter((u) => u.user_id !== user?.id);
 
   return (
-    <>
+    <ListDetailProvider value={contextValue}>
       <header className="list-detail-header">
         <div className="list-detail-header__left">
           <button
@@ -136,15 +169,7 @@ export default function ListDetailView({ list, onBack }: any) {
             <span>{error}</span>
           </div>
         )}
-        {activeTab === "places" && (
-          <ListGetawaysTab
-            listId={list.id}
-            getaways={getaways}
-            setGetaways={setGetaways}
-            isLoading={isLoading}
-            onRefresh={() => loadData(true)}
-          />
-        )}
+        {activeTab === "places" && <ListGetawaysTab />}
 
         {activeTab === "members" && (
           <ListMembersTab
@@ -156,6 +181,6 @@ export default function ListDetailView({ list, onBack }: any) {
           />
         )}
       </div>
-    </>
+    </ListDetailProvider>
   );
 }

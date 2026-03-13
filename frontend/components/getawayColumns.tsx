@@ -3,9 +3,11 @@
 import type { ReactNode } from "react";
 import ExpandableCell from "@/components/ExpandableCell";
 import EditableCell from "@/components/EditableCell";
+import VoteCell from "@/components/VoteCell";
 import { TrashIcon, ExternalLinkIcon } from "@/components/icons";
 
 export const COLUMN_KEYS = [
+  "votes",
   "image",
   "name",
   "location",
@@ -25,6 +27,7 @@ export type ColumnKey = (typeof COLUMN_KEYS)[number];
 export type VisibleColumns = Record<ColumnKey, boolean>;
 
 export const DEFAULT_VISIBLE: VisibleColumns = {
+  votes: true,
   image: true,
   name: true,
   location: true,
@@ -61,6 +64,11 @@ export type CellRenderContext = {
   onImageClick: (e: React.MouseEvent) => void;
   handleSave: () => void;
   handleCancel: () => void;
+  votesByGetaway?: Record<string, { user_id: string; first_name?: string; avatar_url?: string }[]>;
+  currentUserId?: string;
+  canVote?: boolean;
+  onVote?: (getawayId: string) => void;
+  onUnvote?: (getawayId: string) => void;
 };
 
 type ColumnDef = {
@@ -71,6 +79,32 @@ type ColumnDef = {
 };
 
 const COLUMN_CONFIG: Record<ColumnKey, ColumnDef> = {
+  votes: {
+    key: "votes",
+    className: "col-votes",
+    label: "",
+    render: ({
+      getaway,
+      votesByGetaway,
+      currentUserId,
+      canVote,
+      onVote,
+      onUnvote,
+      className,
+    }) => {
+      const voters = (votesByGetaway && votesByGetaway[getaway.id]) || [];
+      return (
+        <VoteCell
+          voters={voters}
+          currentUserId={currentUserId}
+          canVote={!!canVote}
+          onVote={() => onVote?.(getaway.id)}
+          onUnvote={() => onUnvote?.(getaway.id)}
+          className={className}
+        />
+      );
+    },
+  },
   image: {
     key: "image",
     className: "col-thumb",
@@ -392,6 +426,11 @@ export type CellRenderContextInput = Pick<
   | "onImageClick"
   | "handleSave"
   | "handleCancel"
+  | "votesByGetaway"
+  | "currentUserId"
+  | "canVote"
+  | "onVote"
+  | "onUnvote"
 >;
 
 /** Render a cell for the given column key. */

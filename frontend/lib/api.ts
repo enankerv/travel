@@ -225,3 +225,33 @@ export async function removeListMember(listId: string, userId: string) {
   if (!res.ok) throw new Error('Failed to remove member')
   return res.json()
 }
+
+// Votes
+export type VoteRecord = { getaway_id: string; user_id: string; first_name?: string; avatar_url?: string }
+
+export async function getListVotes(listId: string): Promise<{ votes: VoteRecord[] }> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_URL}/api/lists/${listId}/votes`, { headers })
+  if (!res.ok) throw new Error('Failed to fetch votes')
+  return res.json()
+}
+
+export async function addVote(listId: string, getawayId: string) {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_URL}/api/lists/${listId}/getaways/${getawayId}/vote`, {
+    method: 'POST',
+    headers,
+  })
+  if (!res.ok) throw new Error('Failed to add vote')
+  return res.json()
+}
+
+export async function removeVote(listId: string, getawayId: string) {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_URL}/api/lists/${listId}/getaways/${getawayId}/vote`, {
+    method: 'DELETE',
+    headers,
+  })
+  if (!res.ok) throw new Error('Failed to remove vote')
+  return res.json()
+}

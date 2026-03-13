@@ -2,26 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { scoutUrl, scoutPaste, deleteGetaway, updateGetaway } from "@/lib/api";
+import { useListDetailContext } from "@/lib/ListDetailContext";
 import DropZone from "./DropZone";
 import GetawayTable from "./GetawayTable";
 import PasteModal from "./PasteModal";
 import ImageGallery from "./ImageGallery";
 
-type ListGetawaysTabProps = {
-  listId: string;
-  getaways: any[];
-  setGetaways: React.Dispatch<React.SetStateAction<any[]>>;
-  isLoading: boolean;
-  onRefresh: () => Promise<void>;
-};
-
-export default function ListGetawaysTab({
-  listId,
-  getaways,
-  setGetaways,
-  isLoading,
-  onRefresh,
-}: ListGetawaysTabProps) {
+export default function ListGetawaysTab() {
+  const { list, getaways, setGetaways, isLoading, onRefresh } = useListDetailContext();
+  const listId = list.id;
   const [error, setError] = useState("");
   const [scoutLoading, setScoutLoading] = useState(false);
   const [lastFailedUrl, setLastFailedUrl] = useState("");
