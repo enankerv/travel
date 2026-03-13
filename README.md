@@ -1,67 +1,43 @@
-# 📚 Documentation Index
+# GetawayGather
 
-## 🚀 START HERE
-
-1. **FINAL_SUMMARY.md** ← Master overview of everything
-2. **COMPLETE_SETUP.md** ← Step-by-step setup guide
-3. **NEXTJS_SETUP_GUIDE.md** ← Frontend creation
+Collaborative lists for tracking vacation rentals. Scout listings from URLs or pasted text, store getaways in shared lists, and invite others to collaborate.
 
 ---
 
-## Backend Documentation
+## Project Structure
 
-### Setup & Configuration
-- **SUPABASE_SETUP_GUIDE.md** - Supabase project setup
-- **IMPLEMENTATION_SUMMARY.md** - Backend architecture overview
+### Backend (FastAPI)
+- **`backend/app.py`** - Main app, middleware, static serving
+- **`backend/routes/`** - API endpoints by resource (auth, lists, members, invites, getaways, scout)
+- **`backend/db/`** - Database layer by table (client, lists, list_members, invite_tokens, getaways)
+- **`backend/utils/`** - Crawling, extraction, images, storage URLs
+- **`backend/scout.py`** - Scraping & LLM extraction pipeline
 
-### Implementation Details
-- **FASTAPI_IMPLEMENTATION.md** - FastAPI endpoints guide
-- **API_DOCUMENTATION.md** - All 22 endpoint specs (use for testing)
-- **LISTS_ARCHITECTURE.md** - Data model & RLS policies
+### Frontend (Next.js)
+- **`frontend/app/`** - Pages (home, auth, terms, privacy)
+- **`frontend/components/`** - GetawayTable, ListDetailView, ImageGallery, etc.
+- **`frontend/lib/`** - Supabase client, API helpers
+- **`frontend/hooks/`** - useAuthBootstrap, useSignedImageUrls
 
-### Quick Reference
-- **QUICKSTART.md** - Command reference & examples
-
----
-
-## Frontend Documentation
-
-### Setup & Configuration
-- **NEXTJS_SETUP_GUIDE.md** - Frontend project creation
-- **NEXTJS_COMPONENTS_GUIDE.md** - Component templates
-
-### Code Files Ready to Copy
-- **COMPONENT_SignupForm.tsx** - Example auth component
-- **NEXTJS_SUPABASE_CLIENT.ts** - Supabase client code
-
----
-
-## Architecture & Design
-
-### System Design
-- **PROJECT_STRUCTURE.md** - Complete file organization
-- **ARCHITECTURE_DIAGRAM.md** - Visual system diagrams
-- **LISTS_ARCHITECTURE.md** - Collaborative lists design
+### Data
+- **Images** - Supabase Storage (`getaway-images`, legacy `villa-images`)
+- **Database** - Supabase Postgres (lists, getaways, list_members, invite_tokens)
+- **`db/supabase_setup.sql`** - Schema & RLS policies
 
 ---
 
 ## Reference Guides
 
 ### For Backend Development
-- Start: FASTAPI_IMPLEMENTATION.md
-- Test: API_DOCUMENTATION.md
-- Deploy: COMPLETE_SETUP.md (Deployment section)
+- API docs: http://localhost:8000/docs (Swagger)
+- Routes: `backend/routes/` (prefix `/api`)
 
 ### For Frontend Development
-- Start: NEXTJS_SETUP_GUIDE.md
-- Implement: NEXTJS_COMPONENTS_GUIDE.md
-- Copy: COMPONENT_SignupForm.tsx (as example)
-- Deploy: COMPLETE_SETUP.md (Deployment section)
+- OAuth: `frontend/GOOGLE_OAUTH_SETUP.md`
 
 ### For Database
-- Schema: supabase_schema_v2_lists.sql
-- Setup: SUPABASE_SETUP_GUIDE.md
-- Design: LISTS_ARCHITECTURE.md
+- Schema: `db/supabase_setup.sql`
+- Migration: `db/supabase_migrate_villas_to_getaways.sql`
 
 ---
 
@@ -69,16 +45,14 @@
 
 ```bash
 # Backend
-cd TravelBlog
+cd backend
 pip install -r requirements.txt
 python app.py
-
-# Frontend Setup
-npx create-next-app@latest frontend --typescript --tailwind
+# or: uvicorn app:app --reload
 
 # Frontend Dev
 cd frontend
-npm install @supabase/supabase-js
+npm install
 npm run dev
 
 # Frontend Deploy
@@ -88,125 +62,48 @@ vercel deploy
 
 ---
 
-## Development Workflow
-
-### Phase 1: Backend (Already Done)
-- [x] Created FastAPI app
-- [x] Built 22 endpoints
-- [x] Integrated Supabase
-- [x] Added RLS policies
-- [x] Documented everything
-
-**Status:** Ready to run! Just `python app.py`
-
-### Phase 2: Frontend Setup (30 minutes)
-- [ ] Create Next.js project
-- [ ] Install Supabase client
-- [ ] Create .env.local
-- [ ] Copy core lib files
-
-**Status:** Follow NEXTJS_SETUP_GUIDE.md
-
-### Phase 3: Auth Pages (1 hour)
-- [ ] Implement SignupForm (copy from COMPONENT_SignupForm.tsx)
-- [ ] Implement LoginForm
-- [ ] Test auth flow
-- [ ] Verify session handling
-
-**Status:** Code ready in NEXTJS_COMPONENTS_GUIDE.md
-
-### Phase 4: Lists Dashboard (1 hour)
-- [ ] Create app/lists/page.tsx
-- [ ] Implement ListGrid component
-- [ ] Test list viewing
-- [ ] Add create list page
-
-**Status:** Code ready in NEXTJS_COMPONENTS_GUIDE.md
-
-### Phase 5: Villa Management (2 hours)
-- [ ] Port VillaTable from Vite React
-- [ ] Port VillaRow with inline editing
-- [ ] Port ImageGallery
-- [ ] Port DropZone
-
-**Status:** Copy from existing Vite React app
-
-### Phase 6: Scouting (1 hour)
-- [ ] Add URL input form
-- [ ] Integrate POST /api/scout
-- [ ] Add loading states
-- [ ] Handle errors & paste fallback
-
-**Status:** Use API from lib/api.ts
-
-### Phase 7: Invites & Members (1 hour)
-- [ ] Create invite form
-- [ ] Build join page for tokens
-- [ ] Show members list
-- [ ] Add share functionality
-
-**Status:** Endpoints ready in backend
-
-### Phase 8: Deploy (1 hour)
-- [ ] Deploy backend to Railway
-- [ ] Deploy frontend to Vercel
-- [ ] Set environment variables
-- [ ] Test end-to-end
-
-**Status:** Instructions in COMPLETE_SETUP.md
-
----
-
 ## FAQ
 
 ### Q: Where do I start?
 A: Read FINAL_SUMMARY.md, then COMPLETE_SETUP.md
 
 ### Q: How do I run the backend?
-A: See FASTAPI_IMPLEMENTATION.md or run `python app.py`
+A: `cd backend && python app.py` (or `uvicorn app:app --reload`)
 
-### Q: How do I create the frontend?
-A: Follow NEXTJS_SETUP_GUIDE.md step by step
-
-### Q: What components are ready to copy?
-A: See NEXTJS_COMPONENTS_GUIDE.md for all code
+### Q: How do I run the frontend?
+A: `cd frontend && npm run dev`
 
 ### Q: How do I test the endpoints?
-A: Use http://localhost:8000/docs (Swagger UI) or API_DOCUMENTATION.md
+A: http://localhost:8000/docs (Swagger UI)
 
 ### Q: How do I deploy?
-A: See COMPLETE_SETUP.md Deployment section
+A: Backend → Railway/Render; Frontend → Vercel. Set env vars for Supabase.
 
 ### Q: How does authentication work?
-A: See SUPABASE_SETUP_GUIDE.md or LISTS_ARCHITECTURE.md
+A: Supabase Auth (OAuth). Terms & age verification required before API access.
 
-### Q: How does invite sharing work?
-A: See LISTS_ARCHITECTURE.md Invite section or API_DOCUMENTATION.md
+### Q: Where are images stored?
+A: Supabase Storage (private buckets). Signed URLs generated per request.
 
 ---
 
 ## File Locations
 
-All files are in: `c:\Users\Ethan\Documents\Projects\TravelBlog\`
-
 ### Main Files
-- app.py - Backend main
-- routes.py - Backend endpoints
-- models.py - Data validation
-- db_lists.py - Database functions
-- scout.py - Scraping logic
-- requirements.txt - Python dependencies
+- `backend/app.py` - FastAPI application
+- `backend/routes/` - API endpoints (auth, lists, members, invites, getaways, scout)
+- `backend/db/` - Database layer (client, lists, list_members, invite_tokens, getaways)
+- `backend/models.py` - Pydantic models
+- `backend/scout.py` - Scraping & extraction logic
+- `backend/requirements.txt` - Python dependencies
 
 ### Configuration
-- .env - Backend secrets (create this)
-- supabase_schema_v2_lists.sql - Database schema
+- `backend/.env` - Backend secrets (Supabase URL, keys, etc.)
+- `db/supabase_setup.sql` - Database schema
 
 ### Documentation
-- All `.md` files listed above
-
-### Templates
-- COMPONENT_SignupForm.tsx - Example component
-- NEXTJS_SUPABASE_CLIENT.ts - Client code
+- README.md (this file)
+- frontend/GOOGLE_OAUTH_SETUP.md
 
 ---
 
@@ -241,12 +138,6 @@ Vercel - Frontend
 
 ## Support Resources
 
-**In This Repo:**
-- FINAL_SUMMARY.md - Overview
-- COMPLETE_SETUP.md - Detailed guide
-- API_DOCUMENTATION.md - Endpoint reference
-- README files for each component
-
 **External:**
 - FastAPI docs: https://fastapi.tiangolo.com/
 - Next.js docs: https://nextjs.org/docs
@@ -257,35 +148,18 @@ Vercel - Frontend
 
 ## Timeline Estimate
 
-**If you follow this guide:**
-
-- Backend: Already done ✅
-- Frontend setup: 30 min
-- Auth pages: 1 hour
-- Lists dashboard: 1 hour
-- Villa components: 2 hours
-- Scouting: 1 hour
-- Invites: 1 hour
-- Deployment: 1 hour
-
-**Total: ~8 hours from now to production**
-
-Or faster if you:
-- Reuse more components from existing React app
-- Skip advanced features initially
-- Use pre-built UI library
+- Backend: Done ✅
+- Frontend: Done ✅
+- Deployment: ~1 hour (Railway + Vercel + env vars)
 
 ---
 
 ## Next Steps
 
-1. Open FINAL_SUMMARY.md
-2. Read COMPLETE_SETUP.md
-3. Run backend: `python app.py`
-4. Create frontend: `npx create-next-app@latest ...`
-5. Copy files from NEXTJS_COMPONENTS_GUIDE.md
-6. Implement pages one by one
-7. Deploy!
+1. Configure `backend/.env` (Supabase URL, anon key)
+2. Run backend: `cd backend && python app.py`
+3. Run frontend: `cd frontend && npm run dev`
+4. Open http://localhost:3000
 
 ---
 
@@ -299,10 +173,10 @@ Or faster if you:
 
 **Frontend:**
 - 25+ React components
-- Auth system
+- Auth system (Supabase OAuth)
 - List management
-- Villa spreadsheet
-- Image gallery
+- Getaway table with inline editing
+- Image gallery (Supabase Storage)
 - Invite system
 
 **Database:**
@@ -319,18 +193,12 @@ Or faster if you:
 
 ---
 
-## Ready to Launch? 
+## Ready to Launch?
 
-✅ Backend is built & documented
-✅ Frontend templates are ready
-✅ Database schema is defined
-✅ API endpoints are specified
-✅ Deployment guides are written
+✅ Backend (FastAPI + Supabase)
+✅ Frontend (Next.js + Supabase Auth)
+✅ Getaway scouting (URL + paste)
+✅ Collaborative lists with invites
+✅ Images in Supabase Storage
 
-**Start here: FINAL_SUMMARY.md**
-
-Then follow: COMPLETE_SETUP.md
-
-Questions? Check the appropriate guide above.
-
-Let's build! 🚀
+**Run:** `cd backend && python app.py` | `cd frontend && npm run dev`
