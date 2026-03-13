@@ -7,6 +7,7 @@
 
 -- Triggers -------------------------------------------------------------------
 
+DROP TRIGGER IF EXISTS getaway_images_broadcast_trigger ON public.getaway_images;
 DROP TRIGGER IF EXISTS getaways_broadcast_list_trigger ON public.getaways;
 DROP TRIGGER IF EXISTS update_getaways_updated_at ON getaways;
 DROP TRIGGER IF EXISTS update_lists_updated_at ON lists;
@@ -80,7 +81,9 @@ DROP TABLE IF EXISTS public.profiles;
 
 -- Functions ------------------------------------------------------------------
 
+DROP FUNCTION IF EXISTS public.getaway_images_broadcast_trigger();
 DROP FUNCTION IF EXISTS public.getaways_broadcast_list_trigger();
+DROP FUNCTION IF EXISTS public._getaway_with_images(record);
 DROP FUNCTION IF EXISTS public.update_getaways_updated_at();
 DROP FUNCTION IF EXISTS public.update_lists_updated_at();
 DROP FUNCTION IF EXISTS public.add_creator_as_member();

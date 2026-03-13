@@ -548,15 +548,34 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
 -- Broadcast getaway changes to realtime channel list:<list_id> ---------------
+-- Attach images from getaway_images (getaways table has no images column)
+
+CREATE OR REPLACE FUNCTION public._getaway_with_images(rec RECORD)
+RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  rid uuid;
+  imgs jsonb;
+BEGIN
+  rid := (rec).id;
+  SELECT COALESCE(jsonb_agg(gi.image_url ORDER BY gi.position), '[]'::jsonb)
+    INTO imgs FROM getaway_images gi WHERE gi.getaway_id = rid;
+  RETURN row_to_json(rec)::jsonb || jsonb_build_object('images', imgs);
+END;
+$$;
 
 CREATE OR REPLACE FUNCTION public.getaways_broadcast_list_trigger()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
+DECLARE
+  new_payload jsonb;
+  old_payload jsonb;
+  msg jsonb;
 BEGIN
-  PERFORM realtime.broadcast_changes(
-    'list:' || COALESCE(NEW.list_id, OLD.list_id)::text,
-    TG_OP, TG_OP, TG_TABLE_NAME, TG_TABLE_SCHEMA, NEW, OLD
-  );
+  new_payload := public._getaway_with_images(COALESCE(NEW, OLD));
+  old_payload := CASE WHEN OLD IS NOT NULL THEN public._getaway_with_images(OLD) ELSE NULL END;
+  msg := jsonb_build_object('record', new_payload, 'old_record', old_payload);
+  PERFORM realtime.send(msg, TG_OP, 'list:' || COALESCE(NEW.list_id, OLD.list_id)::text, true);
   RETURN COALESCE(NEW, OLD);
 END;
 $$;
@@ -565,6 +584,30 @@ DROP TRIGGER IF EXISTS getaways_broadcast_list_trigger ON public.getaways;
 CREATE TRIGGER getaways_broadcast_list_trigger
   AFTER INSERT OR UPDATE OR DELETE ON public.getaways
   FOR EACH ROW EXECUTE FUNCTION public.getaways_broadcast_list_trigger();
+
+-- When images change, broadcast the parent getaway (with images)
+CREATE OR REPLACE FUNCTION public.getaway_images_broadcast_trigger()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  g getaways%ROWTYPE;
+  payload jsonb;
+  msg jsonb;
+BEGIN
+  SELECT * INTO g FROM getaways WHERE id = COALESCE(NEW.getaway_id, OLD.getaway_id);
+  IF FOUND THEN
+    payload := public._getaway_with_images(g);
+    msg := jsonb_build_object('record', payload, 'old_record', payload);
+    PERFORM realtime.send(msg, 'UPDATE', 'list:' || g.list_id::text, true);
+  END IF;
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+DROP TRIGGER IF EXISTS getaway_images_broadcast_trigger ON public.getaway_images;
+CREATE TRIGGER getaway_images_broadcast_trigger
+  AFTER INSERT OR UPDATE OR DELETE ON public.getaway_images
+  FOR EACH ROW EXECUTE FUNCTION public.getaway_images_broadcast_trigger();
 
 
 -- ============================================================================
