@@ -1,4 +1,4 @@
-"""Villa scouting and data extraction engine."""
+"""Getaway scouting and data extraction engine."""
 import logging
 from urllib.parse import urlparse
 
@@ -22,115 +22,122 @@ logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("scout")
 
 
-async def generate_villa_page(
+def _listing_to_getaway_row(listing, slug: str, source_url: str, name: str) -> dict:
+    """Map extracted VillaListing to getaways table row (no images; those go to getaway_images)."""
+    ld = listing.model_dump()
+    parts = [
+        ld.get("interiors_summary"),
+        ld.get("exteriors_summary"),
+        ld.get("location_summary"),
+    ]
+    description = "\n\n".join(p for p in parts if p and str(p).strip()) or None
+    pool = ld.get("pool_features") or []
+    am = ld.get("amenities") or []
+    extras = ld.get("extras") or []
+    amenities = [x for x in (pool + am + extras) if x and str(x).strip()]
+    price = ld.get("price_weekly_usd") or ld.get("price_weekly_min_eur")
+    price_currency = "USD" if ld.get("price_weekly_usd") is not None else ("EUR" if (ld.get("price_weekly_min_eur") or ld.get("price_weekly_max_eur")) else None)
+    return {
+        "slug": slug,
+        "source_url": source_url,
+        "import_status": "loaded",
+        "name": name or (ld.get("villa_name") or "").strip() or None,
+        "location": ld.get("location"),
+        "region": ld.get("region"),
+        "bedrooms": ld.get("bedrooms"),
+        "bathrooms": ld.get("bathrooms"),
+        "max_guests": ld.get("max_guests"),
+        "price": price,
+        "price_currency": price_currency,
+        "price_period": "week",
+        "deposit": ld.get("security_deposit_eur"),
+        "amenities": amenities if amenities else None,
+        "included": ld.get("included_in_price"),
+        "description": description,
+        "caveats": ld.get("the_catch"),
+    }
+
+
+async def generate_getaway_page(
     url: str,
     check_in: str | None = None,
     check_out: str | None = None,
     guests: int | None = None,
     list_id: str | None = None,
     auth_token: str | None = None,
-    villa_id: str | None = None,
+    getaway_id: str | None = None,
 ):
-    """Scrape a villa listing URL and extract structured data.
-    
-    If villa_id is provided, updates that villa instead of creating a new one.
-    """
+    """Scrape a listing URL and extract structured data. If getaway_id is provided, updates that getaway."""
     print(f"[SCOUT] Scouting: {url}")
 
-    # Prepare URL with optional parameters
     crawl_url = add_search_params(url, check_in, check_out, guests)
     js_code = generate_js_params(check_in, check_out, guests)
-    
-    # For JS-heavy sites, add scroll to trigger lazy loading
     if is_js_heavy_site(crawl_url):
         scroll_js = "window.scrollTo(0, 1000);"
         js_code = f"{js_code}; {scroll_js}" if js_code else scroll_js
 
-    # Crawl the page
     raw_markdown, media = await crawl_page(crawl_url, js_code, is_js_heavy_site(crawl_url))
-    
     if not raw_markdown:
         print("[WARN] Crawl failed — skipping extraction")
-        return {"path": None, "thin_scrape": True, "villa_id": villa_id}
+        return {"path": None, "thin_scrape": True, "getaway_id": getaway_id}
 
-    # Get images from crawl result
     url_slug = extract_url_slug(url)
     crawl_image_urls = pick_best_images_from_media(media, villa_name=url_slug, base_url=crawl_url)
     log.info("found %d candidate images from crawl", len(crawl_image_urls))
 
-    # Clean and prepare markdown for extraction
     raw_markdown = strip_other_villas_block(raw_markdown)
     extraction_md = extract_main_property_only(raw_markdown)
-
-    # Check if scrape is too thin
     if is_thin_scrape(extraction_md):
         print("[WARN] Thin scrape — skipping LLM, user will paste manually")
-        return {"path": None, "thin_scrape": True, "villa_id": villa_id}
+        return {"path": None, "thin_scrape": True, "getaway_id": getaway_id}
 
-    # Extract villa data via LLM
     listing = await extract_villa_two_pass(extraction_md)
 
-    # Generate slug and save data
-    title = url.split('/')[-1].split('?')[0].replace('-', ' ').title()
+    title = url.split("/")[-1].split("?")[0].replace("-", " ").title()
     if not title:
-        title = "Tuscan Villa Listing"
+        title = "Listing"
     if listing.villa_name:
-        title = listing.villa_name
-
+        title = (listing.villa_name or "").strip() or title
     slug = generate_slug(title)
 
-    # Upload images to Supabase Storage (server-only)
     image_urls: list[str] = []
-    if villa_id and crawl_image_urls:
-        image_urls = await upload_images_to_supabase(crawl_image_urls, villa_id, auth_token) or []
+    if getaway_id and crawl_image_urls:
+        image_urls = await upload_images_to_supabase(crawl_image_urls, getaway_id, auth_token) or []
     if image_urls:
         print(f"[IMG] Uploaded {len(image_urls)} images to Supabase")
 
-    # Update villa in Supabase
-    from db_lists import update_villa
-    if not villa_id or not auth_token:
-        raise ValueError("villa_id and auth_token required")
-    villa_obj = listing.model_dump()
-    villa_obj["title"] = title
-    villa_obj["slug"] = slug
-    villa_obj["original_url"] = url
-    villa_obj["images"] = image_urls
-    update_villa(villa_id, villa_obj, auth_token=auth_token)
-    print(f"[OK] Success! Villa updated in Supabase")
-    return {"path": f"/villas/{slug}", "thin_scrape": False, "villa_id": villa_id}
+    from db_lists import update_getaway, insert_getaway_images
+    if not getaway_id or not auth_token:
+        raise ValueError("getaway_id and auth_token required")
+    row = _listing_to_getaway_row(listing, slug=slug, source_url=url, name=title)
+    update_getaway(getaway_id, row, auth_token=auth_token)
+    if image_urls:
+        insert_getaway_images(getaway_id, image_urls, auth_token)
+    print("[OK] Success! Getaway updated in Supabase")
+    return {"path": f"/getaways/{slug}", "thin_scrape": False, "getaway_id": getaway_id}
 
 
-async def generate_villa_page_from_paste(
+async def generate_getaway_page_from_paste(
     pasted_text: str,
     original_url: str | None = None,
     list_id: str | None = None,
     auth_token: str | None = None,
-    villa_id: str | None = None,
-) -> str:
-    """Build a villa report from pasted listing text (e.g. copied from Airbnb).
-    Skips crawling; runs the same two-pass extraction and saves the report.
-    Auto-extracts image URLs from the pasted content.
-    
-    If villa_id is provided, updates that villa instead of creating a new one.
-    """
+    getaway_id: str | None = None,
+) -> dict:
+    """Build a getaway report from pasted listing text. If getaway_id is provided, updates that getaway."""
     extraction_md = (pasted_text or "").strip()
     if not extraction_md:
         raise ValueError("Pasted text is empty.")
-
     log.info("manual paste: len=%d chars", len(extraction_md))
 
-    # Extract villa data via LLM (same two-pass process)
     listing = await extract_villa_two_pass(extraction_md)
-
-    # Generate title and slug
     title = (listing.villa_name or "").strip() or "Manual entry"
     slug = generate_slug(title)
 
-    # Get images: try og:image first, then extract from pasted text
     og_url = await fetch_og_image(original_url)
     if og_url:
         image_candidates = [og_url]
-        print(f"[IMG] Using og:image from original URL")
+        print("[IMG] Using og:image from original URL")
     else:
         image_candidates = extract_image_urls_from_text(extraction_md)
         if image_candidates:
@@ -138,25 +145,21 @@ async def generate_villa_page_from_paste(
         else:
             print("[IMG] No images found in paste text")
 
-    # Upload images to Supabase Storage (server-only)
     image_urls: list[str] = []
-    if villa_id and image_candidates:
-        image_urls = await upload_images_to_supabase(image_candidates, villa_id, auth_token) or []
+    if getaway_id and image_candidates:
+        image_urls = await upload_images_to_supabase(image_candidates, getaway_id, auth_token) or []
     if image_urls:
         print(f"[IMG] Uploaded {len(image_urls)} images to Supabase")
 
-    # Update villa in Supabase
-    from db_lists import update_villa
-    if not villa_id or not auth_token:
-        raise ValueError("villa_id and auth_token required")
-    villa_obj = listing.model_dump()
-    villa_obj["title"] = title
-    villa_obj["slug"] = slug
-    villa_obj["original_url"] = original_url
-    villa_obj["images"] = image_urls
-    update_villa(villa_id, villa_obj, auth_token=auth_token)
-    print(f"[OK] Success! Villa updated in Supabase")
-    return {"path": f"/villas/{slug}", "villa_id": villa_id}
+    from db_lists import update_getaway, insert_getaway_images
+    if not getaway_id or not auth_token:
+        raise ValueError("getaway_id and auth_token required")
+    row = _listing_to_getaway_row(listing, slug=slug, source_url=original_url or "", name=title)
+    update_getaway(getaway_id, row, auth_token=auth_token)
+    if image_urls:
+        insert_getaway_images(getaway_id, image_urls, auth_token)
+    print("[OK] Success! Getaway updated in Supabase")
+    return {"path": f"/getaways/{slug}", "getaway_id": getaway_id}
 
 
 if __name__ == "__main__":

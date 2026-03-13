@@ -147,42 +147,42 @@ CREATE POLICY "Users can remove themselves from a list"
   ON list_members FOR DELETE
   USING (user_has_verified_terms_and_age() AND user_id = auth.uid());
 
--- Villas: require verification (use SECURITY DEFINER helpers to avoid recursion)
-DROP POLICY IF EXISTS "Users can view villas in their lists" ON villas;
-CREATE POLICY "Users can view villas in their lists"
-  ON villas FOR SELECT
-  USING (user_has_verified_terms_and_age() AND is_list_owner_or_member(villas.list_id, auth.uid()));
+-- Getaways: require verification (use SECURITY DEFINER helpers to avoid recursion)
+DROP POLICY IF EXISTS "Users can view getaways in their lists" ON getaways;
+CREATE POLICY "Users can view getaways in their lists"
+  ON getaways FOR SELECT
+  USING (user_has_verified_terms_and_age() AND is_list_owner_or_member(getaways.list_id, auth.uid()));
 
-DROP POLICY IF EXISTS "Users can add villas to lists they have access to" ON villas;
-CREATE POLICY "Users can add villas to lists they have access to"
-  ON villas FOR INSERT
-  WITH CHECK (user_has_verified_terms_and_age() AND is_list_owner_or_editor(villas.list_id, auth.uid()));
+DROP POLICY IF EXISTS "Users can add getaways to lists they have access to" ON getaways;
+CREATE POLICY "Users can add getaways to lists they have access to"
+  ON getaways FOR INSERT
+  WITH CHECK (user_has_verified_terms_and_age() AND is_list_owner_or_editor(getaways.list_id, auth.uid()));
 
-DROP POLICY IF EXISTS "Users can update villas in lists they have access to" ON villas;
-CREATE POLICY "Users can update villas in lists they have access to"
-  ON villas FOR UPDATE
-  USING (user_has_verified_terms_and_age() AND is_list_owner_or_editor(villas.list_id, auth.uid()));
+DROP POLICY IF EXISTS "Users can update getaways in lists they have access to" ON getaways;
+CREATE POLICY "Users can update getaways in lists they have access to"
+  ON getaways FOR UPDATE
+  USING (user_has_verified_terms_and_age() AND is_list_owner_or_editor(getaways.list_id, auth.uid()));
 
-DROP POLICY IF EXISTS "Admins can delete villas from lists" ON villas;
-CREATE POLICY "Admins can delete villas from lists"
-  ON villas FOR DELETE
-  USING (user_has_verified_terms_and_age() AND is_list_owner_or_editor(villas.list_id, auth.uid()));
+DROP POLICY IF EXISTS "Admins can delete getaways from lists" ON getaways;
+CREATE POLICY "Admins can delete getaways from lists"
+  ON getaways FOR DELETE
+  USING (user_has_verified_terms_and_age() AND is_list_owner_or_editor(getaways.list_id, auth.uid()));
 
--- Villa images: require verification (villas/lists bypass RLS via helpers)
-DROP POLICY IF EXISTS "Users can view images in their villas" ON villa_images;
-CREATE POLICY "Users can view images in their villas"
-  ON villa_images FOR SELECT
+-- Getaway images: require verification (getaways/lists bypass RLS via helpers)
+DROP POLICY IF EXISTS "Users can view images in their getaways" ON getaway_images;
+CREATE POLICY "Users can view images in their getaways"
+  ON getaway_images FOR SELECT
   USING (
     user_has_verified_terms_and_age()
-    AND EXISTS (SELECT 1 FROM villas v WHERE v.id = villa_images.villa_id AND is_list_owner_or_member(v.list_id, auth.uid()))
+    AND EXISTS (SELECT 1 FROM getaways g WHERE g.id = getaway_images.getaway_id AND is_list_owner_or_member(g.list_id, auth.uid()))
   );
 
-DROP POLICY IF EXISTS "Users can add images to their villas" ON villa_images;
-CREATE POLICY "Users can add images to their villas"
-  ON villa_images FOR INSERT
+DROP POLICY IF EXISTS "Users can add images to their getaways" ON getaway_images;
+CREATE POLICY "Users can add images to their getaways"
+  ON getaway_images FOR INSERT
   WITH CHECK (
     user_has_verified_terms_and_age()
-    AND EXISTS (SELECT 1 FROM villas v WHERE v.id = villa_images.villa_id AND is_list_owner_or_editor(v.list_id, auth.uid()))
+    AND EXISTS (SELECT 1 FROM getaways g WHERE g.id = getaway_images.getaway_id AND is_list_owner_or_editor(g.list_id, auth.uid()))
   );
 
 -- Invite tokens: require verification
@@ -201,29 +201,43 @@ CREATE POLICY "List admins can manage invite tokens"
   ON invite_tokens FOR UPDATE
   USING (user_has_verified_terms_and_age() AND is_list_admin(invite_tokens.list_id, auth.uid()));
 
--- Storage: require verification for villa image access
-DROP POLICY IF EXISTS "Allow villa image uploads" ON storage.objects;
-CREATE POLICY "Allow villa image uploads" ON storage.objects
+-- Storage: require verification for getaway image access (getaway-images bucket)
+DROP POLICY IF EXISTS "Allow getaway image uploads" ON storage.objects;
+CREATE POLICY "Allow getaway image uploads" ON storage.objects
 FOR INSERT TO authenticated
 WITH CHECK (
   user_has_verified_terms_and_age()
-  AND bucket_id = 'villa-images'
+  AND bucket_id = 'getaway-images'
   AND EXISTS (
-    SELECT 1 FROM villas v
-    WHERE v.id::text = (storage.foldername(name))[1]
-    AND is_list_owner_or_member(v.list_id, auth.uid())
+    SELECT 1 FROM getaways g
+    WHERE g.id::text = (storage.foldername(name))[1]
+    AND is_list_owner_or_editor(g.list_id, auth.uid())
   )
 );
 
-DROP POLICY IF EXISTS "List members can view villa images" ON storage.objects;
-CREATE POLICY "List members can view villa images" ON storage.objects
+DROP POLICY IF EXISTS "List members can view getaway images" ON storage.objects;
+CREATE POLICY "List members can view getaway images" ON storage.objects
+FOR SELECT TO authenticated
+USING (
+  user_has_verified_terms_and_age()
+  AND bucket_id = 'getaway-images'
+  AND EXISTS (
+    SELECT 1 FROM getaways g
+    WHERE g.id::text = (storage.foldername(name))[1]
+    AND is_list_owner_or_member(g.list_id, auth.uid())
+  )
+);
+
+-- Legacy bucket villa-images: SELECT only (existing objects; path = getaway_id/filename)
+DROP POLICY IF EXISTS "List members can view legacy villa-images" ON storage.objects;
+CREATE POLICY "List members can view legacy villa-images" ON storage.objects
 FOR SELECT TO authenticated
 USING (
   user_has_verified_terms_and_age()
   AND bucket_id = 'villa-images'
   AND EXISTS (
-    SELECT 1 FROM villas v
-    WHERE v.id::text = (storage.foldername(name))[1]
-    AND is_list_owner_or_member(v.list_id, auth.uid())
+    SELECT 1 FROM getaways g
+    WHERE g.id::text = (storage.foldername(name))[1]
+    AND is_list_owner_or_member(g.list_id, auth.uid())
   )
 );

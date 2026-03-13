@@ -78,21 +78,21 @@ def get_user_lists(auth_token: str) -> list[dict]:
         if lid:
             members_by_list.setdefault(lid, []).append(m)
 
-    # Fetch villa counts per list
+    # Fetch getaway counts per list
     for lst in data:
         members = members_by_list.get(lst["id"], [])
         lst["member_count"] = len(members)  # creator is now in list_members
         try:
             count_resp = (
-                client.table("villas")
+                client.table("getaways")
                 .select("id", count="exact")
                 .eq("list_id", lst["id"])
                 .limit(0)
                 .execute()
             )
-            lst["villa_count"] = getattr(count_resp, "count", None) or 0
+            lst["getaway_count"] = getattr(count_resp, "count", None) or 0
         except Exception:
-            lst["villa_count"] = 0
+            lst["getaway_count"] = 0
     return data
 
 
@@ -296,75 +296,84 @@ def revoke_invite_token(token: str, auth_token: str) -> dict:
 
 
 # ============================================================================
-# VILLA OPERATIONS (updated for lists)
+# GETAWAY OPERATIONS
 # ============================================================================
 
-def create_loading_villa(list_id: str, url: str, auth_token: str = None) -> dict:
-    """Create a placeholder villa row with 'loading' status. Returns the villa ID."""
+def create_loading_getaway(list_id: str, url: str, auth_token: str = None) -> dict:
+    """Create a placeholder getaway row with 'loading' status. Returns the getaway ID."""
     import secrets
-    from urllib.parse import urlparse
-    
+
     client = get_supabase_client(auth_token)
-    domain = urlparse(url).netloc
     slug = f"loading-{secrets.token_hex(4)}"
-    
     data = {
         "list_id": list_id,
         "slug": slug,
-        "original_url": url,
-        "scrap_status": "loading",
+        "source_url": url,
+        "import_status": "loading",
     }
-    response = client.table("villas").insert(data).execute()
+    response = client.table("getaways").insert(data).execute()
     return response.data[0] if response.data else None
 
 
-def insert_villa(list_id: str, user_id: str, villa_data: dict, auth_token: str = None) -> dict:
-    """Insert a new villa into a list."""
+def insert_getaway(list_id: str, user_id: str, getaway_data: dict, auth_token: str = None) -> dict:
+    """Insert a new getaway into a list."""
     client = get_supabase_client(auth_token)
-    villa_data["list_id"] = list_id
-    villa_data["user_id"] = user_id
-    response = client.table("villas").insert(villa_data).execute()
+    getaway_data["list_id"] = list_id
+    getaway_data["user_id"] = user_id
+    response = client.table("getaways").insert(getaway_data).execute()
     return response.data[0] if response.data else None
 
 
-def get_list_villas(list_id: str, auth_token: str) -> list[dict]:
-    """Get all villas in a list."""
+def _attach_images_to_getaways(rows: list[dict]) -> list[dict]:
+    """Flatten getaway_images into an 'images' array (sorted by position) on each row."""
+    for row in rows:
+        imgs = row.pop("getaway_images", None) or []
+        row["images"] = [x["image_url"] for x in sorted(imgs, key=lambda i: (i.get("position") or 0))]
+    return rows
+
+
+def get_list_getaways(list_id: str, auth_token: str) -> list[dict]:
+    """Get all getaways in a list, with images from getaway_images."""
     client = get_supabase_client(auth_token)
     response = (
-        client.table("villas")
-        .select("*")
+        client.table("getaways")
+        .select("*, getaway_images(image_url, position)")
         .eq("list_id", list_id)
         .order("created_at", desc=True)
         .execute()
     )
-    return response.data or []
+    rows = response.data or []
+    return _attach_images_to_getaways(rows)
 
 
-def get_villa_by_slug(list_id: str, slug: str, auth_token: str) -> dict:
-    """Get a specific villa by slug in a list."""
+def get_getaway_by_slug(list_id: str, slug: str, auth_token: str) -> dict:
+    """Get a specific getaway by slug in a list."""
     client = get_supabase_client(auth_token)
     response = (
-        client.table("villas")
-        .select("*")
+        client.table("getaways")
+        .select("*, getaway_images(image_url, position)")
         .eq("list_id", list_id)
         .eq("slug", slug)
         .execute()
     )
-    return response.data[0] if response.data else None
+    if not response.data:
+        return None
+    rows = _attach_images_to_getaways([response.data[0]])
+    return rows[0]
 
 
-def update_villa(villa_id: str, updates: dict, auth_token: str) -> dict:
-    """Update a villa."""
+def update_getaway(getaway_id: str, updates: dict, auth_token: str) -> dict:
+    """Update a getaway."""
     client = get_supabase_client(auth_token)
-    response = client.table("villas").update(updates).eq("id", villa_id).execute()
+    response = client.table("getaways").update(updates).eq("id", getaway_id).execute()
     return response.data[0] if response.data else None
 
 
-def update_villa_by_slug(list_id: str, slug: str, updates: dict, auth_token: str) -> dict:
-    """Update a villa by slug."""
+def update_getaway_by_slug(list_id: str, slug: str, updates: dict, auth_token: str) -> dict:
+    """Update a getaway by slug."""
     client = get_supabase_client(auth_token)
     response = (
-        client.table("villas")
+        client.table("getaways")
         .update(updates)
         .eq("list_id", list_id)
         .eq("slug", slug)
@@ -373,21 +382,32 @@ def update_villa_by_slug(list_id: str, slug: str, updates: dict, auth_token: str
     return response.data[0] if response.data else None
 
 
-def delete_villa(villa_id: str, auth_token: str) -> bool:
-    """Delete a villa."""
+def delete_getaway(getaway_id: str, auth_token: str) -> bool:
+    """Delete a getaway (getaway_images cascade)."""
     client = get_supabase_client(auth_token)
-    response = client.table("villas").delete().eq("id", villa_id).execute()
+    response = client.table("getaways").delete().eq("id", getaway_id).execute()
     return len(response.data) > 0 if response.data else False
 
 
-def delete_villa_by_slug(list_id: str, slug: str, auth_token: str) -> bool:
-    """Delete a villa by slug."""
+def delete_getaway_by_slug(list_id: str, slug: str, auth_token: str) -> bool:
+    """Delete a getaway by slug."""
     client = get_supabase_client(auth_token)
     response = (
-        client.table("villas")
+        client.table("getaways")
         .delete()
         .eq("list_id", list_id)
         .eq("slug", slug)
         .execute()
     )
     return len(response.data) > 0 if response.data else False
+
+
+def insert_getaway_images(getaway_id: str, image_urls: list[str], auth_token: str) -> None:
+    """Insert image rows into getaway_images for a getaway. Replaces any existing images for that getaway."""
+    if not image_urls:
+        return
+    client = get_supabase_client(auth_token)
+    # Delete existing images for this getaway so we don't duplicate
+    client.table("getaway_images").delete().eq("getaway_id", getaway_id).execute()
+    rows = [{"getaway_id": getaway_id, "image_url": url, "position": i} for i, url in enumerate(image_urls)]
+    client.table("getaway_images").insert(rows).execute()

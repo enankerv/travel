@@ -1,20 +1,20 @@
-"""FastAPI routes for lists, members, invites, and villas."""
+"""FastAPI routes for lists, members, invites, and getaways."""
 from fastapi import APIRouter, HTTPException, Query, Header
 from typing import Optional
 
 from models import (
     ListCreate, ListUpdate, ListResponse, AddListMember, UpdateMemberRole,
     CreateInvite, InviteResponse, InviteTokenDetails, AcceptInvite,
-    VillaResponse, ScoutRequest, ScoutPasteRequest, ScoutResponse,
+    GetawayResponse, ScoutRequest, ScoutPasteRequest, ScoutResponse,
 )
 from db_lists import (
     create_list, get_user_lists, get_list_by_id, update_list, delete_list,
     add_list_member, get_list_members, update_member_role, remove_list_member,
     create_invite_token, get_invite_token, get_invite_for_accept_rpc, accept_invite, list_invite_tokens, revoke_invite_token,
-    insert_villa, get_list_villas, get_villa_by_slug, update_villa, update_villa_by_slug, delete_villa, delete_villa_by_slug,
+    create_loading_getaway, insert_getaway, get_list_getaways, get_getaway_by_slug, update_getaway, update_getaway_by_slug, delete_getaway, delete_getaway_by_slug,
 )
 
-from scout import generate_villa_page, generate_villa_page_from_paste
+from scout import generate_getaway_page, generate_getaway_page_from_paste
 from utils.urls import generate_slug
 
 router = APIRouter(prefix="/api", tags=["api"])
@@ -312,47 +312,48 @@ async def revoke_invite_endpoint(token: str, authorization: Optional[str] = Head
 
 
 # ============================================================================
-# VILLA ENDPOINTS
+# GETAWAY ENDPOINTS
 # ============================================================================
 
-@router.get("/lists/{list_id}/villas", response_model=list[VillaResponse])
-async def get_villas_endpoint(list_id: str, authorization: Optional[str] = Header(None)):
-    """Get all villas in a list. Image paths are signed for private bucket access."""
+@router.get("/lists/{list_id}/getaways", response_model=list[GetawayResponse])
+async def get_getaways_endpoint(list_id: str, authorization: Optional[str] = Header(None)):
+    """Get all getaways in a list. Image paths are signed for private bucket access."""
     try:
-        from utils.storage_urls import sign_villa_images
+        from utils.storage_urls import sign_getaway_images
         token = extract_auth_token(authorization)
-        villas = get_list_villas(list_id, token)
-        return [sign_villa_images(v, token) for v in villas]
+        getaways = get_list_getaways(list_id, token)
+        return [sign_getaway_images(g, token) for g in getaways]
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.put("/lists/{list_id}/villas/{villa_slug}")
-async def update_villa_endpoint(list_id: str, villa_slug: str, updates: dict, authorization: Optional[str] = Header(None)):
-    """Update villa fields."""
+@router.put("/lists/{list_id}/getaways/{getaway_slug}")
+async def update_getaway_endpoint(list_id: str, getaway_slug: str, updates: dict, authorization: Optional[str] = Header(None)):
+    """Update getaway fields."""
     try:
-        from utils.storage_urls import sign_villa_images
+        from utils.storage_urls import sign_getaway_images
         token = extract_auth_token(authorization)
-        result = update_villa_by_slug(list_id, villa_slug, updates, token)
+        result = update_getaway_by_slug(list_id, getaway_slug, updates, token)
         if not result:
-            raise HTTPException(status_code=404, detail="Villa not found")
-        return {"ok": True, "villa": sign_villa_images(result, token)}
+            raise HTTPException(status_code=404, detail="Getaway not found")
+        full = get_getaway_by_slug(list_id, result.get("slug") or getaway_slug, token)
+        return {"ok": True, "getaway": sign_getaway_images(full or result, token)}
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/lists/{list_id}/villas/{villa_slug}")
-async def delete_villa_endpoint(list_id: str, villa_slug: str, authorization: Optional[str] = Header(None)):
-    """Delete a villa. Only admin or editor can do this."""
+@router.delete("/lists/{list_id}/getaways/{getaway_slug}")
+async def delete_getaway_endpoint(list_id: str, getaway_slug: str, authorization: Optional[str] = Header(None)):
+    """Delete a getaway. Only admin or editor can do this."""
     try:
         token = extract_auth_token(authorization)
-        success = delete_villa_by_slug(list_id, villa_slug, token)
+        success = delete_getaway_by_slug(list_id, getaway_slug, token)
         if not success:
-            raise HTTPException(status_code=404, detail="Villa not found")
+            raise HTTPException(status_code=404, detail="Getaway not found")
         return {"ok": True}
     except HTTPException:
         raise
@@ -361,145 +362,84 @@ async def delete_villa_endpoint(list_id: str, villa_slug: str, authorization: Op
 
 
 # ============================================================================
-# SCOUT ENDPOINTS (updated for lists)
+# SCOUT ENDPOINTS
 # ============================================================================
 
 @router.post("/scout", response_model=ScoutResponse)
 async def scout_listing(req: ScoutRequest, authorization: Optional[str] = Header(None)):
-    """Scout a URL and save to a list.
-    
-    If villa_id is provided, updates that existing villa (retry).
-    Otherwise creates a loading villa row, then processes in background.
-    """
+    """Scout a URL and save to a list. If getaway_id is provided, updates that getaway (retry)."""
     url = str(req.url)
     list_id = req.list_id
-    
     try:
         token = extract_auth_token(authorization)
-        
-        if req.villa_id:
-            # Update existing villa (retry)
-            villa_id = req.villa_id
-            from db_lists import update_villa
-            update_villa(villa_id, {"scrap_status": "loading"}, auth_token=token)
+        if req.getaway_id:
+            getaway_id = req.getaway_id
+            update_getaway(getaway_id, {"import_status": "loading"}, auth_token=token)
         else:
-            # Create a loading villa placeholder
-            from db_lists import create_loading_villa
-            loading_villa = create_loading_villa(list_id, url, auth_token=token)
-            if not loading_villa:
-                raise Exception("Failed to create loading villa")
-            villa_id = loading_villa.get("id")
-        
-        # Process scout in background (fire and forget)
+            loading_getaway = create_loading_getaway(list_id, url, auth_token=token)
+            if not loading_getaway:
+                raise Exception("Failed to create loading getaway")
+            getaway_id = loading_getaway.get("id")
         import asyncio
-        asyncio.create_task(_process_scout(url, list_id, villa_id, req.check_in, req.check_out, req.guests, token))
-        
-        return ScoutResponse(
-            ok=True,
-            villa_id=villa_id,
-        )
+        asyncio.create_task(_process_scout(url, list_id, getaway_id, req.check_in, req.check_out, req.guests, token))
+        return ScoutResponse(ok=True, getaway_id=getaway_id)
     except HTTPException:
         raise
     except Exception as e:
         return ScoutResponse(ok=False, error=str(e), thin_scrape=False)
 
 
-async def _process_scout(url: str, list_id: str, villa_id: str, check_in: str, check_out: str, guests: int, auth_token: str):
-    """Background task to process scout and update the villa row."""
+async def _process_scout(url: str, list_id: str, getaway_id: str, check_in: str, check_out: str, guests: int, auth_token: str):
+    """Background task to process scout and update the getaway row."""
     try:
-        from db_lists import update_villa
-        result = await generate_villa_page(
-            url,
-            check_in=check_in,
-            check_out=check_out,
-            guests=guests,
-            list_id=list_id,
-            auth_token=auth_token,
-            villa_id=villa_id,  # Pass villa_id to update instead of insert
+        result = await generate_getaway_page(
+            url, check_in=check_in, check_out=check_out, guests=guests,
+            list_id=list_id, auth_token=auth_token, getaway_id=getaway_id,
         )
-        
-        # Update the loading villa with the result or status
         if result.get("thin_scrape"):
-            update_villa(villa_id, {"scrap_status": "thin"}, auth_token)
+            update_getaway(getaway_id, {"import_status": "thin"}, auth_token)
         else:
-            # Update with all the scraped data
             updates = {
-                "scrap_status": "loaded",
-                **{k: v for k, v in result.items() if k not in ["villa_id", "path", "thin_scrape"]}
+                "import_status": "loaded",
+                **{k: v for k, v in result.items() if k not in ["getaway_id", "path", "thin_scrape"]}
             }
-            update_villa(villa_id, updates, auth_token)
+            update_getaway(getaway_id, updates, auth_token)
     except Exception as e:
-        # Update villa with error status
-        from db_lists import update_villa
-        update_villa(villa_id, {
-            "scrap_status": "error",
-            "scrap_error": str(e)
-        }, auth_token)
+        update_getaway(getaway_id, {"import_status": "error", "import_error": str(e)}, auth_token)
 
 
 @router.post("/scout-paste", response_model=ScoutResponse)
 async def scout_from_paste(req: ScoutPasteRequest, authorization: Optional[str] = Header(None)):
-    """Build a villa report from pasted listing text.
-    
-    If villa_id is provided, updates that existing villa (e.g. thin scrape).
-    Otherwise creates a loading villa row, then processes in background.
-    """
+    """Build a getaway report from pasted listing text. If getaway_id is provided, updates that getaway."""
     list_id = req.list_id
-    
     try:
         token = extract_auth_token(authorization)
-        
-        if req.villa_id:
-            # Update existing villa (thin scrape / resubmit)
-            villa_id = req.villa_id
-            # Mark as loading while we process
-            from db_lists import update_villa
-            update_villa(villa_id, {"scrap_status": "loading"}, auth_token=token)
+        if req.getaway_id:
+            getaway_id = req.getaway_id
+            update_getaway(getaway_id, {"import_status": "loading"}, auth_token=token)
         else:
-            # Create a loading villa placeholder
-            from db_lists import create_loading_villa
             url = req.original_url or "paste"
-            loading_villa = create_loading_villa(list_id, url, auth_token=token)
-            if not loading_villa:
-                raise Exception("Failed to create loading villa")
-            villa_id = loading_villa.get("id")
-        
-        # Process scout in background (fire and forget)
+            loading_getaway = create_loading_getaway(list_id, url, auth_token=token)
+            if not loading_getaway:
+                raise Exception("Failed to create loading getaway")
+            getaway_id = loading_getaway.get("id")
         import asyncio
-        asyncio.create_task(_process_scout_paste(req.pasted_text, list_id, villa_id, req.original_url, token))
-        
-        return ScoutResponse(
-            ok=True,
-            villa_id=villa_id,
-        )
+        asyncio.create_task(_process_scout_paste(req.pasted_text, list_id, getaway_id, req.original_url, token))
+        return ScoutResponse(ok=True, getaway_id=getaway_id)
     except HTTPException:
         raise
     except Exception as e:
         return ScoutResponse(ok=False, error=str(e))
 
 
-async def _process_scout_paste(pasted_text: str, list_id: str, villa_id: str, original_url: str, auth_token: str):
-    """Background task to process paste scout and update the villa row."""
+async def _process_scout_paste(pasted_text: str, list_id: str, getaway_id: str, original_url: str, auth_token: str):
+    """Background task to process paste scout and update the getaway row."""
     try:
-        from db_lists import update_villa
-        result = await generate_villa_page_from_paste(
-            pasted_text=pasted_text,
-            original_url=original_url,
-            list_id=list_id,
-            auth_token=auth_token,
-            villa_id=villa_id,  # Pass villa_id to update instead of insert
+        result = await generate_getaway_page_from_paste(
+            pasted_text=pasted_text, original_url=original_url, list_id=list_id,
+            auth_token=auth_token, getaway_id=getaway_id,
         )
-        
-        # Update the loading villa with the result
-        updates = {
-            "scrap_status": "loaded",
-            **{k: v for k, v in result.items() if k not in ["villa_id", "path"]}
-        }
-        update_villa(villa_id, updates, auth_token)
+        updates = {"import_status": "loaded", **{k: v for k, v in result.items() if k not in ["getaway_id", "path"]}}
+        update_getaway(getaway_id, updates, auth_token)
     except Exception as e:
-        # Update villa with error status
-        from db_lists import update_villa
-        update_villa(villa_id, {
-            "scrap_status": "error",
-            "scrap_error": str(e)
-        }, auth_token)
+        update_getaway(getaway_id, {"import_status": "error", "import_error": str(e)}, auth_token)

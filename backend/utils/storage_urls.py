@@ -2,10 +2,10 @@
 Uses user auth_token for RLS - never service role."""
 import re
 
-BUCKET = "villa-images"
+BUCKET = "getaway-images"
 EXPIRE_SEC = 3600  # 1 hour
 
-# Match Supabase storage URL to extract path: .../object/public/villa-images/path or .../object/sign/...
+# Match Supabase storage URL to extract path: .../object/public/getaway-images/path or .../object/sign/...
 _STORAGE_PATH_RE = re.compile(r"/storage/v1/object/(?:public|sign)/[^/]+/(.+)$")
 
 
@@ -45,10 +45,10 @@ def sign_image_paths(paths: list[str] | None, auth_token: str) -> list[str]:
     return signed
 
 
-def sign_villa_images(villa: dict, auth_token: str) -> dict:
-    """Return villa with images array replaced by signed URLs. Uses auth_token for RLS."""
-    if not villa or "images" not in villa:
-        return villa
-    images = villa.get("images") or []
-    villa = {**villa, "images": sign_image_paths(images, auth_token)}
-    return villa
+def sign_getaway_images(getaway: dict, auth_token: str) -> dict:
+    """Return getaway with images array replaced by signed URLs. Uses auth_token for RLS."""
+    if not getaway or "images" not in getaway:
+        return getaway
+    images = getaway.get("images") or []
+    getaway = {**getaway, "images": sign_image_paths(images, auth_token)}
+    return getaway

@@ -8,7 +8,7 @@ import httpx
 
 log = logging.getLogger("scout.images")
 
-SUPABASE_BUCKET = "villa-images"
+SUPABASE_BUCKET = "getaway-images"
 
 # Regex patterns for image extraction
 MD_IMAGE_RE = re.compile(r"!\[[^\]]*\]\((https?://[^\s\)]+\.(?:jpe?g|png|webp))\)", re.IGNORECASE)
@@ -58,11 +58,11 @@ def is_likely_property_photo(url: str) -> bool:
 
 async def upload_images_to_supabase(
     image_urls: list[str],
-    villa_id: str,
+    getaway_id: str,
     auth_token: str,
     max_images: int = 5,
 ) -> list[str] | None:
-    """Download images from URLs and upload to Supabase Storage. Returns storage paths (villa_id/filename) or None on failure.
+    """Download images from URLs and upload to Supabase Storage. Returns storage paths (getaway_id/filename) or None on failure.
     Uses auth_token for Storage RLS (authenticated user must have list access)."""
     from db_lists import get_supabase_client
 
@@ -88,7 +88,7 @@ async def upload_images_to_supabase(
                     ext = "webp"
                 elif "gif" in ct:
                     ext = "gif"
-                path = f"{villa_id}/{i:02d}.{ext}"
+                path = f"{getaway_id}/{i:02d}.{ext}"
                 mime = ct or f"image/{ext}"
                 # storage-py: upload(path, file, file_options); file can be bytes
                 bucket.upload(
