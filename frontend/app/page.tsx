@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/lib/AuthContext'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { getLists, createList, checkAccess, getMyProfile } from '@/lib/api'
@@ -27,14 +27,20 @@ function HomeContent() {
   const [termsIsReAccept, setTermsIsReAccept] = useState(false)
   const [termsRequiresAge, setTermsRequiresAge] = useState(false)
   const [underAgeDenied, setUnderAgeDenied] = useState(false)
+  const loadedForUserIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!authLoading && !user && !allowlistDenied && !underAgeDenied) {
+      loadedForUserIdRef.current = null
       router.push('/auth/login')
       return
     }
 
     if (user && !allowlistDenied) {
+      // Skip reload on tab focus (Supabase fires onAuthStateChange on token refresh)
+      if (loadedForUserIdRef.current === user.id) return
+      loadedForUserIdRef.current = user.id
+
       setIsLoading(true)
       checkAccess()
         .then(() => getMyProfile())
