@@ -16,13 +16,13 @@ from utils.images import (
     fetch_og_image,
 )
 from utils.crawler import crawl_page
-from utils.extraction import extract_villa_two_pass
+from utils.extraction import extract_villa_two_pass, extract_price_from_text
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("scout")
 
 
-def _listing_to_getaway_row(listing, slug: str, source_url: str, name: str) -> dict:
+def _listing_to_getaway_row(listing, slug: str, source_url: str, name: str, raw_text: str | None = None) -> dict:
     """Map extracted VillaListing to getaways table row (no images; those go to getaway_images)."""
     ld = listing.model_dump()
     parts = [
@@ -35,8 +35,16 @@ def _listing_to_getaway_row(listing, slug: str, source_url: str, name: str) -> d
     am = ld.get("amenities") or []
     extras = ld.get("extras") or []
     amenities = [x for x in (pool + am + extras) if x and str(x).strip()]
-    price = ld.get("price_weekly_usd") or ld.get("price_weekly_min_eur")
-    price_currency = "USD" if ld.get("price_weekly_usd") is not None else ("EUR" if (ld.get("price_weekly_min_eur") or ld.get("price_weekly_max_eur")) else None)
+    price = None
+    price_currency = None
+    if raw_text:
+        regex_price, regex_currency = extract_price_from_text(raw_text)
+        if regex_price is not None:
+            price, price_currency = regex_price, regex_currency
+            log.info("price from text (currency symbols): %s %s", price_currency, price)
+    if price is None:
+        price = ld.get("price_weekly_usd") or ld.get("price_weekly_min_eur")
+        price_currency = "USD" if ld.get("price_weekly_usd") is not None else ("EUR" if (ld.get("price_weekly_min_eur") or ld.get("price_weekly_max_eur")) else None)
     return {
         "slug": slug,
         "source_url": source_url,
@@ -109,7 +117,7 @@ async def generate_getaway_page(
     from db_lists import update_getaway, insert_getaway_images
     if not getaway_id or not auth_token:
         raise ValueError("getaway_id and auth_token required")
-    row = _listing_to_getaway_row(listing, slug=slug, source_url=url, name=title)
+    row = _listing_to_getaway_row(listing, slug=slug, source_url=url, name=title, raw_text=extraction_md)
     update_getaway(getaway_id, row, auth_token=auth_token)
     if image_urls:
         insert_getaway_images(getaway_id, image_urls, auth_token)
@@ -154,7 +162,7 @@ async def generate_getaway_page_from_paste(
     from db_lists import update_getaway, insert_getaway_images
     if not getaway_id or not auth_token:
         raise ValueError("getaway_id and auth_token required")
-    row = _listing_to_getaway_row(listing, slug=slug, source_url=original_url or "", name=title)
+    row = _listing_to_getaway_row(listing, slug=slug, source_url=original_url or "", name=title, raw_text=pasted_text)
     update_getaway(getaway_id, row, auth_token=auth_token)
     if image_urls:
         insert_getaway_images(getaway_id, image_urls, auth_token)

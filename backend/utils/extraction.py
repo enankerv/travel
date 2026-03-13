@@ -2,10 +2,41 @@
 import asyncio
 import logging
 import os
+import re
 import instructor
 from schema import VillaListing, FactSheet
 
 log = logging.getLogger("scout.extraction")
+
+# Regex to find prices with currency symbols ($ € £ ¥ etc.) or "N USD/EUR"
+_PRICE_PATTERNS = [
+    (r"[\$€£¥]\s*([\d,]+(?:\.[\d]+)?)", None),  # $1,234 or €500 or £1,200
+    (r"([\d,]+(?:\.[\d]+)?)\s*(USD|EUR|GBP)\b", 2),  # 1,234 USD
+]
+_CURRENCY_MAP = {"$": "USD", "€": "EUR", "£": "GBP", "¥": "JPY"}
+
+
+def extract_price_from_text(text: str) -> tuple[float | None, str | None]:
+    """Find the first price with $ € £ ¥ or USD/EUR/GBP in the text. Returns (price, currency) or (None, None)."""
+    if not text or not isinstance(text, str):
+        return (None, None)
+    for pattern, currency_group in _PRICE_PATTERNS:
+        m = re.search(pattern, text, re.IGNORECASE)
+        if m:
+            try:
+                num_str = m.group(1).replace(",", "")
+                price = float(num_str)
+                if price <= 0:
+                    continue
+                if currency_group is None:
+                    sym = m.group(0).strip()[0]
+                    currency = _CURRENCY_MAP.get(sym, "USD" if sym == "$" else "EUR")
+                else:
+                    currency = m.group(currency_group).upper()
+                return (price, currency)
+            except (ValueError, IndexError):
+                continue
+    return (None, None)
 
 # Provider: "gemini" (prod) or "ollama" (local). Defaults to gemini if GEMINI_API_KEY is set.
 LLM_PROVIDER = os.getenv("LLM_PROVIDER") or ("gemini" if os.getenv("GEMINI_API_KEY") else "ollama")
