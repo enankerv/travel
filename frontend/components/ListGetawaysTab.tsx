@@ -23,6 +23,7 @@ export default function ListGetawaysTab({
   onRefresh,
 }: ListGetawaysTabProps) {
   const [error, setError] = useState("");
+  const [scoutLoading, setScoutLoading] = useState(false);
   const [lastFailedUrl, setLastFailedUrl] = useState("");
   const [lastFailedPaste, setLastFailedPaste] = useState("");
   const [showPasteModal, setShowPasteModal] = useState(false);
@@ -39,6 +40,7 @@ export default function ListGetawaysTab({
   async function handleScoutUrl(url: string, getawayId?: string) {
     setError("");
     setLastFailedUrl("");
+    setScoutLoading(true);
     try {
       const result = await scoutUrl(url, listId, getawayId);
       if (result.ok) {
@@ -74,6 +76,8 @@ export default function ListGetawaysTab({
           icon: "✕",
         });
       }
+    } finally {
+      setScoutLoading(false);
     }
   }
 
@@ -186,7 +190,7 @@ export default function ListGetawaysTab({
     <>
       <div className="list-villas-tab">
         <div className="list-villas-tab__drop">
-          <DropZone onUrlSubmit={handleScoutUrl} isLoading={isLoading} />
+          <DropZone onUrlSubmit={handleScoutUrl} isLoading={scoutLoading} />
         </div>
 
         {error && (

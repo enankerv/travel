@@ -134,7 +134,12 @@ button:focus-visible {
 }
 
 .dropzone:hover {
-  border-color: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.22);
+  background: var(--surface-hover);
+}
+
+.dropzone:hover .dropzone__icon {
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .dropzone.focused {
@@ -1041,6 +1046,12 @@ button:focus-visible {
   flex: 1;
   padding: 0 2rem 1.5rem;
   overflow: hidden;
+}
+
+/* Table matches dropzone width (both use 2rem horizontal padding from their containers) */
+.list-villas-tab__table-wrap .sheet-wrap {
+  margin-left: 0;
+  margin-right: 0;
 }
 
 /* List members tab */
