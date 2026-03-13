@@ -44,9 +44,7 @@ export default function AmenitiesCell({
   const fullText = normalizeAmenitiesDisplay(amenities)
   const isLong = fullText.length > truncateLen
 
-  const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation()
-  }
+  // Don't stop propagation - let row click open listing. Expand/collapse buttons handle their own clicks.
 
   if (readOnly) {
     return (
@@ -101,7 +99,6 @@ export default function AmenitiesCell({
   return (
     <td
       className={cellClassName}
-      onClick={handleClick}
       title={fullText}
     >
       {renderContent()}

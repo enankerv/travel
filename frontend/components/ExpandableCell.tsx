@@ -38,10 +38,11 @@ export default function ExpandableCell({
   const isLong = fullText.length > truncateLen
 
   const handleCellClick = (e: React.MouseEvent) => {
+    if (!isLong) return // let click bubble to row (open listing)
     e.stopPropagation()
-    if (isLong && !expanded) {
+    if (!expanded) {
       setExpanded(true)
-    } else if (expanded) {
+    } else {
       setExpanded(false)
     }
   }
