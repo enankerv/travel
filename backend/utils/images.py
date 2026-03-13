@@ -64,7 +64,7 @@ async def upload_images_to_supabase(
 ) -> list[str] | None:
     """Download images from URLs and upload to Supabase Storage. Returns storage paths (getaway_id/filename) or None on failure.
     Uses auth_token for Storage RLS (authenticated user must have list access)."""
-    from db_lists import get_supabase_client
+    from db import get_supabase_client
 
     if not auth_token:
         log.warning("auth_token required for storage upload")

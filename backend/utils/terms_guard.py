@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 from typing import Optional
 
-from db_lists import get_supabase_client
+from db import get_supabase_client
 
 # Bump this when you update Terms/Privacy. Must match frontend lib/constants.ts
 TERMS_UPDATED_AT = os.getenv("TERMS_UPDATED_AT", "2025-03-07T00:00:00Z")

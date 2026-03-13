@@ -114,7 +114,7 @@ async def generate_getaway_page(
     if image_urls:
         print(f"[IMG] Uploaded {len(image_urls)} images to Supabase")
 
-    from db_lists import update_getaway, insert_getaway_images
+    from db import update_getaway, insert_getaway_images
     if not getaway_id or not auth_token:
         raise ValueError("getaway_id and auth_token required")
     row = _listing_to_getaway_row(listing, slug=slug, source_url=url, name=title, raw_text=extraction_md)
@@ -159,7 +159,7 @@ async def generate_getaway_page_from_paste(
     if image_urls:
         print(f"[IMG] Uploaded {len(image_urls)} images to Supabase")
 
-    from db_lists import update_getaway, insert_getaway_images
+    from db import update_getaway, insert_getaway_images
     if not getaway_id or not auth_token:
         raise ValueError("getaway_id and auth_token required")
     row = _listing_to_getaway_row(listing, slug=slug, source_url=original_url or "", name=title, raw_text=pasted_text)
