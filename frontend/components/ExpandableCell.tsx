@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 
 const DEFAULT_TRUNCATE_LEN = 50
 
@@ -25,6 +25,7 @@ type ExpandableCellProps = {
   value: string | string[] | number | null | undefined
   truncateLen?: number
   cellClassName: string
+  suffix?: ReactNode
 }
 
 /** Reusable cell with expand/collapse for long text. Shrinks to fit, expands on click. */
@@ -32,13 +33,14 @@ export default function ExpandableCell({
   value,
   truncateLen = DEFAULT_TRUNCATE_LEN,
   cellClassName,
+  suffix,
 }: ExpandableCellProps) {
   const [expanded, setExpanded] = useState(false)
   const fullText = toDisplayString(value)
   const isLong = fullText.length > truncateLen
 
   const handleCellClick = (e: React.MouseEvent) => {
-    if (!isLong) return // let click bubble to row (open listing)
+    if (!isLong) return
     e.stopPropagation()
     if (!expanded) {
       setExpanded(true)
@@ -97,7 +99,10 @@ export default function ExpandableCell({
 
   return (
     <td className={className} onClick={handleCellClick} title={fullText}>
-      {renderContent()}
+      <span className="expandable-cell-inner">
+        {renderContent()}
+        {suffix}
+      </span>
     </td>
   )
 }

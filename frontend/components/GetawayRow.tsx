@@ -65,12 +65,6 @@ export default function GetawayRow({
     }
   }
 
-  const handleRowClick = () => {
-    if (!isEditing && getaway.source_url) {
-      window.open(getaway.source_url, '_blank')
-    }
-  }
-
   const cellCtx: CellRenderContextInput = {
     getaway,
     editData,
@@ -86,11 +80,7 @@ export default function GetawayRow({
 
   if (getaway.import_status === 'loading') {
     return (
-      <tr
-        style={{ opacity: 0.6, cursor: getaway.source_url ? 'pointer' : undefined }}
-        onClick={() => getaway.source_url && window.open(getaway.source_url, '_blank')}
-        title={getaway.source_url ? 'Open listing' : undefined}
-      >
+      <tr style={{ opacity: 0.6 }}>
         {visibleKeys.includes('image') && (
           <td className="col-thumb">
             <div className="spinner" style={{ width: '2rem', height: '2rem' }}></div>
@@ -120,9 +110,7 @@ export default function GetawayRow({
           </td>
         )}
         <td className="col-name" colSpan={colspanMessage} style={{ color: 'var(--orange)' }}>
-          <span style={{ cursor: 'pointer' }}>
-            Unable to extract full data. Click here to paste listing details manually.
-          </span>
+          Unable to extract full data. Click here to paste listing details manually.
         </td>
         {visibleKeys.includes('actions') && (
           <td className="col-catch" onClick={(e) => e.stopPropagation()}>
@@ -177,11 +165,7 @@ export default function GetawayRow({
   }
 
   return (
-    <tr
-      onClick={handleRowClick}
-      style={getaway.source_url ? { cursor: 'pointer' } : undefined}
-      title={getaway.source_url ? 'Open listing' : undefined}
-    >
+    <tr>
       {visibleKeys.map((key) => renderColumnCell(key, cellCtx))}
     </tr>
   )

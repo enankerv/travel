@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import ExpandableCell from "@/components/ExpandableCell";
 import EditableCell from "@/components/EditableCell";
-import { TrashIcon } from "@/components/icons";
+import { TrashIcon, ExternalLinkIcon } from "@/components/icons";
 
 export const COLUMN_KEYS = [
   "image",
@@ -112,6 +112,20 @@ const COLUMN_CONFIG: Record<ColumnKey, ColumnDef> = {
           value={getaway.name}
           cellClassName={className}
           truncateLen={40}
+          suffix={
+            getaway.source_url ? (
+              <a
+                href={getaway.source_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="name-external-link"
+                title="Open listing"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <ExternalLinkIcon size={14} />
+              </a>
+            ) : null
+          }
         />
       ),
   },

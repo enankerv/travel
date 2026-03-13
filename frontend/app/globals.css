@@ -302,7 +302,6 @@ button:focus-visible {
 .sheet tbody tr {
   border-bottom: 1px solid var(--border);
   transition: background 0.15s;
-  cursor: pointer;
 }
 
 .sheet tbody tr:hover {
@@ -362,6 +361,34 @@ button:focus-visible {
   overflow: visible;
   text-overflow: clip;
   vertical-align: top;
+  max-width: none;
+  min-width: 200px;
+}
+
+.expandable-cell-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.expandable-cell-inner .expandable-content,
+.expandable-cell-inner .expandable-truncated {
+  flex: 1;
+  min-width: 0;
+}
+
+.name-external-link {
+  flex-shrink: 0;
+  color: var(--muted);
+  padding: 0.2rem;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.name-external-link:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 
 /* Shared styles for villa row edit inputs */
