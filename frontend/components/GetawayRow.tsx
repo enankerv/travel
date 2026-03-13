@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls'
 import { parseAmenitiesInput } from '@/components/AmenitiesCell'
-import TrashIcon from '@/components/TrashIcon'
+import { TrashIcon } from '@/components/icons'
 import {
   getVisibleColumnKeys,
   renderColumnCell,

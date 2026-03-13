@@ -25,7 +25,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const initAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        const sessionPromise = supabase.auth.getSession()
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Session check timeout')), 8000)
+        )
+        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise])
         setSession(session)
         setUser(session?.user ?? null)
       } catch (error) {

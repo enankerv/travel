@@ -120,60 +120,142 @@ button:focus-visible {
   letter-spacing: 0.06em;
 }
 
-/* Drop zone */
+/* Drop zone - URL input bar */
 .dropzone {
-  margin: 0 2rem 1rem;
-  border: 2px dashed var(--border-strong);
-  border-radius: 12px;
-  padding: 1.25rem 1.5rem;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  transition: all 0.2s;
-  background: var(--dark-2);
+  gap: 1rem;
+  padding: 0.5rem 0.5rem 0.5rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  cursor: text;
+}
+
+.dropzone:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.dropzone.focused {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
 .dropzone.drag-over {
   border-color: var(--accent);
   background: var(--accent-soft);
+  box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
-.dropzone input[type="text"] {
+.dropzone__input-wrap {
   flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.dropzone__icon {
+  color: var(--muted);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+}
+
+.dropzone.focused .dropzone__icon,
+.dropzone.drag-over .dropzone__icon {
+  color: var(--accent);
+}
+
+.dropzone__input {
+  flex: 1;
+  min-width: 0;
   background: transparent;
   border: none;
   color: var(--light);
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-family: inherit;
   outline: none;
+  padding: 0.6rem 0;
 }
 
-.dropzone input[type="text"]::placeholder {
+.dropzone__input::placeholder {
   color: var(--muted);
 }
 
-.dropzone .hint {
-  color: var(--muted);
-  font-size: 0.8rem;
-  white-space: nowrap;
+.dropzone__input:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
-.dropzone button {
+.dropzone__submit {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   background: var(--accent);
   color: #fff;
   border: none;
-  border-radius: 8px;
-  padding: 0.6rem 1.25rem;
-  font-size: 0.85rem;
+  border-radius: 10px;
+  padding: 0.65rem 1.25rem;
+  font-size: 0.9rem;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
   white-space: nowrap;
-  transition: filter 0.15s;
+  transition: filter 0.15s, transform 0.1s;
+  flex-shrink: 0;
 }
 
-.dropzone button:hover {
+.dropzone__submit:hover:not(:disabled) {
   filter: brightness(1.1);
+}
+
+.dropzone__submit:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.dropzone__submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.dropzone__submit-text {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dropzone__spinner {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: dropzone-spin 0.7s linear infinite;
+}
+
+@keyframes dropzone-spin {
+  to { transform: rotate(360deg); }
+}
+
+.dropzone__hint {
+  color: var(--muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .dropzone {
+    flex-wrap: wrap;
+  }
+  .dropzone__hint {
+    order: 3;
+    width: 100%;
+    padding-left: 2.5rem;
+  }
 }
 
 /* Spreadsheet wrapper */

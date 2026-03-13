@@ -186,7 +186,7 @@ export default function ListGetawaysTab({
     <>
       <div className="list-villas-tab">
         <div className="list-villas-tab__drop">
-          <DropZone onUrlSubmit={handleScoutUrl} isLoading={false} />
+          <DropZone onUrlSubmit={handleScoutUrl} isLoading={isLoading} />
         </div>
 
         {error && (

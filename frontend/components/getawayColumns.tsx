@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import ExpandableCell from "@/components/ExpandableCell";
 import EditableCell from "@/components/EditableCell";
-import TrashIcon from "@/components/TrashIcon";
+import { TrashIcon } from "@/components/icons";
 
 export const COLUMN_KEYS = [
   "image",
