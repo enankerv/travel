@@ -20,7 +20,7 @@ type UseAuthBootstrapParams = {
 
 export function useAuthBootstrap({
   user,
-  authLoading,
+  authLoading: _authLoading,
   signOut,
   allowlistDenied,
   underAgeDenied,
