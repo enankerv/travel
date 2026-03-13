@@ -1,13 +1,16 @@
 'use client'
 
-import { Suspense, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useAuth } from '@/lib/AuthContext'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { getLists, createList, checkAccess, getMyProfile } from '@/lib/api'
-import { TERMS_UPDATED_AT } from '@/lib/constants'
+import { getLists, createList } from '@/lib/api'
 import ListsView, { type ListItem } from '@/components/ListsView'
 import ListDetailView from '@/components/ListDetailView'
 import TermsConsentModal from '@/components/TermsConsentModal'
+import CreateListModal from '@/components/CreateListModal'
+import AuthDeniedView from '@/components/AuthDeniedView'
+import LoadingView from '@/components/LoadingView'
+import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
 
 function HomeContent() {
   const { user, loading: authLoading, signOut } = useAuth()
@@ -18,103 +21,61 @@ function HomeContent() {
   const [isLoading, setIsLoading] = useState(true)
   const [selectedListId, setSelectedListId] = useState<string | null>(null)
   const [createModalOpen, setCreateModalOpen] = useState(false)
-  const [newListName, setNewListName] = useState('')
-  const [newListDescription, setNewListDescription] = useState('')
-  const [createLoading, setCreateLoading] = useState(false)
   const [error, setError] = useState('')
   const [allowlistDenied, setAllowlistDenied] = useState(false)
   const [showTermsModal, setShowTermsModal] = useState(false)
   const [termsIsReAccept, setTermsIsReAccept] = useState(false)
   const [termsRequiresAge, setTermsRequiresAge] = useState(false)
   const [underAgeDenied, setUnderAgeDenied] = useState(false)
-  const loadedForUserIdRef = useRef<string | null>(null)
+
+  const loadLists = useCallback(
+    async (applyListFromUrl = true) => {
+      try {
+        const data = await getLists()
+        setLists(data || [])
+        if (applyListFromUrl && listParam && data?.some((l: ListItem) => l.id === listParam)) {
+          setSelectedListId(listParam)
+        } else if (listParam) {
+          router.replace('/', { scroll: false })
+        }
+      } catch (err) {
+        console.error('Failed to load lists:', err)
+        setError('Failed to load lists')
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [listParam, router]
+  )
+
+  const onTermsNeeded = useCallback(
+    ({ isReAccept, requiresAge }: { isReAccept: boolean; requiresAge: boolean }) => {
+      setTermsIsReAccept(isReAccept)
+      setTermsRequiresAge(requiresAge)
+      setShowTermsModal(true)
+    },
+    []
+  )
+
+  useAuthBootstrap({
+    user,
+    authLoading,
+    signOut,
+    allowlistDenied,
+    underAgeDenied,
+    onReady: loadLists,
+    onTermsNeeded,
+    onAllowlistDenied: () => setAllowlistDenied(true),
+    onUnderAgeDenied: () => setUnderAgeDenied(true),
+    onError: setError,
+    onLoadingChange: setIsLoading,
+  })
 
   useEffect(() => {
     if (!authLoading && !user && !allowlistDenied && !underAgeDenied) {
-      loadedForUserIdRef.current = null
       router.push('/auth/login')
-      return
     }
-
-    if (user && !allowlistDenied) {
-      // Skip reload on tab focus (Supabase fires onAuthStateChange on token refresh)
-      if (loadedForUserIdRef.current === user.id) return
-      loadedForUserIdRef.current = user.id
-
-      setIsLoading(true)
-      checkAccess()
-        .then(() => getMyProfile())
-        .then(async (profile) => {
-          const acceptedAt = profile?.terms_accepted_at ? new Date(profile.terms_accepted_at).getTime() : 0
-          const termsUpdatedAt = new Date(TERMS_UPDATED_AT).getTime()
-          const needsAcceptance = !profile?.terms_accepted_at || acceptedAt < termsUpdatedAt
-          const needsAge = !profile?.age_verified_at
-
-          if (!needsAcceptance) {
-            loadLists()
-            return
-          }
-          // Consent + age in localStorage from login/signup? Use if recent.
-          const consentAt = typeof window !== 'undefined' ? localStorage.getItem('terms_consent_at') : null
-          const consentAge = typeof window !== 'undefined' ? localStorage.getItem('terms_consent_age') : null
-          if (consentAt) {
-            const consentTime = new Date(consentAt).getTime()
-            const age = Date.now() - consentTime
-            if (age < 10 * 60 * 1000 && consentTime >= termsUpdatedAt) {
-              const ageNum = consentAge ? parseInt(consentAge, 10) : undefined
-              if (needsAge && ageNum !== undefined && !isNaN(ageNum) && ageNum >= 16) {
-                const { acceptTerms } = await import('@/lib/api')
-                await acceptTerms(ageNum)
-                localStorage.removeItem('terms_consent_at')
-                localStorage.removeItem('terms_consent_age')
-                loadLists()
-                return
-              }
-              if (!needsAge) {
-                const { acceptTerms } = await import('@/lib/api')
-                await acceptTerms()
-                localStorage.removeItem('terms_consent_at')
-                localStorage.removeItem('terms_consent_age')
-                loadLists()
-                return
-              }
-            }
-          }
-          setTermsIsReAccept(!!profile?.terms_accepted_at)
-          setTermsRequiresAge(needsAge)
-          setShowTermsModal(true)
-          setIsLoading(false)
-        })
-        .catch((err: Error & { code?: string }) => {
-          if (err.code === 'NOT_ON_ALLOWLIST') {
-            setAllowlistDenied(true)
-            signOut()
-          } else {
-            setError('Failed to load')
-          }
-          setIsLoading(false)
-        })
-    }
-  }, [user, authLoading, router, allowlistDenied, underAgeDenied])
-
-  async function loadLists(applyListFromUrl = true) {
-    try {
-      const data = await getLists()
-      setLists(data || [])
-      if (applyListFromUrl && listParam && data?.some((l: ListItem) => l.id === listParam)) {
-        setSelectedListId(listParam)
-        // Keep URL as ?list=id so refresh reopens this list
-      } else if (listParam) {
-        // Invalid or deleted list id in URL – clear it
-        router.replace('/', { scroll: false })
-      }
-    } catch (err) {
-      console.error('Failed to load lists:', err)
-      setError('Failed to load lists')
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  }, [authLoading, user, allowlistDenied, underAgeDenied, router])
 
   function handleSelectList(id: string | null) {
     setSelectedListId(id)
@@ -125,89 +86,42 @@ function HomeContent() {
     }
   }
 
-  async function handleCreateList() {
-    if (!newListName.trim()) return
-
-    setCreateLoading(true)
-    try {
-      const list = await createList(newListName, newListDescription)
-      setLists([...lists, list])
-      setNewListName('')
-      setNewListDescription('')
-      setCreateModalOpen(false)
-    } catch (err: any) {
-      setError(err.message || 'Failed to create list')
-    } finally {
-      setCreateLoading(false)
-    }
+  async function handleCreateList(name: string, description: string) {
+    const list = await createList(name, description)
+    setLists((prev) => [...prev, list])
   }
 
   if (authLoading || isLoading) {
     return (
-      <div className="app" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', flexDirection: 'column', gap: '1rem' }}>
-        <div className="spinner" style={{ width: '2.5rem', height: '2.5rem' }} />
-        <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.95rem' }}>
-          {authLoading ? 'Checking session…' : 'Loading your lists…'}
-        </p>
-      </div>
+      <LoadingView message={authLoading ? 'Checking session…' : 'Loading your lists…'} />
     )
   }
 
   if (allowlistDenied) {
     return (
-      <div className="app" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', flexDirection: 'column', gap: '1rem', padding: '2rem' }}>
-        <h2 style={{ margin: 0, color: 'var(--light)' }}>You&apos;re not on the invite list yet</h2>
-        <p style={{ margin: 0, color: 'var(--muted)', textAlign: 'center' }}>
-          This app is currently invite-only. Ask the owner to add your email.
-        </p>
-        <button
-          onClick={() => router.push('/auth/login')}
-          style={{
-            background: 'var(--accent)',
-            color: '#fff',
-            border: 'none',
-            padding: '0.6rem 1.25rem',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontWeight: 600,
-          }}
-        >
-          Back to Login
-        </button>
-      </div>
+      <AuthDeniedView
+        title="You're not on the invite list yet"
+        message="This app is currently invite-only. Ask the owner to add your email."
+        onAction={() => router.push('/auth/login')}
+      />
+    )
+  }
+
+  if (underAgeDenied) {
+    return (
+      <AuthDeniedView
+        title="You must be 16+ to use GetawayGather"
+        message="GetawayGather requires users to be at least 16 years old."
+        onAction={() => {
+          signOut()
+          setUnderAgeDenied(false)
+          router.push('/auth/login')
+        }}
+      />
     )
   }
 
   if (!user) return null
-
-  if (underAgeDenied) {
-    return (
-      <div className="app" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', flexDirection: 'column', gap: '1rem', padding: '2rem' }}>
-        <h2 style={{ margin: 0, color: 'var(--light)' }}>You must be 16+ to use GetawayGather</h2>
-        <p style={{ margin: 0, color: 'var(--muted)', textAlign: 'center' }}>
-          GetawayGather requires users to be at least 16 years old.
-        </p>
-        <button
-          onClick={() => {
-            signOut()
-            setUnderAgeDenied(false)
-            router.push('/auth/login')
-          }}
-          style={{
-            background: 'var(--accent)',
-            color: '#fff',
-            border: 'none',
-            padding: '0.6rem 1.25rem',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontWeight: 600,
-          }}
-        >
-          Back to Login
-        </button>
-      </div>
-    )
-  }
 
   if (showTermsModal) {
     return (
@@ -280,91 +194,18 @@ function HomeContent() {
         )}
       </div>
 
-      {/* Create List Modal */}
-      <div className={`modal-overlay ${createModalOpen ? 'open' : ''}`}>
-        <div className="modal" style={{ width: '400px' }}>
-          <h2>Create New List</h2>
-          <p>Create a collaborative list for tracking getaways</p>
-
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--light)' }}>
-              List Name
-            </label>
-            <input
-              type="text"
-              value={newListName}
-              onChange={(e) => setNewListName(e.target.value)}
-              placeholder="e.g., Italy Trip 2024"
-              style={{
-                width: '100%',
-                background: 'var(--surface)',
-                border: '1px solid var(--border-strong)',
-                borderRadius: '8px',
-                padding: '0.6rem',
-                color: 'var(--light)',
-                fontFamily: 'inherit',
-                fontSize: '0.9rem',
-              }}
-            />
-          </div>
-
-          <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--light)' }}>
-              Description (optional)
-            </label>
-            <textarea
-              value={newListDescription}
-              onChange={(e) => setNewListDescription(e.target.value)}
-              placeholder="Add notes about this list..."
-              style={{
-                width: '100%',
-                background: 'var(--surface)',
-                border: '1px solid var(--border-strong)',
-                borderRadius: '8px',
-                padding: '0.6rem',
-                color: 'var(--light)',
-                fontFamily: 'inherit',
-                fontSize: '0.9rem',
-                minHeight: '80px',
-                resize: 'vertical',
-              }}
-            />
-          </div>
-
-          <div className="modal-actions">
-            <button
-              className="btn-cancel"
-              onClick={() => {
-                setCreateModalOpen(false)
-                setNewListName('')
-                setNewListDescription('')
-              }}
-              disabled={createLoading}
-            >
-              Cancel
-            </button>
-            <button
-              className="btn-primary"
-              onClick={handleCreateList}
-              disabled={createLoading || !newListName.trim()}
-            >
-              {createLoading ? 'Creating...' : 'Create'}
-            </button>
-          </div>
-        </div>
-      </div>
+      <CreateListModal
+        open={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onCreate={handleCreateList}
+      />
     </div>
   )
 }
 
 export default function Home() {
   return (
-    <Suspense fallback={
-      <div className="app" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', flexDirection: 'column', gap: '1rem' }}>
-        <div className="spinner" style={{ width: '2.5rem', height: '2.5rem' }} />
-        <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.95rem' }}>Loading…</p>
-      </div>
-    }>
+    <Suspense fallback={<LoadingView />}>
       <HomeContent />
     </Suspense>
   )

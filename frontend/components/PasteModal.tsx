@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Modal from './Modal'
 
 interface PasteModalProps {
   isOpen: boolean
@@ -82,8 +83,7 @@ export default function PasteModal({ isOpen, onClose, onSubmit, isLoading, initi
   }
 
   return (
-    <div className={`modal-overlay ${isOpen ? 'open' : ''}`}>
-      <div className="modal">
+    <Modal open={isOpen} onClose={handleClose}>
         <h2>Paste Listing Details</h2>
         {listingUrl ? (
           <>
@@ -135,7 +135,6 @@ export default function PasteModal({ isOpen, onClose, onSubmit, isLoading, initi
             {isLoading ? 'Processing...' : 'Process'}
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
