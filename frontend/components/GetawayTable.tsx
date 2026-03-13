@@ -1,10 +1,24 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import GetawayRow from './GetawayRow'
+import ColumnPopover from './ColumnPopover'
+import {
+  COLUMN_BY_KEY,
+  COLUMN_KEYS,
+  DEFAULT_VISIBLE,
+  getVisibleColumnKeys,
+  type ColumnKey,
+  type VisibleColumns,
+} from './getawayColumns'
+
+export { COLUMN_KEYS, type ColumnKey, type VisibleColumns }
 
 export default function GetawayTable({ getaways, isLoading, onDelete, onUpdate, onImageClick, onRetry, onPasteClick }: any) {
   const [editingId, setEditingId] = useState(null)
+  const [visibleColumns, setVisibleColumns] = useState<VisibleColumns>(DEFAULT_VISIBLE)
+  const [showColumnMenu, setShowColumnMenu] = useState(false)
+  const triggerRef = useRef<HTMLButtonElement>(null)
 
   const handleEditStart = (getawayId: any) => {
     setEditingId(getawayId)
@@ -15,6 +29,10 @@ export default function GetawayTable({ getaways, isLoading, onDelete, onUpdate, 
       onUpdate(getawayId, updatedData)
     }
     setEditingId(null)
+  }
+
+  const toggleColumn = (key: ColumnKey) => {
+    setVisibleColumns((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
   if (isLoading) {
@@ -39,19 +57,33 @@ export default function GetawayTable({ getaways, isLoading, onDelete, onUpdate, 
 
   return (
     <div className="sheet-wrap" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <div className="sheet-toolbar">
+        <button
+          ref={triggerRef}
+          type="button"
+          className="column-toggle-btn"
+          onClick={() => setShowColumnMenu(!showColumnMenu)}
+          title="Toggle columns"
+        >
+          ⋮ Columns
+        </button>
+      </div>
+      <ColumnPopover
+        open={showColumnMenu}
+        onClose={() => setShowColumnMenu(false)}
+        triggerRef={triggerRef}
+        visibleColumns={visibleColumns}
+        onToggleColumn={toggleColumn}
+      />
       <div className="sheet-scroll" style={{ flex: 1 }}>
         <table className="sheet">
           <thead>
             <tr>
-              <th className="col-thumb">Image</th>
-              <th className="col-name">Getaway Name</th>
-              <th className="col-loc">Location</th>
-              <th className="col-beds">Beds</th>
-              <th className="col-baths">Baths</th>
-              <th className="col-guests">Guests</th>
-              <th className="col-price">Price</th>
-              <th className="col-amenities">Amenities</th>
-              <th className="col-catch">Actions</th>
+              {getVisibleColumnKeys(visibleColumns).map((key) => (
+                <th key={key} className={COLUMN_BY_KEY[key].className}>
+                  {COLUMN_BY_KEY[key].label}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -60,6 +92,7 @@ export default function GetawayTable({ getaways, isLoading, onDelete, onUpdate, 
                 key={getaway.id}
                 getaway={getaway}
                 isEditing={editingId === getaway.id}
+                visibleColumns={visibleColumns}
                 onEditStart={() => handleEditStart(getaway.id)}
                 onEditEnd={(updatedData: any) => handleEditEnd(getaway.id, updatedData)}
                 onDelete={() => onDelete && onDelete(getaway.id)}
