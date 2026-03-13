@@ -72,7 +72,7 @@ export default function AmenitiesCell({
             className="amenities-collapse-btn"
             title="Show less"
           >
-            {' '}▼
+            {' '}▲
           </button>
         </span>
       )
@@ -90,7 +90,7 @@ export default function AmenitiesCell({
           title="Show all amenities"
         >
           <span className="amenities-ellipsis"> …</span>
-          <span className="amenities-arrow"> ▶</span>
+          <span className="amenities-arrow"> ▼</span>
         </button>
       </span>
     )

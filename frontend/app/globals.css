@@ -393,7 +393,6 @@ button:focus-visible {
 
 .name-external-link:hover {
   color: var(--accent);
-  background: var(--accent-soft);
 }
 
 /* Shared styles for villa row edit inputs */
@@ -500,14 +499,23 @@ button:focus-visible {
 }
 .expandable-truncated:hover .expandable-indicator,
 .expandable-clickable:hover .expandable-indicator {
-  color: var(--light);
+  color: var(--accent);
 }
 .amenities-expand-btn:hover,
+.expandable-expand-btn:hover {
+  color: var(--accent);
+}
 .amenities-collapse-btn:hover,
-.expandable-expand-btn:hover,
 .expandable-collapse-btn:hover {
-  color: var(--light);
-  text-decoration: underline;
+  color: var(--accent);
+}
+/* Highlight arrows when hovering anywhere on cell */
+.col-amenities:hover .amenities-expand-btn {
+  color: var(--accent);
+}
+.expandable-expanded:hover .expandable-collapse-btn,
+.amenities-expanded:hover .amenities-collapse-btn {
+  color: var(--accent);
 }
 .col-catch {
   width: auto;

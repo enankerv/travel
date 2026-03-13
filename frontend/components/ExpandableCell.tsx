@@ -65,7 +65,7 @@ export default function ExpandableCell({
             }}
             title="Show less"
           >
-            {' '}▼
+            {' '}▲
           </button>
         </span>
       )
@@ -89,7 +89,7 @@ export default function ExpandableCell({
       >
         <span className="expandable-text">{fullText.slice(0, truncateLen)}</span>
         <span className="expandable-indicator">
-          <span className="expandable-arrow">▶</span>
+          <span className="expandable-arrow">▼</span>
         </span>
       </span>
     )
