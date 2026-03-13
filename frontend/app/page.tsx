@@ -166,6 +166,7 @@ function HomeContent() {
           onSignOut={signOut}
           user={user}
           error={error}
+          onDismissError={() => setError('')}
           isLoading={isLoading}
         />
       </div>

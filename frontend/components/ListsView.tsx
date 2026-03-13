@@ -17,6 +17,7 @@ interface ListsViewProps {
   onSignOut: () => void
   user: User | null
   error: string
+  onDismissError?: () => void
   isLoading?: boolean
 }
 
@@ -27,6 +28,7 @@ export default function ListsView({
   onSignOut,
   user,
   error,
+  onDismissError,
 }: ListsViewProps) {
   return (
     <>
@@ -89,9 +91,23 @@ export default function ListsView({
             border: '1px solid var(--red)',
             borderRadius: '8px',
             color: 'var(--red)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '1rem',
           }}
         >
-          {error}
+          <span>{error}</span>
+          {onDismissError && (
+            <button
+              type="button"
+              onClick={onDismissError}
+              className="list-villas-tab__error-dismiss"
+              title="Dismiss"
+            >
+              ×
+            </button>
+          )}
         </div>
       )}
 

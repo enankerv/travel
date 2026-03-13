@@ -167,6 +167,14 @@ export default function ListDetailView({ list, onBack }: any) {
             style={{ margin: "1rem 2rem 0" }}
           >
             <span>{error}</span>
+            <button
+              type="button"
+              onClick={() => setError("")}
+              className="list-villas-tab__error-dismiss"
+              title="Dismiss"
+            >
+              ×
+            </button>
           </div>
         )}
         {activeTab === "places" && <ListGetawaysTab />}

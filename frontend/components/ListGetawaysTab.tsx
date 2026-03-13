@@ -185,15 +185,25 @@ export default function ListGetawaysTab() {
         {error && (
           <div className="list-villas-tab__error">
             <span>{error}</span>
-            {showRetry && (
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              {showRetry && (
+                <button
+                  type="button"
+                  onClick={handleRetryError}
+                  className="list-villas-tab__error-retry"
+                >
+                  Retry
+                </button>
+              )}
               <button
                 type="button"
-                onClick={handleRetryError}
-                className="list-villas-tab__error-retry"
+                onClick={() => setError("")}
+                className="list-villas-tab__error-dismiss"
+                title="Dismiss"
               >
-                Retry
+                ×
               </button>
-            )}
+            </div>
           </div>
         )}
 
