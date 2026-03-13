@@ -17,6 +17,8 @@ type UseListGetawaysRealtimeOptions = {
   onInsert: (row: GetawayRow) => void;
   onUpdate: (row: GetawayRow) => void;
   onDelete: (id: string) => void;
+  /** Called when getaway_images changes; refetch getaways to get updated images */
+  onImagesChange?: () => void;
 };
 
 /**
@@ -33,6 +35,7 @@ export function useListGetawaysRealtime({
   onInsert,
   onUpdate,
   onDelete,
+  onImagesChange,
 }: UseListGetawaysRealtimeOptions) {
   useEffect(() => {
     if (!enabled) return;
@@ -61,9 +64,10 @@ export function useListGetawaysRealtime({
       .on("broadcast", { event: "UPDATE" }, (p: any) =>
         applyChange("UPDATE", p.payload?.record, p.payload?.old_record ?? null),
       )
-      .on("broadcast", { event: "DELETE" }, (p: any) =>
-        applyChange("DELETE", null, p.payload?.old_record ?? null),
-      )
+      .on("broadcast", { event: "DELETE" }, (p: any) => {
+        const oldRecord = p.payload?.old_record ?? p.payload?.record;
+        applyChange("DELETE", null, oldRecord);
+      })
       .on(
         "postgres_changes",
         {
@@ -78,6 +82,17 @@ export function useListGetawaysRealtime({
             payload.new,
             payload.old ?? null,
           );
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "getaway_images",
+        },
+        () => {
+          onImagesChange?.();
         },
       )
       .subscribe();

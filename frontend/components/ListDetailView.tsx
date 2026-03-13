@@ -33,6 +33,7 @@ export default function ListDetailView({ list, onBack }: any) {
     onUpdate: (row) =>
       setGetaways((prev) => prev.map((g) => (g.id === row.id ? row : g))),
     onDelete: (id) => setGetaways((prev) => prev.filter((g) => g.id !== id)),
+    onImagesChange: () => loadData(true),
   });
 
   useListPresence({
