@@ -1,18 +1,18 @@
 'use client'
 
 import { useState } from 'react'
-import VillaRow from './VillaRow'
+import GetawayRow from './GetawayRow'
 
-export default function VillaTable({ villas, isLoading, onDelete, onUpdate, onImageClick, onRetry, onPasteClick }: any) {
+export default function GetawayTable({ getaways, isLoading, onDelete, onUpdate, onImageClick, onRetry, onPasteClick }: any) {
   const [editingId, setEditingId] = useState(null)
 
-  const handleEditStart = (villaId: any) => {
-    setEditingId(villaId)
+  const handleEditStart = (getawayId: any) => {
+    setEditingId(getawayId)
   }
 
-  const handleEditEnd = (villaId: any, updatedData: any) => {
+  const handleEditEnd = (getawayId: any, updatedData: any) => {
     if (updatedData && onUpdate) {
-      onUpdate(villaId, updatedData)
+      onUpdate(getawayId, updatedData)
     }
     setEditingId(null)
   }
@@ -26,7 +26,7 @@ export default function VillaTable({ villas, isLoading, onDelete, onUpdate, onIm
     )
   }
 
-  if (!villas || villas.length === 0) {
+  if (!getaways || getaways.length === 0) {
     return (
       <div className="sheet-wrap">
         <div className="empty-state">
@@ -49,22 +49,22 @@ export default function VillaTable({ villas, isLoading, onDelete, onUpdate, onIm
               <th className="col-beds">Beds</th>
               <th className="col-baths">Baths</th>
               <th className="col-guests">Guests</th>
-              <th className="col-price">Price/Week</th>
+              <th className="col-price">Price</th>
               <th className="col-amenities">Amenities</th>
               <th className="col-catch">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {villas.map((villa: any) => (
-              <VillaRow
-                key={villa.id}
-                villa={villa}
-                isEditing={editingId === villa.id}
-                onEditStart={() => handleEditStart(villa.id)}
-                onEditEnd={(updatedData: any) => handleEditEnd(villa.id, updatedData)}
-                onDelete={() => onDelete && onDelete(villa.id)}
+            {getaways.map((getaway: any) => (
+              <GetawayRow
+                key={getaway.id}
+                getaway={getaway}
+                isEditing={editingId === getaway.id}
+                onEditStart={() => handleEditStart(getaway.id)}
+                onEditEnd={(updatedData: any) => handleEditEnd(getaway.id, updatedData)}
+                onDelete={() => onDelete && onDelete(getaway.id)}
                 onImageClick={onImageClick}
-                onRetry={villa.original_url ? () => onRetry && onRetry(villa) : undefined}
+                onRetry={getaway.source_url ? () => onRetry && onRetry(getaway) : undefined}
                 onPasteClick={onPasteClick}
               />
             ))}

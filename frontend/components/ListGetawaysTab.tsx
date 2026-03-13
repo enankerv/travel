@@ -1,32 +1,32 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { scoutUrl, scoutPaste, deleteVilla, updateVilla } from "@/lib/api";
+import { scoutUrl, scoutPaste, deleteGetaway, updateGetaway } from "@/lib/api";
 import DropZone from "./DropZone";
-import VillaTable from "./VillaTable";
+import GetawayTable from "./GetawayTable";
 import PasteModal from "./PasteModal";
 import ImageGallery from "./ImageGallery";
 
-type ListVillasTabProps = {
+type ListGetawaysTabProps = {
   listId: string;
-  villas: any[];
-  setVillas: React.Dispatch<React.SetStateAction<any[]>>;
+  getaways: any[];
+  setGetaways: React.Dispatch<React.SetStateAction<any[]>>;
   isLoading: boolean;
   onRefresh: () => Promise<void>;
 };
 
-export default function ListVillasTab({
+export default function ListGetawaysTab({
   listId,
-  villas,
-  setVillas,
+  getaways,
+  setGetaways,
   isLoading,
   onRefresh,
-}: ListVillasTabProps) {
+}: ListGetawaysTabProps) {
   const [error, setError] = useState("");
   const [lastFailedUrl, setLastFailedUrl] = useState("");
   const [lastFailedPaste, setLastFailedPaste] = useState("");
   const [showPasteModal, setShowPasteModal] = useState(false);
-  const [pasteVilla, setPasteVilla] = useState<any>(null);
+  const [pasteGetaway, setPasteGetaway] = useState<any>(null);
   const [galleryImages, setGalleryImages] = useState<string[] | null>(null);
   const [galleryIndex, setGalleryIndex] = useState(0);
 
@@ -36,15 +36,15 @@ export default function ListVillasTab({
     }
   }, []);
 
-  async function handleScoutUrl(url: string, villaId?: string) {
+  async function handleScoutUrl(url: string, getawayId?: string) {
     setError("");
     setLastFailedUrl("");
     try {
-      const result = await scoutUrl(url, listId, villaId);
+      const result = await scoutUrl(url, listId, getawayId);
       if (result.ok) {
-        if (villaId) {
-          setVillas((prev) =>
-            prev.map((v) => (v.id === villaId ? { ...v, scrap_status: "loading" } : v))
+        if (getawayId) {
+          setGetaways((prev) =>
+            prev.map((g) => (g.id === getawayId ? { ...g, import_status: "loading" } : g))
           );
         }
         if (Notification.permission === "granted") {
@@ -76,15 +76,15 @@ export default function ListVillasTab({
     setError("");
     setLastFailedPaste("");
     setShowPasteModal(false);
-    const villaId = pasteVilla?.id ?? undefined;
-    const originalUrl = pasteVilla?.original_url ?? undefined;
+    const getawayId = pasteGetaway?.id ?? undefined;
+    const originalUrl = pasteGetaway?.source_url ?? undefined;
     try {
-      const result = await scoutPaste(text, listId, originalUrl, villaId);
+      const result = await scoutPaste(text, listId, originalUrl, getawayId);
       if (result.ok) {
-        setPasteVilla(null);
-        if (villaId) {
-          setVillas((prev) =>
-            prev.map((v) => (v.id === villaId ? { ...v, scrap_status: "loading" } : v))
+        setPasteGetaway(null);
+        if (getawayId) {
+          setGetaways((prev) =>
+            prev.map((g) => (g.id === getawayId ? { ...g, import_status: "loading" } : g))
           );
         }
         if (Notification.permission === "granted") {
@@ -128,33 +128,33 @@ export default function ListVillasTab({
     }
   }
 
-  async function handleRetryVilla(villa: any) {
-    if (!villa?.original_url) return;
+  async function handleRetryGetaway(getaway: any) {
+    if (!getaway?.source_url) return;
     try {
-      await handleScoutUrl(villa.original_url, villa.id);
+      await handleScoutUrl(getaway.source_url, getaway.id);
     } catch (err: any) {
       setError(err.message || "Failed to retry");
     }
   }
 
-  async function handleDeleteVilla(villaId: string) {
+  async function handleDeleteGetaway(getawayId: string) {
     if (!confirm("Delete this getaway?")) return;
     try {
-      const villa = villas.find((v: any) => v.id === villaId);
-      if (villa) {
-        await deleteVilla(listId, villa.slug);
-        setVillas((prev) => prev.filter((v: any) => v.id !== villaId));
+      const getaway = getaways.find((g: any) => g.id === getawayId);
+      if (getaway) {
+        await deleteGetaway(listId, getaway.slug);
+        setGetaways((prev) => prev.filter((g: any) => g.id !== getawayId));
       }
     } catch (err: any) {
       setError(err.message || "Failed to delete getaway");
     }
   }
 
-  async function handleUpdateVilla(villaId: string, updatedData: any) {
+  async function handleUpdateGetaway(getawayId: string, updatedData: any) {
     try {
-      const villa = villas.find((v: any) => v.id === villaId);
-      if (villa) {
-        await updateVilla(listId, villa.slug, updatedData);
+      const getaway = getaways.find((g: any) => g.id === getawayId);
+      if (getaway) {
+        await updateGetaway(listId, getaway.slug, updatedData);
         await onRefresh();
       }
     } catch (err: any) {
@@ -167,8 +167,8 @@ export default function ListVillasTab({
     setGalleryIndex(index);
   }
 
-  function handlePasteClick(villa: any) {
-    setPasteVilla(villa);
+  function handlePasteClick(getaway: any) {
+    setPasteGetaway(getaway);
     setLastFailedPaste("");
     setShowPasteModal(true);
   }
@@ -198,13 +198,13 @@ export default function ListVillasTab({
         )}
 
         <div className="list-villas-tab__table-wrap">
-          <VillaTable
-            villas={villas}
+          <GetawayTable
+            getaways={getaways}
             isLoading={isLoading}
-            onDelete={handleDeleteVilla}
-            onUpdate={handleUpdateVilla}
+            onDelete={handleDeleteGetaway}
+            onUpdate={handleUpdateGetaway}
             onImageClick={handleImageClick}
-            onRetry={handleRetryVilla}
+            onRetry={handleRetryGetaway}
             onPasteClick={handlePasteClick}
           />
         </div>
@@ -222,13 +222,13 @@ export default function ListVillasTab({
         isOpen={showPasteModal}
         onClose={() => {
           setShowPasteModal(false);
-          setPasteVilla(null);
+          setPasteGetaway(null);
           setLastFailedPaste("");
         }}
         onSubmit={handleScoutPaste}
         isLoading={false}
         initialText={lastFailedPaste}
-        listingUrl={pasteVilla?.original_url ?? undefined}
+        listingUrl={pasteGetaway?.source_url ?? undefined}
       />
     </>
   );

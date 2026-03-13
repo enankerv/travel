@@ -6,7 +6,7 @@ export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000
 export function resolveImageUrl(url: string): string {
   if (!url) return ''
   if (url.startsWith('http://') || url.startsWith('https://')) return url
-  // Legacy /images/ and raw storage paths (villa_id/filename) - not loadable without signed URL
+  // Legacy /images/ and raw storage paths (getaway_id/filename) - not loadable without signed URL
   return ''
 }
 
@@ -107,16 +107,16 @@ export async function deleteList(listId: string) {
 }
 
 // Getaways
-export async function getVillas(listId: string) {
+export async function getGetaways(listId: string) {
   const headers = await getAuthHeaders()
-  const res = await fetch(`${API_URL}/api/lists/${listId}/villas`, { headers })
+  const res = await fetch(`${API_URL}/api/lists/${listId}/getaways`, { headers })
   if (!res.ok) throw new Error('Failed to fetch getaways')
   return res.json()
 }
 
-export async function updateVilla(listId: string, slug: string, updates: any) {
+export async function updateGetaway(listId: string, slug: string, updates: any) {
   const headers = await getAuthHeaders()
-  const res = await fetch(`${API_URL}/api/lists/${listId}/villas/${slug}`, {
+  const res = await fetch(`${API_URL}/api/lists/${listId}/getaways/${slug}`, {
     method: 'PUT',
     headers,
     body: JSON.stringify(updates),
@@ -125,9 +125,9 @@ export async function updateVilla(listId: string, slug: string, updates: any) {
   return res.json()
 }
 
-export async function deleteVilla(listId: string, slug: string) {
+export async function deleteGetaway(listId: string, slug: string) {
   const headers = await getAuthHeaders()
-  const res = await fetch(`${API_URL}/api/lists/${listId}/villas/${slug}`, {
+  const res = await fetch(`${API_URL}/api/lists/${listId}/getaways/${slug}`, {
     method: 'DELETE',
     headers,
   })
@@ -136,10 +136,10 @@ export async function deleteVilla(listId: string, slug: string) {
 }
 
 // Scout
-export async function scoutUrl(url: string, listId: string, villaId?: string) {
+export async function scoutUrl(url: string, listId: string, getawayId?: string) {
   const headers = await getAuthHeaders()
   const body: Record<string, unknown> = { url, list_id: listId }
-  if (villaId) body.villa_id = villaId
+  if (getawayId) body.getaway_id = getawayId
   const res = await fetch(`${API_URL}/api/scout`, {
     method: 'POST',
     headers,
@@ -149,10 +149,10 @@ export async function scoutUrl(url: string, listId: string, villaId?: string) {
   return res.json()
 }
 
-export async function scoutPaste(pasted_text: string, listId: string, original_url?: string, villaId?: string) {
+export async function scoutPaste(pasted_text: string, listId: string, original_url?: string, getawayId?: string) {
   const headers = await getAuthHeaders()
   const body: Record<string, unknown> = { pasted_text, list_id: listId, original_url }
-  if (villaId) body.villa_id = villaId
+  if (getawayId) body.getaway_id = getawayId
   const res = await fetch(`${API_URL}/api/scout-paste`, {
     method: 'POST',
     headers,

@@ -7,8 +7,14 @@ import { parseAmenitiesInput } from '@/components/AmenitiesCell'
 import EditableCell from '@/components/EditableCell'
 import TrashIcon from '@/components/TrashIcon'
 
-export default function VillaRow({
-  villa,
+function formatPrice(price: number | null | undefined, currency?: string | null) {
+  if (price == null) return '—'
+  const sym = currency === 'EUR' ? '€' : '$'
+  return `${sym}${Number(price).toLocaleString()}`
+}
+
+export default function GetawayRow({
+  getaway,
   isEditing,
   onEditStart,
   onEditEnd,
@@ -17,8 +23,8 @@ export default function VillaRow({
   onRetry,
   onPasteClick,
 }: any) {
-  const [editData, setEditData] = useState(villa)
-  const signedUrls = useSignedImageUrls(villa.images || [])
+  const [editData, setEditData] = useState(getaway)
+  const signedUrls = useSignedImageUrls(getaway.images || [])
   const thumbUrl = signedUrls[0]
 
   const handleSave = () => {
@@ -29,58 +35,58 @@ export default function VillaRow({
     if (toSend.amenities != null && !Array.isArray(toSend.amenities)) {
       toSend.amenities = [String(toSend.amenities)]
     }
-    if (onEditEnd) onEditEnd(toSend)
+    // Only send editable getaway fields (backend getaways table has no images column)
+    const { id, list_id, slug, images, created_at, updated_at, import_status, import_error, source_url, ...rest } = toSend
+    if (onEditEnd) onEditEnd(rest)
   }
 
   const handleCancel = () => {
-    setEditData(villa)
-    if (onEditEnd) {
-      onEditEnd(null)
-    }
+    setEditData(getaway)
+    if (onEditEnd) onEditEnd(null)
   }
 
   const handleImageClick = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (villa.images && villa.images.length > 0) {
+    if (getaway.images && getaway.images.length > 0) {
       if (onImageClick) {
-        onImageClick(villa.images, 0)
-      } else if (villa.original_url) {
-        window.open(villa.original_url, '_blank')
+        onImageClick(getaway.images, 0)
+      } else if (getaway.source_url) {
+        window.open(getaway.source_url, '_blank')
       }
     }
   }
 
   const handleRowClick = () => {
-    if (!isEditing && villa.original_url) {
-      window.open(villa.original_url, '_blank')
+    if (!isEditing && getaway.source_url) {
+      window.open(getaway.source_url, '_blank')
     }
   }
 
-  if (villa.scrap_status === 'loading') {
+  if (getaway.import_status === 'loading') {
     return (
       <tr
-        style={{ opacity: 0.6, cursor: villa.original_url ? 'pointer' : undefined }}
-        onClick={() => villa.original_url && window.open(villa.original_url, '_blank')}
-        title={villa.original_url ? 'Open listing' : undefined}
+        style={{ opacity: 0.6, cursor: getaway.source_url ? 'pointer' : undefined }}
+        onClick={() => getaway.source_url && window.open(getaway.source_url, '_blank')}
+        title={getaway.source_url ? 'Open listing' : undefined}
       >
         <td className="col-thumb">
           <div className="spinner" style={{ width: '2rem', height: '2rem' }}></div>
         </td>
         <td className="col-name" colSpan={7} style={{ color: 'var(--muted)' }}>
-          Processing {villa.original_url ? new URL(villa.original_url).hostname : 'listing'}...
+          Processing {getaway.source_url ? new URL(getaway.source_url).hostname : 'listing'}...
         </td>
         <td className="col-catch"></td>
       </tr>
     )
   }
 
-  if (villa.scrap_status === 'thin') {
+  if (getaway.import_status === 'thin') {
     return (
       <tr
         style={{ opacity: 0.7, backgroundColor: 'var(--orange-soft)', cursor: onPasteClick ? 'pointer' : undefined }}
         onClick={(e) => {
           if (onPasteClick && !(e.target as HTMLElement).closest('button')) {
-            onPasteClick(villa)
+            onPasteClick(getaway)
           }
         }}
         title={onPasteClick ? 'Click to paste listing details' : undefined}
@@ -106,13 +112,13 @@ export default function VillaRow({
     )
   }
 
-  if (villa.scrap_status === 'error') {
+  if (getaway.import_status === 'error') {
     return (
       <tr
         style={{ opacity: 0.7, backgroundColor: 'var(--red-soft)', cursor: onPasteClick ? 'pointer' : undefined }}
         onClick={(e) => {
           if (onPasteClick && !(e.target as HTMLElement).closest('button')) {
-            onPasteClick(villa)
+            onPasteClick(getaway)
           }
         }}
         title={onPasteClick ? 'Click to paste listing details' : undefined}
@@ -121,11 +127,11 @@ export default function VillaRow({
           <div className="thumb-placeholder">❌</div>
         </td>
         <td className="col-name" colSpan={7} style={{ color: 'var(--red)' }}>
-          {villa.scrap_error || 'Error while processing listing'}
+          {getaway.import_error || 'Error while processing listing'}
         </td>
         <td className="col-catch" onClick={(e) => e.stopPropagation()}>
           <div className="row-actions">
-            {villa.original_url && onRetry && (
+            {getaway.source_url && onRetry && (
               <button
                 className="row-action-btn"
                 onClick={() => onRetry()}
@@ -138,9 +144,9 @@ export default function VillaRow({
               className="row-action-btn trash"
               onClick={() => onDelete && onDelete()}
               title="Delete"
-          >
-            <TrashIcon />
-          </button>
+            >
+              <TrashIcon />
+            </button>
           </div>
         </td>
       </tr>
@@ -151,8 +157,8 @@ export default function VillaRow({
     return (
       <tr>
         <td className="col-thumb">
-          {villa.images && villa.images.length > 0 && thumbUrl ? (
-            <img src={thumbUrl} alt={villa.villa_name} className="thumb" />
+          {getaway.images && getaway.images.length > 0 && thumbUrl ? (
+            <img src={thumbUrl} alt={getaway.name} className="thumb" />
           ) : (
             <div className="thumb-placeholder">—</div>
           )}
@@ -160,8 +166,8 @@ export default function VillaRow({
         <EditableCell
           type="text"
           cellClassName="col-name"
-          value={editData.villa_name}
-          onChange={(v) => setEditData({ ...editData, villa_name: v as string })}
+          value={editData.name}
+          onChange={(v) => setEditData({ ...editData, name: v as string })}
         />
         <EditableCell
           type="text"
@@ -190,8 +196,8 @@ export default function VillaRow({
         <EditableCell
           type="price"
           cellClassName="col-price"
-          value={editData.price_weekly_usd}
-          onChange={(v) => setEditData({ ...editData, price_weekly_usd: v })}
+          value={editData.price}
+          onChange={(v) => setEditData({ ...editData, price: v })}
         />
         <EditableCell
           type="amenities"
@@ -216,25 +222,25 @@ export default function VillaRow({
   return (
     <tr
       onClick={handleRowClick}
-      style={villa.original_url ? { cursor: 'pointer' } : undefined}
-      title={villa.original_url ? 'Open listing' : undefined}
+      style={getaway.source_url ? { cursor: 'pointer' } : undefined}
+      title={getaway.source_url ? 'Open listing' : undefined}
     >
       <td className="col-thumb">
-        {villa.images && villa.images.length > 0 && thumbUrl ? (
+        {getaway.images && getaway.images.length > 0 && thumbUrl ? (
           <div className="thumb-link" onClick={handleImageClick} title="Click to view images">
-            <img src={thumbUrl} alt={villa.villa_name} className="thumb" />
+            <img src={thumbUrl} alt={getaway.name} className="thumb" />
           </div>
         ) : (
           <div className="thumb-placeholder">—</div>
         )}
       </td>
-      <td className="col-name">{villa.villa_name || '—'}</td>
-      <td className="col-loc">{villa.location || '—'}</td>
-      <td className="col-beds">{villa.bedrooms || '—'}</td>
-      <td className="col-baths">{villa.bathrooms || '—'}</td>
-      <td className="col-guests">{villa.max_guests || '—'}</td>
-      <td className="col-price">${villa.price_weekly_usd || '—'}</td>
-      <AmenitiesCell amenities={villa.amenities} />
+      <td className="col-name">{getaway.name || '—'}</td>
+      <td className="col-loc">{getaway.location || '—'}</td>
+      <td className="col-beds">{getaway.bedrooms ?? '—'}</td>
+      <td className="col-baths">{getaway.bathrooms ?? '—'}</td>
+      <td className="col-guests">{getaway.max_guests ?? '—'}</td>
+      <td className="col-price">{formatPrice(getaway.price, getaway.price_currency)}</td>
+      <AmenitiesCell amenities={getaway.amenities} />
       <td className="col-catch" onClick={(e) => e.stopPropagation()}>
         <div className="row-actions">
           <button

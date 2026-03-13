@@ -1,17 +1,21 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getVillas, getListMembers } from "@/lib/api";
+import { getGetaways, getListMembers } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
-import { useListVillasRealtime, useListPresence, PresenceUser } from "@/lib/realtime";
-import ListVillasTab from "./ListVillasTab";
+import {
+  useListGetawaysRealtime,
+  useListPresence,
+  PresenceUser,
+} from "@/lib/realtime";
+import ListGetawaysTab from "./ListGetawaysTab";
 import ListMembersTab from "./ListMembersTab";
 
 export default function ListDetailView({ list, onBack }: any) {
   const { user } = useAuth();
 
   const [activeTab, setActiveTab] = useState<"places" | "members">("places");
-  const [villas, setVillas] = useState<any[]>([]);
+  const [getaways, setGetaways] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [viewingUsers, setViewingUsers] = useState<PresenceUser[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -22,12 +26,13 @@ export default function ListDetailView({ list, onBack }: any) {
     if (!dataLoaded) loadData();
   }, []);
 
-  useListVillasRealtime({
+  useListGetawaysRealtime({
     listId: list.id,
     enabled: dataLoaded && !!user,
-    onInsert: (row) => setVillas((prev) => [row, ...prev]),
-    onUpdate: (row) => setVillas((prev) => prev.map((v) => (v.id === row.id ? row : v))),
-    onDelete: (id) => setVillas((prev) => prev.filter((v) => v.id !== id)),
+    onInsert: (row) => setGetaways((prev) => [row, ...prev]),
+    onUpdate: (row) =>
+      setGetaways((prev) => prev.map((g) => (g.id === row.id ? row : g))),
+    onDelete: (id) => setGetaways((prev) => prev.filter((g) => g.id !== id)),
   });
 
   useListPresence({
@@ -40,11 +45,11 @@ export default function ListDetailView({ list, onBack }: any) {
   async function loadData(silent = false) {
     if (!silent) setIsLoading(true);
     try {
-      const [villasData, membersData] = await Promise.all([
-        getVillas(list.id),
+      const [getawaysData, membersData] = await Promise.all([
+        getGetaways(list.id),
         getListMembers(list.id),
       ]);
-      setVillas(villasData || []);
+      setGetaways(getawaysData || []);
       setMembers(membersData?.members || []);
       setDataLoaded(true);
     } catch (err) {
@@ -61,14 +66,21 @@ export default function ListDetailView({ list, onBack }: any) {
     <>
       <header className="list-detail-header">
         <div className="list-detail-header__left">
-          <button type="button" onClick={onBack} className="list-detail-header__back" aria-label="Back">
+          <button
+            type="button"
+            onClick={onBack}
+            className="list-detail-header__back"
+            aria-label="Back"
+          >
             ←
           </button>
           <h1 className="list-detail-header__title">{list.name}</h1>
           {presenceOthers.length > 0 && (
             <div
               className="list-detail-presence"
-              title={presenceOthers.map((u) => u.first_name || u.user_id.slice(0, 8)).join(", ")}
+              title={presenceOthers
+                .map((u) => u.first_name || u.user_id.slice(0, 8))
+                .join(", ")}
             >
               <span>Viewing with</span>
               <div className="list-detail-presence__avatars">
@@ -79,7 +91,11 @@ export default function ListDetailView({ list, onBack }: any) {
                     title={u.first_name || u.user_id.slice(0, 8)}
                   >
                     {u.avatar_url ? (
-                      <img src={u.avatar_url} alt="" referrerPolicy="no-referrer" />
+                      <img
+                        src={u.avatar_url}
+                        alt=""
+                        referrerPolicy="no-referrer"
+                      />
                     ) : (
                       <div className="list-detail-presence__avatar-fallback">
                         {(u.first_name || u.user_id).charAt(0).toUpperCase()}
@@ -112,15 +128,18 @@ export default function ListDetailView({ list, onBack }: any) {
 
       <div className="list-detail-content">
         {error && (
-          <div className="list-villas-tab__error" style={{ margin: "1rem 2rem 0" }}>
+          <div
+            className="list-villas-tab__error"
+            style={{ margin: "1rem 2rem 0" }}
+          >
             <span>{error}</span>
           </div>
         )}
         {activeTab === "places" && (
-          <ListVillasTab
+          <ListGetawaysTab
             listId={list.id}
-            villas={villas}
-            setVillas={setVillas}
+            getaways={getaways}
+            setGetaways={setGetaways}
             isLoading={isLoading}
             onRefresh={() => loadData(true)}
           />

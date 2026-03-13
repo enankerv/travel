@@ -6,7 +6,7 @@ export interface ListItem {
   id: string
   name?: string
   description?: string | null
-  villa_count?: number
+  getaway_count?: number
   member_count?: number
 }
 
@@ -127,7 +127,7 @@ export default function ListsView({
                       {list.description || '—'}
                     </td>
                     <td style={{ textAlign: 'center' }}>
-                      {list.villa_count}
+                      {list.getaway_count}
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       {list.member_count}

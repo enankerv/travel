@@ -9,31 +9,31 @@ export type PresenceUser = {
   avatar_url?: string;
 };
 
-type VillaRow = { id: string; updated_at?: string; [key: string]: any };
+type GetawayRow = { id: string; updated_at?: string; [key: string]: any };
 
-type UseListVillasRealtimeOptions = {
+type UseListGetawaysRealtimeOptions = {
   listId: string;
   enabled: boolean;
-  onInsert: (row: VillaRow) => void;
-  onUpdate: (row: VillaRow) => void;
+  onInsert: (row: GetawayRow) => void;
+  onUpdate: (row: GetawayRow) => void;
   onDelete: (id: string) => void;
 };
 
 /**
- * Subscribes to villa changes for a list via:
+ * Subscribes to getaway changes for a list via:
  *  1. Broadcast (realtime.broadcast_changes DB trigger) — primary
  *  2. postgres_changes — fallback
  *
  * Deduplicates events so both sources firing for the same change
  * only applies the update once.
  */
-export function useListVillasRealtime({
+export function useListGetawaysRealtime({
   listId,
   enabled,
   onInsert,
   onUpdate,
   onDelete,
-}: UseListVillasRealtimeOptions) {
+}: UseListGetawaysRealtimeOptions) {
   useEffect(() => {
     if (!enabled) return;
 
@@ -69,7 +69,7 @@ export function useListVillasRealtime({
         {
           event: "*",
           schema: "public",
-          table: "villas",
+          table: "getaways",
           filter: `list_id=eq.${listId}`,
         },
         (payload: { eventType?: string; new?: any; old?: any }) => {
