@@ -8,34 +8,45 @@ from schema import VillaListing, FactSheet
 
 log = logging.getLogger("scout.extraction")
 
-# Regex to find prices with currency symbols ($ € £ ¥ etc.) or "N USD/EUR"
-_PRICE_PATTERNS = [
-    (r"[\$€£¥]\s*([\d,]+(?:\.[\d]+)?)", None),  # $1,234 or €500 or £1,200
-    (r"([\d,]+(?:\.[\d]+)?)\s*(USD|EUR|GBP)\b", 2),  # 1,234 USD
+# Prefer prices near "for X nights" or "per night" (main listing price); fallback to first $ € £
+_PRICE_PREFERRED = [
+    (r"[\$€£¥]\s*([\d,]+(?:\.[\d]+)?)\s+for\s+\d+\s+nights?", None),  # $828 for 5 nights
+    (r"[\$€£¥]\s*([\d,]+(?:\.[\d]+)?)\s+per\s+night", None),  # $165 per night
+    (r"[\$€£¥]\s*([\d,]+(?:\.[\d]+)?)\s*/\s*(?:night|week)", None),  # $165/night
+]
+_PRICE_FALLBACK = [
+    (r"[\$€£¥]\s*([\d,]+(?:\.[\d]+)?)", None),
+    (r"([\d,]+(?:\.[\d]+)?)\s*(USD|EUR|GBP)\b", 2),
 ]
 _CURRENCY_MAP = {"$": "USD", "€": "EUR", "£": "GBP", "¥": "JPY"}
 
 
+def _parse_price_match(m, currency_group) -> tuple[float | None, str | None]:
+    try:
+        num_str = m.group(1).replace(",", "")
+        price = float(num_str)
+        if price <= 0:
+            return (None, None)
+        if currency_group is None:
+            sym = m.group(0).strip()[0]
+            currency = _CURRENCY_MAP.get(sym, "USD" if sym == "$" else "EUR")
+        else:
+            currency = m.group(currency_group).upper()
+        return (price, currency)
+    except (ValueError, IndexError):
+        return (None, None)
+
+
 def extract_price_from_text(text: str) -> tuple[float | None, str | None]:
-    """Find the first price with $ € £ ¥ or USD/EUR/GBP in the text. Returns (price, currency) or (None, None)."""
+    """Find the main listing price. Prefers prices near 'for X nights' or 'per night'."""
     if not text or not isinstance(text, str):
         return (None, None)
-    for pattern, currency_group in _PRICE_PATTERNS:
+    for pattern, cg in _PRICE_PREFERRED + _PRICE_FALLBACK:
         m = re.search(pattern, text, re.IGNORECASE)
         if m:
-            try:
-                num_str = m.group(1).replace(",", "")
-                price = float(num_str)
-                if price <= 0:
-                    continue
-                if currency_group is None:
-                    sym = m.group(0).strip()[0]
-                    currency = _CURRENCY_MAP.get(sym, "USD" if sym == "$" else "EUR")
-                else:
-                    currency = m.group(currency_group).upper()
+            price, currency = _parse_price_match(m, cg)
+            if price is not None:
                 return (price, currency)
-            except (ValueError, IndexError):
-                continue
     return (None, None)
 
 # Provider: "gemini" (prod) or "ollama" (local). Defaults to gemini if GEMINI_API_KEY is set.
@@ -60,7 +71,9 @@ async def extract_fact_sheet(markdown_text: str) -> str:
     stage1_system = (
         "You are a professional researcher for Nankervis Digital. Your task is to extract villa data.\n\n"
         "Read the provided text.\n"
-        "Find the 'Hard Facts': villa name, location, region, beds, baths, max guests, price range (EUR and USD using 1 EUR ≈ 1.16 USD), security deposit.\n"
+        "Find the 'Hard Facts': villa name, location, region, beds, baths, max guests, price, security deposit.\n"
+        "For PRICE: use the main displayed listing price (e.g. '$828 for 5 nights', '€500 per night'). "
+        "Do NOT use totals, taxes, or amounts from other listings. Prefer the price shown with 'for X nights' or 'per night'.\n"
         "Identify the 'Soft Facts': The Catch (cons/caveats), short summaries for Interiors, Exteriors, Location, plus amenities, pool features, extras, included/not included.\n"
         "Output ONLY a single structured Markdown fact sheet. Use clear section headings (## Villa Name, ## Location, ## Hard Facts, ## Amenities, ## Summaries, ## Included / Not Included, ## The Catch). "
         "Include only information that appears in the source; do not invent or guess. Do not include any conversational text—only the fact sheet."
@@ -95,7 +108,8 @@ async def extract_villa_listing(fact_sheet_markdown: str) -> VillaListing:
     stage2_system = (
         "You are a professional researcher for Nankervis Digital. Your task is to extract villa data.\n\n"
         "Read the provided Markdown fact sheet.\n"
-        "Find the 'Hard Facts' (beds, baths, price, deposit).\n"
+        "Find the 'Hard Facts' (beds, baths, price, deposit). "
+        "For price: use the main listing price (e.g. $828 for 5 nights), NOT totals or amounts from other properties.\n"
         "Identify the 'Soft Facts' (The Catch, summaries, amenities, included/not included).\n"
         "Output ONLY the JSON object with the exact keys requested. Do not include any conversational text. Do not wrap the object in a key like 'properties'."
     )
