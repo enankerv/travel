@@ -17,12 +17,16 @@ from utils.images import (
 )
 from utils.crawler import crawl_page
 from utils.extraction import extract_villa_two_pass, extract_price_from_text
+from utils.geocode import geocode as geocode_location
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("scout")
 
 
-def _listing_to_getaway_row(listing, slug: str, source_url: str, name: str, raw_text: str | None = None) -> dict:
+def _listing_to_getaway_row(
+    listing, slug: str, source_url: str, name: str, raw_text: str | None = None,
+    lat: float | None = None, lng: float | None = None,
+) -> dict:
     """Map extracted VillaListing to getaways table row (no images; those go to getaway_images)."""
     ld = listing.model_dump()
     parts = [
@@ -63,6 +67,8 @@ def _listing_to_getaway_row(listing, slug: str, source_url: str, name: str, raw_
         "included": ld.get("included_in_price"),
         "description": description,
         "caveats": ld.get("the_catch"),
+        "lat": lat,
+        "lng": lng,
     }
 
 
@@ -117,7 +123,20 @@ async def generate_getaway_page(
     from db import update_getaway, insert_getaway_images
     if not getaway_id or not auth_token:
         raise ValueError("getaway_id and auth_token required")
-    row = _listing_to_getaway_row(listing, slug=slug, source_url=url, name=title, raw_text=extraction_md)
+
+    lat, lng = None, None
+    loc = (listing.location or "").strip()
+    reg = (listing.region or "").strip()
+    geocode_query = ", ".join(p for p in [loc, reg] if p)
+    if geocode_query:
+        lat, lng = geocode_location(geocode_query)
+        if lat is not None:
+            log.info("geocoded %r -> %.4f, %.4f", geocode_query, lat, lng)
+
+    row = _listing_to_getaway_row(
+        listing, slug=slug, source_url=url, name=title, raw_text=extraction_md,
+        lat=lat, lng=lng,
+    )
     update_getaway(getaway_id, row, auth_token=auth_token)
     if image_urls:
         insert_getaway_images(getaway_id, image_urls, auth_token)
@@ -162,7 +181,20 @@ async def generate_getaway_page_from_paste(
     from db import update_getaway, insert_getaway_images
     if not getaway_id or not auth_token:
         raise ValueError("getaway_id and auth_token required")
-    row = _listing_to_getaway_row(listing, slug=slug, source_url=original_url or "", name=title, raw_text=pasted_text)
+
+    lat, lng = None, None
+    loc = (listing.location or "").strip()
+    reg = (listing.region or "").strip()
+    geocode_query = ", ".join(p for p in [loc, reg] if p)
+    if geocode_query:
+        lat, lng = geocode_location(geocode_query)
+        if lat is not None:
+            log.info("geocoded %r -> %.4f, %.4f", geocode_query, lat, lng)
+
+    row = _listing_to_getaway_row(
+        listing, slug=slug, source_url=original_url or "", name=title, raw_text=pasted_text,
+        lat=lat, lng=lng,
+    )
     update_getaway(getaway_id, row, auth_token=auth_token)
     if image_urls:
         insert_getaway_images(getaway_id, image_urls, auth_token)

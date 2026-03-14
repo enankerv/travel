@@ -89,6 +89,8 @@ class GetawayData(BaseModel):
     name: Optional[str] = None
     location: Optional[str] = None
     region: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
     bedrooms: Optional[int] = None
     bathrooms: Optional[int] = None
     max_guests: Optional[int] = None

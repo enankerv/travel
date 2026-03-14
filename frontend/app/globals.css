@@ -1137,8 +1137,39 @@ button:focus-visible {
   opacity: 1;
 }
 
+.list-villas-tab__view-toolbar {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0 2rem 0.5rem;
+  flex-shrink: 0;
+}
+
+.list-villas-tab__view-btn {
+  padding: 0.4rem 0.9rem;
+  font-size: 0.9rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.list-villas-tab__view-btn:hover {
+  color: var(--light);
+  background: var(--surface-hover);
+}
+
+.list-villas-tab__view-btn.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 .list-villas-tab__table-wrap {
   flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   padding: 0 2rem 1.5rem;
   overflow: hidden;
 }
@@ -1147,6 +1178,45 @@ button:focus-visible {
 .list-villas-tab__table-wrap .sheet-wrap {
   margin-left: 0;
   margin-right: 0;
+}
+
+/* Getaway map */
+.getaway-map {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  position: relative;
+}
+
+.getaway-map__container {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.getaway-map--empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 2rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.getaway-map__hint {
+  font-size: 0.9em;
+  opacity: 0.9;
+}
+
+.map-marker-accent.leaflet-div-icon {
+  background: none !important;
+  border: none !important;
 }
 
 /* List members tab */
@@ -1370,6 +1440,7 @@ button:focus-visible {
 
 .list-detail-content {
   flex: 1;
+  min-height: 0;
   overflow: auto;
   display: flex;
   flex-direction: column;
@@ -1404,7 +1475,7 @@ button:focus-visible {
   border-radius: 3px;
 }
 
-/* Image Gallery */
+/* Image Gallery - above Leaflet map (z-index up to 1000) */
 .gallery-modal-overlay {
   position: fixed;
   inset: 0;
@@ -1412,7 +1483,7 @@ button:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 101;
+  z-index: 1101;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s;
@@ -1728,6 +1799,154 @@ button:focus-visible {
   border-color: var(--accent);
 }
 
+/* Map getaway sidebar - full villa info (map view only) */
+.map-getaway-sidebar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 380px;
+  max-width: 90vw;
+  height: 100vh;
+  background: var(--dark-2);
+  border-left: 1px solid var(--border);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.3);
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  animation: comments-sidebar-slide-in 0.2s ease-out;
+}
+
+.map-getaway-sidebar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.map-getaway-sidebar__header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  font-family: "Instrument Serif", serif;
+}
+
+.map-getaway-sidebar__close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.25rem;
+}
+
+.map-getaway-sidebar__close:hover {
+  color: var(--light);
+}
+
+.map-getaway-sidebar__content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem 1.25rem;
+}
+
+.map-getaway-sidebar__thumb {
+  width: 100%;
+  aspect-ratio: 16/10;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+  margin-bottom: 1rem;
+  cursor: pointer;
+}
+
+.map-getaway-sidebar__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.map-getaway-sidebar__meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.map-getaway-sidebar__meta dt {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.map-getaway-sidebar__meta dd {
+  margin: 0;
+}
+
+.map-getaway-sidebar__section {
+  margin-bottom: 1rem;
+}
+
+.map-getaway-sidebar__section h4 {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 0.35rem;
+}
+
+.map-getaway-sidebar__section p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.map-getaway-sidebar__desc {
+  white-space: pre-wrap;
+}
+
+.map-getaway-sidebar__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.map-getaway-sidebar__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--accent);
+  font-size: 0.9rem;
+}
+
+.map-getaway-sidebar__link:hover {
+  color: #d17c3b;
+}
+
+.map-getaway-sidebar__comment-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  color: var(--light);
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.map-getaway-sidebar__comment-btn:hover {
+  background: var(--surface-hover);
+}
+
 .comments-sidebar {
   position: fixed;
   top: 0;
@@ -1738,7 +1957,7 @@ button:focus-visible {
   background: var(--dark-2);
   border-left: 1px solid var(--border);
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.3);
-  z-index: 100;
+  z-index: 1100;
   display: flex;
   flex-direction: column;
   animation: comments-sidebar-slide-in 0.2s ease-out;

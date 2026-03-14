@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { scoutUrl, scoutPaste, deleteGetaway, updateGetaway } from "@/lib/api";
 import { useListDetailContext } from "@/lib/ListDetailContext";
 import DropZone from "./DropZone";
@@ -8,6 +9,9 @@ import GetawayTable from "./GetawayTable";
 import PasteModal from "./PasteModal";
 import ImageGallery from "./ImageGallery";
 import CommentsSidebar from "./CommentsSidebar";
+import MapGetawaySidebar from "./MapGetawaySidebar";
+
+const GetawayMap = dynamic(() => import("./GetawayMap"), { ssr: false });
 
 export default function ListGetawaysTab({
   commentsOpen = false,
@@ -20,7 +24,7 @@ export default function ListGetawaysTab({
   focusedGetawayId?: string | null;
   onFocusedGetawayChange?: (id: string | null) => void;
 }) {
-  const { list, getaways, setGetaways, isLoading, onRefresh } = useListDetailContext();
+  const { list, getaways, setGetaways, isLoading, onRefresh, commentsByGetaway } = useListDetailContext();
   const listId = list.id;
   const [error, setError] = useState("");
   const [scoutLoading, setScoutLoading] = useState(false);
@@ -30,6 +34,8 @@ export default function ListGetawaysTab({
   const [pasteGetaway, setPasteGetaway] = useState<any>(null);
   const [galleryImages, setGalleryImages] = useState<string[] | null>(null);
   const [galleryIndex, setGalleryIndex] = useState(0);
+  const [viewMode, setViewMode] = useState<"table" | "map">("table");
+  const [mapGetawayId, setMapGetawayId] = useState<string | null>(null);
 
   useEffect(() => {
     if ("Notification" in window && Notification.permission === "default") {
@@ -218,7 +224,28 @@ export default function ListGetawaysTab({
           </div>
         )}
 
+        <div className="list-villas-tab__view-toolbar">
+          <button
+            type="button"
+            className={`list-villas-tab__view-btn ${viewMode === "table" ? "active" : ""}`}
+            onClick={() => {
+              setViewMode("table");
+              setMapGetawayId(null);
+            }}
+          >
+            Table
+          </button>
+          <button
+            type="button"
+            className={`list-villas-tab__view-btn ${viewMode === "map" ? "active" : ""}`}
+            onClick={() => setViewMode("map")}
+          >
+            Map
+          </button>
+        </div>
+
         <div className="list-villas-tab__table-wrap">
+          {viewMode === "table" ? (
           <GetawayTable
             getaways={getaways}
             isLoading={isLoading}
@@ -232,8 +259,35 @@ export default function ListGetawaysTab({
               onFocusedGetawayChange?.(getawayId);
             }}
           />
+          ) : (
+          <GetawayMap
+            getaways={getaways}
+            onGetawayClick={(id) => setMapGetawayId(id)}
+          />
+          )}
         </div>
       </div>
+
+      {viewMode === "map" && mapGetawayId && (
+        <MapGetawaySidebar
+          getaway={getaways.find((g: any) => g.id === mapGetawayId) ?? null}
+          onClose={() => setMapGetawayId(null)}
+          onImageClick={handleImageClick}
+          onCommentClick={
+            mapGetawayId
+              ? () => {
+                  onCommentsOpenChange?.(true);
+                  onFocusedGetawayChange?.(mapGetawayId);
+                }
+              : undefined
+          }
+          commentsCount={
+            mapGetawayId
+              ? (commentsByGetaway?.[mapGetawayId]?.length ?? 0)
+              : 0
+          }
+        />
+      )}
 
       <CommentsSidebar
         isOpen={commentsOpen}
