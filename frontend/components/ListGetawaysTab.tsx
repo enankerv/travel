@@ -4,11 +4,13 @@ import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { scoutUrl, scoutPaste, deleteGetaway, updateGetaway } from "@/lib/api";
 import { useListDetailContext } from "@/lib/ListDetailContext";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import DropZone from "./DropZone";
 import PasteModal from "./PasteModal";
 import ImageGallery from "./ImageGallery";
 import CommentsSidebar from "./CommentsSidebar";
 import MapGetawaySidebar from "./MapGetawaySidebar";
+import GetawayDetailSheet from "./GetawayDetailSheet";
 import GetawayListView from "./GetawayListView";
 
 const GetawayMap = dynamic(() => import("./GetawayMap"), { ssr: false });
@@ -25,6 +27,7 @@ export default function ListGetawaysTab({
   onFocusedGetawayChange?: (id: string | null) => void;
 }) {
   const { list, getaways, setGetaways, isLoading, onRefresh, commentsByGetaway } = useListDetailContext();
+  const isMobile = useIsMobile();
   const listId = list.id;
   const [error, setError] = useState("");
   const [scoutLoading, setScoutLoading] = useState(false);
@@ -268,24 +271,32 @@ export default function ListGetawaysTab({
       </div>
 
       {viewMode === "map" && mapGetawayId && (
-        <MapGetawaySidebar
-          getaway={getaways.find((g: any) => g.id === mapGetawayId) ?? null}
-          onClose={() => setMapGetawayId(null)}
-          onImageClick={handleImageClick}
-          onCommentClick={
-            mapGetawayId
-              ? () => {
-                  onCommentsOpenChange?.(true);
-                  onFocusedGetawayChange?.(mapGetawayId);
-                }
-              : undefined
-          }
-          commentsCount={
-            mapGetawayId
-              ? (commentsByGetaway?.[mapGetawayId]?.length ?? 0)
-              : 0
-          }
-        />
+        isMobile ? (
+          <GetawayDetailSheet
+            getaway={getaways.find((g: any) => g.id === mapGetawayId) ?? null}
+            onClose={() => setMapGetawayId(null)}
+            onImageClick={handleImageClick}
+          />
+        ) : (
+          <MapGetawaySidebar
+            getaway={getaways.find((g: any) => g.id === mapGetawayId) ?? null}
+            onClose={() => setMapGetawayId(null)}
+            onImageClick={handleImageClick}
+            onCommentClick={
+              mapGetawayId
+                ? () => {
+                    onCommentsOpenChange?.(true);
+                    onFocusedGetawayChange?.(mapGetawayId);
+                  }
+                : undefined
+            }
+            commentsCount={
+              mapGetawayId
+                ? (commentsByGetaway?.[mapGetawayId]?.length ?? 0)
+                : 0
+            }
+          />
+        )
       )}
 
       <CommentsSidebar
