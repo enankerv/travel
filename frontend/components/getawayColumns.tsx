@@ -398,7 +398,7 @@ const COLUMN_CONFIG: Record<ColumnKey, ColumnDef> = {
                 💬
                 {(commentsByGetaway?.[getaway.id]?.length ?? 0) > 0 && (
                   <span className="row-action-btn-comment__count">
-                    {commentsByGetaway[getaway.id].length}
+                    {commentsByGetaway?.[getaway.id]?.length ?? 0}
                   </span>
                 )}
               </button>
