@@ -1,3 +1,4 @@
+export { default as CommentIcon } from './CommentIcon'
 export { default as TrashIcon } from './TrashIcon'
 export { default as LinkIcon } from './LinkIcon'
 export { default as ScoutIcon } from './ScoutIcon'

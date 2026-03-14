@@ -8,6 +8,7 @@ import { useListVotes } from "@/hooks/useListVotes";
 import { ListDetailProvider } from "@/lib/ListDetailContext";
 import ListGetawaysTab from "./ListGetawaysTab";
 import ListMembersTab from "./ListMembersTab";
+import { CommentIcon } from "./icons";
 
 export default function ListDetailView({ list, onBack }: any) {
   const { user } = useAuth();
@@ -155,7 +156,10 @@ export default function ListDetailView({ list, onBack }: any) {
               className="list-detail-header__comments-btn"
               title="Comments"
             >
-              💬 Comments
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+                <CommentIcon size={16} />
+                Comments
+              </span>
             </button>
           )}
           {presenceOthers.length > 0 && (

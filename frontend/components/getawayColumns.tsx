@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import ExpandableCell from "@/components/ExpandableCell";
 import EditableCell from "@/components/EditableCell";
 import VoteCell from "@/components/VoteCell";
-import { TrashIcon, ExternalLinkIcon } from "@/components/icons";
+import { TrashIcon, ExternalLinkIcon, CommentIcon } from "@/components/icons";
 
 export const COLUMN_KEYS = [
   "votes",
@@ -395,7 +395,7 @@ const COLUMN_CONFIG: Record<ColumnKey, ColumnDef> = {
                 onClick={() => onCommentClick?.()}
                 title="Comments"
               >
-                💬
+                <CommentIcon />
                 {(commentsByGetaway?.[getaway.id]?.length ?? 0) > 0 && (
                   <span className="row-action-btn-comment__count">
                     {commentsByGetaway?.[getaway.id]?.length ?? 0}
