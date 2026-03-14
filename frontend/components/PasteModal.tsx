@@ -18,6 +18,8 @@ interface PasteModalProps {
   initialText?: string
   /** When set (e.g. thin scrape), show a link to open the listing in a new tab */
   listingUrl?: string | null
+  /** When true, show a "Paste from clipboard" button (e.g. opened from bookmarklet) */
+  fromBookmarklet?: boolean
 }
 
 const JUNK = ['favicon', 'icon', 'logo', 'avatar', 'badge', 'pixel', '1x1', 'tracking', 'placeholder', '/user/', 'profile_pic', 'airbnb-logo']
@@ -50,7 +52,7 @@ function extractImageUrlsFromHtml(html: string): string[] {
   }
 }
 
-export default function PasteModal({ isOpen, onClose, onSubmit, isLoading, initialText = '', listingUrl }: PasteModalProps) {
+export default function PasteModal({ isOpen, onClose, onSubmit, isLoading, initialText = '', listingUrl, fromBookmarklet }: PasteModalProps) {
   const [text, setText] = useState(initialText)
   const [extractedImages, setExtractedImages] = useState<string[]>([])
   const [hasTyped, setHasTyped] = useState(false)
@@ -81,6 +83,18 @@ export default function PasteModal({ isOpen, onClose, onSubmit, isLoading, initi
       if (urls.length > 0) {
         setExtractedImages(urls)
       }
+    }
+  }
+
+  const handlePasteFromClipboard = async () => {
+    try {
+      const clip = await navigator.clipboard.readText()
+      if (clip) {
+        setText(clip)
+        setHasTyped(true)
+      }
+    } catch {
+      // Clipboard API may be blocked; user can paste manually
     }
   }
 
@@ -124,7 +138,21 @@ export default function PasteModal({ isOpen, onClose, onSubmit, isLoading, initi
             </ol>
           </>
         ) : (
-          <p style={{ color: 'var(--light)' }}>Paste the getaway listing text or HTML below. We'll extract the key information.</p>
+          <p style={{ color: 'var(--light)' }}>
+            {fromBookmarklet
+              ? 'Paste the page content below (or use the button).'
+              : 'Paste the getaway listing text or HTML below. We\'ll extract the key information.'}
+          </p>
+        )}
+        {fromBookmarklet && (
+          <button
+            type="button"
+            onClick={handlePasteFromClipboard}
+            className="btn-primary"
+            style={{ marginBottom: '1rem' }}
+          >
+            Paste from clipboard
+          </button>
         )}
         <textarea
           value={text}

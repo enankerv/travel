@@ -17,6 +17,7 @@ function HomeContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const listParam = searchParams.get('list')
+  const pasteParam = searchParams.get('paste')
   const [lists, setLists] = useState<ListItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedListId, setSelectedListId] = useState<string | null>(null)
@@ -191,6 +192,13 @@ function HomeContent() {
               loadLists(false)
             }}
             onUpdate={() => loadLists()}
+            initialPasteMode={pasteParam === '1'}
+            onConsumePasteParam={() => {
+              const params = new URLSearchParams(searchParams.toString())
+              params.delete('paste')
+              const q = params.toString()
+              router.replace(q ? '/?' + q : '/', { scroll: false })
+            }}
           />
         )}
       </div>

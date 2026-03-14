@@ -102,7 +102,11 @@ export default function GetawayRow({
           </td>
         )}
         <td className="col-name" colSpan={colspanLoading} style={{ color: 'var(--muted)' }}>
-          Processing {getaway.source_url ? new URL(getaway.source_url).hostname : 'listing'}...
+          Processing {(() => {
+            const u = getaway.source_url;
+            if (!u || !u.startsWith('http')) return 'listing';
+            try { return new URL(u).hostname; } catch { return 'listing'; }
+          })()}...
         </td>
       </tr>
     )

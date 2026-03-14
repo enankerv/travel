@@ -10,7 +10,18 @@ import ListGetawaysTab from "./ListGetawaysTab";
 import ListMembersTab from "./ListMembersTab";
 import { CommentIcon } from "./icons";
 
-export default function ListDetailView({ list, onBack }: any) {
+export default function ListDetailView({
+  list,
+  onBack,
+  initialPasteMode,
+  onConsumePasteParam,
+}: {
+  list: any;
+  onBack: () => void;
+  onUpdate?: () => void;
+  initialPasteMode?: boolean;
+  onConsumePasteParam?: () => void;
+}) {
   const { user } = useAuth();
 
   const [activeTab, setActiveTab] = useState<"places" | "members">("places");
@@ -236,6 +247,8 @@ export default function ListDetailView({ list, onBack }: any) {
             onCommentsOpenChange={setCommentsOpen}
             focusedGetawayId={focusedGetawayId}
             onFocusedGetawayChange={setFocusedGetawayId}
+            initialPasteMode={initialPasteMode}
+            onConsumePasteParam={onConsumePasteParam}
           />
         )}
 
