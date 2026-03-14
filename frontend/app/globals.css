@@ -102,6 +102,26 @@ button:focus-visible {
   gap: 1rem;
 }
 
+.header__email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 639px) {
+  .header__email {
+    max-width: 140px;
+  }
+
+  .header__tag {
+    display: none;
+  }
+
+  .lists-view__col-desc {
+    display: none !important;
+  }
+}
+
 .header h1 {
   font-family: "Instrument Serif", serif;
   font-size: 1.75rem;

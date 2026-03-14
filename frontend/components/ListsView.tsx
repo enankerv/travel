@@ -36,10 +36,12 @@ export default function ListsView({
       <div className="header" style={{ justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <h1>Your Lists</h1>
-          <span className="tag">Travel Scout</span>
+          <span className="tag header__tag">Travel Scout</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <span style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>{user?.email}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: 0 }}>
+          <span className="header__email" style={{ color: 'var(--muted)', fontSize: '0.9rem' }} title={user?.email ?? undefined}>
+            {user?.email}
+          </span>
           <button
             onClick={onSignOut}
             style={{
@@ -118,7 +120,7 @@ export default function ListsView({
             <thead>
               <tr>
                 <th style={{ width: '30%' }}>List Name</th>
-                <th style={{ width: '40%' }}>Description</th>
+                <th className="lists-view__col-desc" style={{ width: '40%' }}>Description</th>
                 <th style={{ width: '15%', textAlign: 'center' }}>Getaways</th>
                 <th style={{ width: '15%', textAlign: 'center' }}>Members</th>
               </tr>
@@ -139,7 +141,7 @@ export default function ListsView({
                     style={{ cursor: 'pointer' }}
                   >
                     <td>{list.name ?? '—'}</td>
-                    <td style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>
+                    <td className="lists-view__col-desc" style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>
                       {list.description || '—'}
                     </td>
                     <td style={{ textAlign: 'center' }}>
