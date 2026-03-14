@@ -110,7 +110,15 @@ type UseListVotesRealtimeOptions = {
   onVoteDelete: (getaway_id: string, user_id: string) => void;
 };
 
-type UseListRealtimeOptions = UseListGetawaysRealtimeOptions & UseListVotesRealtimeOptions;
+type UseListCommentsRealtimeOptions = {
+  onCommentInsert?: (comment: any) => void;
+  onCommentUpdate?: (comment: any) => void;
+  onCommentDelete?: (commentId: string, getawayId: string) => void;
+};
+
+type UseListRealtimeOptions = UseListGetawaysRealtimeOptions &
+  UseListVotesRealtimeOptions &
+  UseListCommentsRealtimeOptions;
 
 /**
  * Single subscription to list channel for both getaways and votes.
@@ -125,6 +133,9 @@ export function useListRealtime({
   onImagesChange,
   onVoteInsert,
   onVoteDelete,
+  onCommentInsert,
+  onCommentUpdate,
+  onCommentDelete,
 }: UseListRealtimeOptions) {
   useEffect(() => {
     if (!enabled) return;
@@ -174,6 +185,18 @@ export function useListRealtime({
           onVoteDelete(r.getaway_id, r.user_id);
         }
       })
+      .on("broadcast", { event: "COMMENT_INSERT" }, (p: any) => {
+        const r = p.payload?.record;
+        if (r && onCommentInsert) onCommentInsert(r);
+      })
+      .on("broadcast", { event: "COMMENT_UPDATE" }, (p: any) => {
+        const r = p.payload?.record;
+        if (r && onCommentUpdate) onCommentUpdate(r);
+      })
+      .on("broadcast", { event: "COMMENT_DELETE" }, (p: any) => {
+        const r = p.payload?.old_record;
+        if (r?.id && r?.getaway_id && onCommentDelete) onCommentDelete(r.id, r.getaway_id);
+      })
       .on(
         "postgres_changes",
         {
@@ -206,7 +229,19 @@ export function useListRealtime({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [listId, enabled, onInsert, onUpdate, onDelete, onImagesChange, onVoteInsert, onVoteDelete]);
+  }, [
+    listId,
+    enabled,
+    onInsert,
+    onUpdate,
+    onDelete,
+    onImagesChange,
+    onVoteInsert,
+    onVoteDelete,
+    onCommentInsert,
+    onCommentUpdate,
+    onCommentDelete,
+  ]);
 }
 
 /** @deprecated Use useListRealtime instead. Kept for backwards compat. */

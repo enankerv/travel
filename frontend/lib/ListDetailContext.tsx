@@ -2,6 +2,9 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 import type { VotesByGetaway } from "./votes";
+import type { CommentRecord } from "./api";
+
+export type CommentsByGetaway = Record<string, CommentRecord[]>;
 
 export type ListDetailContextValue = {
   list: { id: string; name: string; user_id?: string };
@@ -14,6 +17,8 @@ export type ListDetailContextValue = {
   isListMember: boolean;
   currentUserId: string | undefined;
   currentUserProfile: { first_name?: string; avatar_url?: string } | undefined;
+  commentsByGetaway: CommentsByGetaway;
+  setCommentsByGetaway: React.Dispatch<React.SetStateAction<CommentsByGetaway>>;
   isLoading: boolean;
   error: string;
   setError: (msg: string) => void;

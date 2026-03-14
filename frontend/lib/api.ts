@@ -255,3 +255,55 @@ export async function removeVote(listId: string, getawayId: string) {
   if (!res.ok) throw new Error('Failed to remove vote')
   return res.json()
 }
+
+// Comments (per getaway per list; list members read, owner can edit)
+export type CommentRecord = {
+  id: string
+  list_id: string
+  getaway_id: string
+  user_id: string
+  body: string
+  created_at: string
+  updated_at: string
+  first_name?: string
+  avatar_url?: string
+}
+
+export async function getListComments(listId: string): Promise<{ comments: CommentRecord[] }> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_URL}/api/lists/${listId}/comments`, { headers })
+  if (!res.ok) throw new Error('Failed to fetch comments')
+  return res.json()
+}
+
+export async function createComment(listId: string, getawayId: string, body: string) {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_URL}/api/lists/${listId}/getaways/${getawayId}/comments`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ body }),
+  })
+  if (!res.ok) throw new Error('Failed to add comment')
+  return res.json()
+}
+
+export async function updateComment(listId: string, commentId: string, body: string) {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_URL}/api/lists/${listId}/comments/${commentId}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({ body }),
+  })
+  if (!res.ok) throw new Error('Failed to update comment')
+  return res.json()
+}
+
+export async function deleteComment(listId: string, commentId: string) {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_URL}/api/lists/${listId}/comments/${commentId}`, {
+    method: 'DELETE',
+    headers,
+  })
+  if (!res.ok) throw new Error('Failed to delete comment')
+  return res.json()
+}

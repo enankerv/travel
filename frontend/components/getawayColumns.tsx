@@ -65,6 +65,8 @@ export type CellRenderContext = {
   handleSave: () => void;
   handleCancel: () => void;
   votesByGetaway?: Record<string, { user_id: string; first_name?: string; avatar_url?: string }[]>;
+  commentsByGetaway?: Record<string, any[]>;
+  onCommentClick?: () => void;
   currentUserId?: string;
   canVote?: boolean;
   onVote?: (getawayId: string) => void;
@@ -355,9 +357,12 @@ const COLUMN_CONFIG: Record<ColumnKey, ColumnDef> = {
     className: "col-catch",
     label: "Actions",
     render: ({
+      getaway,
       isEditing,
       onEditStart,
       onDelete,
+      onCommentClick,
+      commentsByGetaway,
       handleSave,
       handleCancel,
       className,
@@ -384,6 +389,20 @@ const COLUMN_CONFIG: Record<ColumnKey, ColumnDef> = {
       ) : (
         <td className={className} onClick={(e) => e.stopPropagation()}>
           <div className="row-actions">
+            {onCommentClick && (
+              <button
+                className="row-action-btn row-action-btn-comment"
+                onClick={() => onCommentClick?.()}
+                title="Comments"
+              >
+                💬
+                {(commentsByGetaway?.[getaway.id]?.length ?? 0) > 0 && (
+                  <span className="row-action-btn-comment__count">
+                    {commentsByGetaway[getaway.id].length}
+                  </span>
+                )}
+              </button>
+            )}
             <button
               className="row-action-btn"
               onClick={() => onEditStart?.()}
@@ -427,6 +446,8 @@ export type CellRenderContextInput = Pick<
   | "handleSave"
   | "handleCancel"
   | "votesByGetaway"
+  | "commentsByGetaway"
+  | "onCommentClick"
   | "currentUserId"
   | "canVote"
   | "onVote"

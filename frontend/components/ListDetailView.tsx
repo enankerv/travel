@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getGetaways, getListMembers, getListVotes } from "@/lib/api";
+import { getGetaways, getListMembers, getListVotes, getListComments } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
 import { useListRealtime, useListPresence, PresenceUser } from "@/lib/realtime";
 import { useListVotes } from "@/hooks/useListVotes";
@@ -15,6 +15,9 @@ export default function ListDetailView({ list, onBack }: any) {
   const [activeTab, setActiveTab] = useState<"places" | "members">("places");
   const [getaways, setGetaways] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
+  const [commentsByGetaway, setCommentsByGetaway] = useState<Record<string, any[]>>({});
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [focusedGetawayId, setFocusedGetawayId] = useState<string | null>(null);
   const [viewingUsers, setViewingUsers] = useState<PresenceUser[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -41,6 +44,28 @@ export default function ListDetailView({ list, onBack }: any) {
     onImagesChange: () => loadData(true),
     onVoteInsert: votes.onVoteInsert,
     onVoteDelete: votes.onVoteDelete,
+    onCommentInsert: (c) =>
+      setCommentsByGetaway((prev) => {
+        const existing = prev[c.getaway_id] || [];
+        if (existing.some((x) => x.id === c.id)) return prev;
+        const next = { ...prev };
+        next[c.getaway_id] = [...existing, c];
+        return next;
+      }),
+    onCommentUpdate: (c) =>
+      setCommentsByGetaway((prev) => {
+        const next = { ...prev };
+        for (const gid of Object.keys(next)) {
+          next[gid] = next[gid].map((x) => (x.id === c.id ? { ...x, ...c } : x));
+        }
+        return next;
+      }),
+    onCommentDelete: (id, getawayId) =>
+      setCommentsByGetaway((prev) => {
+        const next = { ...prev };
+        next[getawayId] = (next[getawayId] || []).filter((x) => x.id !== id);
+        return next;
+      }),
   });
 
   useListPresence({
@@ -61,6 +86,8 @@ export default function ListDetailView({ list, onBack }: any) {
     isListMember: votes.isListMember,
     currentUserId: votes.currentUserId,
     currentUserProfile: votes.currentUserProfile,
+    commentsByGetaway,
+    setCommentsByGetaway,
     isLoading,
     error,
     setError,
@@ -70,21 +97,30 @@ export default function ListDetailView({ list, onBack }: any) {
   async function loadData(silent = false) {
     if (!silent) setIsLoading(true);
     try {
-      const [getawaysData, membersData, votesData] = await Promise.all([
+      const [getawaysData, membersData, votesData, commentsData] = await Promise.all([
         getGetaways(list.id),
         getListMembers(list.id),
         getListVotes(list.id),
+        getListComments(list.id),
       ]);
       setGetaways(getawaysData || []);
       setMembers(membersData?.members || []);
       const votesList = votesData?.votes || [];
-      const byGetaway: Record<string, { user_id: string; first_name?: string; avatar_url?: string }[]> = {};
+      const commentsList = commentsData?.comments || [];
+      const commentsByGid: Record<string, any[]> = {};
+      for (const c of commentsList) {
+        const gid = c.getaway_id;
+        if (!commentsByGid[gid]) commentsByGid[gid] = [];
+        commentsByGid[gid].push(c);
+      }
+      setCommentsByGetaway(commentsByGid);
+      const votesByGid: Record<string, { user_id: string; first_name?: string; avatar_url?: string }[]> = {};
       for (const v of votesList) {
         const gid = v.getaway_id;
-        if (!byGetaway[gid]) byGetaway[gid] = [];
-        byGetaway[gid].push({ user_id: v.user_id, first_name: v.first_name, avatar_url: v.avatar_url });
+        if (!votesByGid[gid]) votesByGid[gid] = [];
+        votesByGid[gid].push({ user_id: v.user_id, first_name: v.first_name, avatar_url: v.avatar_url });
       }
-      votes.setVotesByGetaway(byGetaway);
+      votes.setVotesByGetaway(votesByGid);
       setDataLoaded(true);
     } catch (err) {
       console.error("Failed to load data:", err);
@@ -109,6 +145,19 @@ export default function ListDetailView({ list, onBack }: any) {
             ←
           </button>
           <h1 className="list-detail-header__title">{list.name}</h1>
+          {activeTab === "places" && (
+            <button
+              type="button"
+              onClick={() => {
+                setCommentsOpen(true);
+                setFocusedGetawayId(null);
+              }}
+              className="list-detail-header__comments-btn"
+              title="Comments"
+            >
+              💬 Comments
+            </button>
+          )}
           {presenceOthers.length > 0 && (
             <div
               className="list-detail-presence"
@@ -177,7 +226,14 @@ export default function ListDetailView({ list, onBack }: any) {
             </button>
           </div>
         )}
-        {activeTab === "places" && <ListGetawaysTab />}
+        {activeTab === "places" && (
+          <ListGetawaysTab
+            commentsOpen={commentsOpen}
+            onCommentsOpenChange={setCommentsOpen}
+            focusedGetawayId={focusedGetawayId}
+            onFocusedGetawayChange={setFocusedGetawayId}
+          />
+        )}
 
         {activeTab === "members" && (
           <ListMembersTab

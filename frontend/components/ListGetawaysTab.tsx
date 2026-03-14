@@ -7,8 +7,19 @@ import DropZone from "./DropZone";
 import GetawayTable from "./GetawayTable";
 import PasteModal from "./PasteModal";
 import ImageGallery from "./ImageGallery";
+import CommentsSidebar from "./CommentsSidebar";
 
-export default function ListGetawaysTab() {
+export default function ListGetawaysTab({
+  commentsOpen = false,
+  onCommentsOpenChange,
+  focusedGetawayId = null,
+  onFocusedGetawayChange,
+}: {
+  commentsOpen?: boolean;
+  onCommentsOpenChange?: (open: boolean) => void;
+  focusedGetawayId?: string | null;
+  onFocusedGetawayChange?: (id: string | null) => void;
+}) {
   const { list, getaways, setGetaways, isLoading, onRefresh } = useListDetailContext();
   const listId = list.id;
   const [error, setError] = useState("");
@@ -216,9 +227,23 @@ export default function ListGetawaysTab() {
             onImageClick={handleImageClick}
             onRetry={handleRetryGetaway}
             onPasteClick={handlePasteClick}
+            onCommentClick={(getawayId: string) => {
+              onCommentsOpenChange?.(true);
+              onFocusedGetawayChange?.(getawayId);
+            }}
           />
         </div>
       </div>
+
+      <CommentsSidebar
+        isOpen={commentsOpen}
+        onClose={() => {
+          onCommentsOpenChange?.(false);
+          onFocusedGetawayChange?.(null);
+        }}
+        focusedGetawayId={focusedGetawayId}
+        onGetawayClick={(id: string) => onFocusedGetawayChange?.(id)}
+      />
 
       {galleryImages && (
         <ImageGallery

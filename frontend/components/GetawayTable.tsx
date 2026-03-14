@@ -23,8 +23,9 @@ export default function GetawayTable({
   onImageClick,
   onRetry,
   onPasteClick,
+  onCommentClick,
 }: any) {
-  const { votesByGetaway, currentUserId, isListMember, onVote, onUnvote } = useListDetailContext();
+  const { votesByGetaway, commentsByGetaway, currentUserId, isListMember, onVote, onUnvote } = useListDetailContext();
   const [editingId, setEditingId] = useState(null)
   const [visibleColumns, setVisibleColumns] = useState<VisibleColumns>(DEFAULT_VISIBLE)
   const [showColumnMenu, setShowColumnMenu] = useState(false)
@@ -109,7 +110,9 @@ export default function GetawayTable({
                 onImageClick={onImageClick}
                 onRetry={getaway.source_url ? () => onRetry && onRetry(getaway) : undefined}
                 onPasteClick={onPasteClick}
+                onCommentClick={onCommentClick ? () => onCommentClick(getaway.id) : undefined}
                 votesByGetaway={votesByGetaway}
+                commentsByGetaway={commentsByGetaway}
                 currentUserId={currentUserId}
                 canVote={isListMember}
                 onVote={onVote}
