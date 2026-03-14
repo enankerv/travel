@@ -5,11 +5,11 @@ import dynamic from "next/dynamic";
 import { scoutUrl, scoutPaste, deleteGetaway, updateGetaway } from "@/lib/api";
 import { useListDetailContext } from "@/lib/ListDetailContext";
 import DropZone from "./DropZone";
-import GetawayTable from "./GetawayTable";
 import PasteModal from "./PasteModal";
 import ImageGallery from "./ImageGallery";
 import CommentsSidebar from "./CommentsSidebar";
 import MapGetawaySidebar from "./MapGetawaySidebar";
+import GetawayListView from "./GetawayListView";
 
 const GetawayMap = dynamic(() => import("./GetawayMap"), { ssr: false });
 
@@ -246,8 +246,7 @@ export default function ListGetawaysTab({
 
         <div className="list-villas-tab__table-wrap">
           {viewMode === "table" ? (
-          <GetawayTable
-            getaways={getaways}
+          <GetawayListView
             isLoading={isLoading}
             onDelete={handleDeleteGetaway}
             onUpdate={handleUpdateGetaway}
