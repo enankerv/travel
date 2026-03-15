@@ -278,7 +278,8 @@ export default function ListGetawaysTab({
           <GetawayDetailSheet
             getaway={getaways.find((g: any) => g.id === mapGetawayId) ?? null}
             onClose={() => setMapGetawayId(null)}
-            onImageClick={handleImageClick}
+            onDelete={handleDeleteGetaway}
+            onUpdate={handleUpdateGetaway}
           />
         ) : (
           <MapGetawaySidebar

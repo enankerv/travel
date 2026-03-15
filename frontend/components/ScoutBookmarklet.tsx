@@ -34,7 +34,7 @@ interface ScoutBookmarkletProps {
   listName?: string;
 }
 
-export default function ScoutBookmarklet({ listName }: ScoutBookmarkletProps) {
+export default function ScoutBookmarklet({ listName: _listName }: ScoutBookmarkletProps) {
   const [appUrl, setAppUrl] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);

@@ -367,6 +367,62 @@ button:focus-visible {
   background: var(--surface);
 }
 
+.image-carousel__viewport {
+  position: relative;
+  width: 100%;
+}
+
+.image-carousel__arrow {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  margin: auto 0;
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: background 0.2s;
+}
+
+.image-carousel__arrow svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.image-carousel__arrow:hover {
+  background: rgba(0, 0, 0, 0.75);
+}
+
+.image-carousel__arrow--prev {
+  left: 12px;
+}
+
+.image-carousel__arrow--next {
+  right: 12px;
+}
+
+.image-carousel__counter {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.6);
+  color: rgba(255, 255, 255, 0.9);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  z-index: 10;
+  pointer-events: none;
+}
+
 .image-carousel__track {
   display: flex;
   overflow-x: auto;
@@ -2136,6 +2192,25 @@ button:focus-visible {
   justify-content: center;
 }
 
+.gallery-container .gallery-carousel {
+  width: 100%;
+  height: 100%;
+  margin-bottom: 0;
+}
+
+.gallery-container .gallery-carousel .image-carousel__viewport {
+  height: 100%;
+}
+
+.gallery-container .gallery-carousel .image-carousel__track {
+  height: 100%;
+  aspect-ratio: auto;
+}
+
+.gallery-container .gallery-carousel .image-carousel__slide img {
+  object-fit: contain;
+}
+
 .gallery-image {
   max-width: 100%;
   max-height: 100%;
@@ -2171,7 +2246,7 @@ button:focus-visible {
   position: absolute;
   top: 20px;
   right: 20px;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.6);
   color: white;
   border: none;
   width: 40px;
@@ -2187,7 +2262,7 @@ button:focus-visible {
 }
 
 .gallery-close:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.75);
 }
 
 /* Auth pages */
