@@ -5,6 +5,7 @@ import { useSignedImageUrls } from "@/hooks/useSignedImageUrls";
 import { parseAmenitiesInput } from "@/components/AmenitiesCell";
 import { ExternalLinkIcon, TrashIcon } from "./icons";
 import GetawayEditForm from "./GetawayEditForm";
+import ImageCarousel from "./ImageCarousel";
 import InlineComments from "./InlineComments";
 
 function formatPrice(price: number | null | undefined, currency?: string | null) {
@@ -21,18 +22,15 @@ function listJoin(arr: string[] | null | undefined): string {
 export default function GetawayDetailSheet({
   getaway,
   onClose,
-  onImageClick,
   onDelete,
   onUpdate,
 }: {
   getaway: any;
   onClose: () => void;
-  onImageClick?: (images: string[], index: number) => void;
   onDelete?: (getawayId: string) => void;
   onUpdate?: (getawayId: string, updates: any) => void;
 }) {
   const signedUrls = useSignedImageUrls(getaway?.images || []);
-  const thumbUrl = signedUrls[0];
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<any>(() => ({ ...getaway }));
 
@@ -137,13 +135,12 @@ export default function GetawayDetailSheet({
             <GetawayEditForm editData={editData} setEditData={setEditData} />
           ) : (
             <>
-              {thumbUrl && (
-                <div
-                  className="getaway-detail-sheet__hero"
-                  onClick={() => onImageClick?.(signedUrls, 0)}
-                >
-                  <img src={thumbUrl} alt={getaway.name} />
-                </div>
+              {signedUrls.length > 0 && (
+                <ImageCarousel
+                  images={signedUrls}
+                  alt={getaway.name || "Getaway"}
+                  className="getaway-detail-sheet__carousel"
+                />
               )}
 
               <dl className="getaway-detail-sheet__meta">

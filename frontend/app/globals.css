@@ -358,6 +358,73 @@ button:focus-visible {
   object-fit: cover;
 }
 
+/* Image carousel - swipeable on mobile */
+.image-carousel {
+  width: 100%;
+  margin-bottom: 1rem;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.image-carousel__track {
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  aspect-ratio: 16/10;
+}
+
+.image-carousel__track::-webkit-scrollbar {
+  display: none;
+}
+
+.image-carousel__track {
+  scrollbar-width: none;
+}
+
+.image-carousel__slide {
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+}
+
+.image-carousel__slide img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.image-carousel__dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+}
+
+.image-carousel__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: none;
+  background: var(--border-strong);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.2s;
+}
+
+.image-carousel__dot:hover {
+  background: var(--muted);
+}
+
+.image-carousel__dot.active {
+  background: var(--accent);
+  transform: scale(1.2);
+}
+
 .getaway-detail-sheet__meta {
   display: grid;
   grid-template-columns: auto 1fr;
