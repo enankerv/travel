@@ -130,6 +130,45 @@ button:focus-visible {
   padding: 0 1rem 1rem;
 }
 
+/* Mobile: single tall page scroll instead of nested scroll areas */
+@media (max-width: 639px) {
+  .app-detail-view {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .app-detail-view .list-detail-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--dark);
+    flex-shrink: 0;
+  }
+
+  .app-detail-view .list-detail-content {
+    flex: none;
+    min-height: auto;
+    overflow: visible;
+  }
+
+  .app-detail-view .list-villas-tab {
+    flex: none;
+    min-height: auto;
+    overflow: visible;
+  }
+
+  .app-detail-view .list-villas-tab__table-wrap {
+    overflow: visible;
+    min-height: 50vh;
+  }
+
+  .app-detail-view .getaway-list-mobile {
+    flex: none;
+    min-height: auto;
+    overflow: visible;
+  }
+}
+
 .getaway-list-mobile__loading {
   display: flex;
   flex-direction: column;

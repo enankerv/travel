@@ -193,6 +193,7 @@ function HomeContent() {
 
       {/* Detail View */}
       <div
+        className="app-detail-view"
         style={{
           position: 'absolute',
           inset: 0,

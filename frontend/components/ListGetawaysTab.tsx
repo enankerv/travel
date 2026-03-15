@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { scoutUrl, scoutPaste, deleteGetaway, updateGetaway } from "@/lib/api";
 import { useListDetailContext } from "@/lib/ListDetailContext";
@@ -21,11 +21,13 @@ export default function ListGetawaysTab({
   onCommentsOpenChange,
   focusedGetawayId = null,
   onFocusedGetawayChange,
+  onStickyContent,
 }: {
   commentsOpen?: boolean;
   onCommentsOpenChange?: (open: boolean) => void;
   focusedGetawayId?: string | null;
   onFocusedGetawayChange?: (id: string | null) => void;
+  onStickyContent?: (content: React.ReactNode) => void;
 }) {
   const { list, getaways, setGetaways, isLoading, onRefresh, commentsByGetaway } = useListDetailContext();
   const isMobile = useIsMobile();
@@ -197,9 +199,9 @@ export default function ListGetawaysTab({
 
   const showRetry = !!(lastFailedUrl || lastFailedPaste);
 
-  return (
-    <>
-      <div className="list-villas-tab">
+  const stickyContent = useMemo(
+    () => (
+      <div className="list-villas-tab__sticky">
         <div className="list-villas-tab__drop">
           <DropZone onUrlSubmit={handleScoutUrl} isLoading={scoutLoading} />
           <ScoutBookmarklet listName={list.name} />
@@ -249,7 +251,19 @@ export default function ListGetawaysTab({
             Map
           </button>
         </div>
+      </div>
+    ),
+    [scoutLoading, error, showRetry, viewMode]
+  );
 
+  useEffect(() => {
+    onStickyContent?.(stickyContent);
+    return () => onStickyContent?.(null);
+  }, [onStickyContent, stickyContent]);
+
+  return (
+    <>
+      <div className="list-villas-tab">
         <div className="list-villas-tab__table-wrap">
           {viewMode === "table" ? (
           <GetawayListView

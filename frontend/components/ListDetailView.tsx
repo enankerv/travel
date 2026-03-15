@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { getGetaways, getListMembers, getListVotes, getListComments } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
 import { useListRealtime, useListPresence, PresenceUser } from "@/lib/realtime";
@@ -29,6 +29,7 @@ export default function ListDetailView({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [placesStickyContent, setPlacesStickyContent] = useState<ReactNode>(null);
 
   const votes = useListVotes({
     listId: list.id,
@@ -141,6 +142,7 @@ export default function ListDetailView({
 
   return (
     <ListDetailProvider value={contextValue}>
+      <div className="list-detail-sticky">
       <header className="list-detail-header">
         <div className="list-detail-header__left">
           <button
@@ -202,6 +204,8 @@ export default function ListDetailView({
           Members ({members.length})
         </button>
       </div>
+      {activeTab === "places" && placesStickyContent}
+      </div>
 
       <div className="list-detail-content">
         {error && (
@@ -226,6 +230,7 @@ export default function ListDetailView({
             onCommentsOpenChange={setCommentsOpen}
             focusedGetawayId={focusedGetawayId}
             onFocusedGetawayChange={setFocusedGetawayId}
+            onStickyContent={setPlacesStickyContent}
           />
         )}
 
