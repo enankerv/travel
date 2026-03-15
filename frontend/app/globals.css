@@ -310,6 +310,31 @@ button:focus-visible {
   color: var(--light);
 }
 
+.getaway-detail-sheet__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.getaway-detail-sheet__action-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  padding: 0.25rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.getaway-detail-sheet__action-btn:hover {
+  color: var(--light);
+}
+
+.getaway-detail-sheet__action-btn--delete:hover {
+  color: var(--red);
+}
+
 .getaway-detail-sheet__content {
   flex: 1;
   overflow-y: auto;
@@ -388,6 +413,37 @@ button:focus-visible {
   gap: 0.5rem;
   color: var(--accent);
   font-size: 0.9rem;
+}
+
+.getaway-detail-sheet__edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.getaway-detail-sheet__edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.getaway-detail-sheet__edit-field label {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.getaway-detail-sheet__edit-row {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.getaway-detail-sheet__edit-row .getaway-detail-sheet__edit-field {
+  flex: 1;
+}
+
+.getaway-detail-sheet__edit-textarea {
+  resize: vertical;
+  min-height: 4rem;
 }
 
 .getaway-detail-sheet__link:hover {

@@ -61,6 +61,8 @@ export default function GetawayListView({
             getaway={detailGetaway}
             onClose={() => setDetailGetaway(null)}
             onImageClick={onImageClick}
+            onDelete={onDelete}
+            onUpdate={onUpdate}
           />
         )}
       </>
