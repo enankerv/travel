@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { getLists, createList } from '@/lib/api'
 import ListsView, { type ListItem } from '@/components/ListsView'
 import ListDetailView from '@/components/ListDetailView'
+import PasteEntryModal from '@/components/PasteEntryModal'
+import { setLastListId } from '@/lib/lastListStorage'
 import TermsConsentModal from '@/components/TermsConsentModal'
 import CreateListModal from '@/components/CreateListModal'
 import AuthDeniedView from '@/components/AuthDeniedView'
@@ -34,10 +36,14 @@ function HomeContent() {
       try {
         const data = await getLists()
         setLists(data || [])
-        if (applyListFromUrl && listParam && data?.some((l: ListItem) => l.id === listParam)) {
-          setSelectedListId(listParam)
-        } else if (listParam) {
-          router.replace('/', { scroll: false })
+        if (applyListFromUrl && data?.length) {
+          if (pasteParam === '1') {
+            setSelectedListId(null)
+          } else if (listParam && data.some((l: ListItem) => l.id === listParam)) {
+            setSelectedListId(listParam)
+          } else if (listParam) {
+            router.replace('/', { scroll: false })
+          }
         }
       } catch (err) {
         console.error('Failed to load lists:', err)
@@ -46,7 +52,7 @@ function HomeContent() {
         setIsLoading(false)
       }
     },
-    [listParam, router]
+    [listParam, pasteParam, router]
   )
 
   const onTermsNeeded = useCallback(
@@ -81,6 +87,7 @@ function HomeContent() {
   function handleSelectList(id: string | null) {
     setSelectedListId(id)
     if (id) {
+      setLastListId(id)
       router.replace('/?list=' + encodeURIComponent(id), { scroll: false })
     } else {
       router.replace('/', { scroll: false })
@@ -144,6 +151,18 @@ function HomeContent() {
   }
 
   const selectedList = lists.find(l => l.id === selectedListId)
+  const showPasteEntryModal = pasteParam === '1'
+
+  const handlePasteEntryClose = () => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete('paste')
+    const q = params.toString()
+    router.replace(q ? '/?' + q : '/', { scroll: false })
+  }
+
+  const handlePasteEntrySuccess = (listId: string) => {
+    handleSelectList(listId)
+  }
 
   return (
     <div className="app" style={{ overflow: 'hidden', height: '100vh' }}>
@@ -192,13 +211,6 @@ function HomeContent() {
               loadLists(false)
             }}
             onUpdate={() => loadLists()}
-            initialPasteMode={pasteParam === '1'}
-            onConsumePasteParam={() => {
-              const params = new URLSearchParams(searchParams.toString())
-              params.delete('paste')
-              const q = params.toString()
-              router.replace(q ? '/?' + q : '/', { scroll: false })
-            }}
           />
         )}
       </div>
@@ -207,6 +219,14 @@ function HomeContent() {
         open={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
         onCreate={handleCreateList}
+      />
+
+      <PasteEntryModal
+        isOpen={showPasteEntryModal}
+        onClose={handlePasteEntryClose}
+        lists={lists}
+        defaultListId={listParam || undefined}
+        onSuccess={handlePasteEntrySuccess}
       />
     </div>
   )

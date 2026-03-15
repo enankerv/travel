@@ -13,14 +13,10 @@ import { CommentIcon } from "./icons";
 export default function ListDetailView({
   list,
   onBack,
-  initialPasteMode,
-  onConsumePasteParam,
 }: {
   list: any;
   onBack: () => void;
   onUpdate?: () => void;
-  initialPasteMode?: boolean;
-  onConsumePasteParam?: () => void;
 }) {
   const { user } = useAuth();
 
@@ -247,8 +243,6 @@ export default function ListDetailView({
             onCommentsOpenChange={setCommentsOpen}
             focusedGetawayId={focusedGetawayId}
             onFocusedGetawayChange={setFocusedGetawayId}
-            initialPasteMode={initialPasteMode}
-            onConsumePasteParam={onConsumePasteParam}
           />
         )}
 

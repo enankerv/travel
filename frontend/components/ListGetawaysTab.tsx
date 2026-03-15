@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { scoutUrl, scoutPaste, deleteGetaway, updateGetaway } from "@/lib/api";
 import { useListDetailContext } from "@/lib/ListDetailContext";
@@ -21,15 +21,11 @@ export default function ListGetawaysTab({
   onCommentsOpenChange,
   focusedGetawayId = null,
   onFocusedGetawayChange,
-  initialPasteMode,
-  onConsumePasteParam,
 }: {
   commentsOpen?: boolean;
   onCommentsOpenChange?: (open: boolean) => void;
   focusedGetawayId?: string | null;
   onFocusedGetawayChange?: (id: string | null) => void;
-  initialPasteMode?: boolean;
-  onConsumePasteParam?: () => void;
 }) {
   const { list, getaways, setGetaways, isLoading, onRefresh, commentsByGetaway } = useListDetailContext();
   const isMobile = useIsMobile();
@@ -44,7 +40,6 @@ export default function ListGetawaysTab({
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [viewMode, setViewMode] = useState<"table" | "map">("table");
   const [mapGetawayId, setMapGetawayId] = useState<string | null>(null);
-  const [pasteFromBookmarklet, setPasteFromBookmarklet] = useState(false);
 
   useEffect(() => {
     if ("Notification" in window && Notification.permission === "default") {
@@ -52,17 +47,6 @@ export default function ListGetawaysTab({
     }
   }, []);
 
-  const consumedPasteRef = useRef(false);
-  useEffect(() => {
-    if (initialPasteMode && !consumedPasteRef.current) {
-      consumedPasteRef.current = true;
-      setPasteFromBookmarklet(true);
-      setShowPasteModal(true);
-      setPasteGetaway(null);
-      setLastFailedPaste("");
-      onConsumePasteParam?.();
-    }
-  }, [initialPasteMode]);
 
   async function handleScoutUrl(url: string, getawayId?: string) {
     setError("");
@@ -218,7 +202,7 @@ export default function ListGetawaysTab({
       <div className="list-villas-tab">
         <div className="list-villas-tab__drop">
           <DropZone onUrlSubmit={handleScoutUrl} isLoading={scoutLoading} />
-          <ScoutBookmarklet listId={listId} listName={list.name} />
+          <ScoutBookmarklet listName={list.name} />
         </div>
 
         {error && (
@@ -342,13 +326,11 @@ export default function ListGetawaysTab({
           setShowPasteModal(false);
           setPasteGetaway(null);
           setLastFailedPaste("");
-          setPasteFromBookmarklet(false);
         }}
         onSubmit={handleScoutPaste}
         isLoading={false}
         initialText={lastFailedPaste}
         listingUrl={pasteGetaway?.source_url ?? undefined}
-        fromBookmarklet={pasteFromBookmarklet}
       />
     </>
   );

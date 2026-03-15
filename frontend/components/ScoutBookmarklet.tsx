@@ -8,9 +8,9 @@ const FALLBACK_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
  * Build the paste bookmarklet.
  * Copies page HTML (with images) and text to clipboard, opens app with paste modal.
  */
-function buildPasteBookmarklet(listId: string, appUrl: string): string {
+function buildPasteBookmarklet(appUrl: string): string {
   const base = appUrl || FALLBACK_APP_URL || "https://getawaygather.com";
-  const url = `${base}/?list=${listId}&paste=1`;
+  const url = `${base}/?paste=1`;
   // Prefer HTML to preserve img tags; fallback to text
   const script = [
     "(function(){",
@@ -30,11 +30,11 @@ function buildPasteBookmarklet(listId: string, appUrl: string): string {
 }
 
 interface ScoutBookmarkletProps {
-  listId: string;
-  listName: string;
+  listId?: string;
+  listName?: string;
 }
 
-export default function ScoutBookmarklet({ listId, listName }: ScoutBookmarkletProps) {
+export default function ScoutBookmarklet({ listName }: ScoutBookmarkletProps) {
   const [appUrl, setAppUrl] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -43,7 +43,7 @@ export default function ScoutBookmarklet({ listId, listName }: ScoutBookmarkletP
     setAppUrl(typeof window !== "undefined" ? window.location.origin : "");
   }, []);
 
-  const pasteHref = useMemo(() => buildPasteBookmarklet(listId, appUrl), [listId, appUrl]);
+  const pasteHref = useMemo(() => buildPasteBookmarklet(appUrl), [appUrl]);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -66,7 +66,7 @@ export default function ScoutBookmarklet({ listId, listName }: ScoutBookmarkletP
         <div className="scout-bookmarklet__content">
           <p className="scout-bookmarklet__intro">
             Drag this to your bookmarks bar. When you&apos;re on a listing page, click it to copy the page
-            and add to <strong>{listName}</strong>.
+            and add to a list.
           </p>
 
           <div className="scout-bookmarklet__row">
