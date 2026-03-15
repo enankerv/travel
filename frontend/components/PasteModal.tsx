@@ -88,13 +88,50 @@ export default function PasteModal({ isOpen, onClose, onSubmit, isLoading, initi
 
   const handlePasteFromClipboard = async () => {
     try {
-      const clip = await navigator.clipboard.readText()
-      if (clip) {
-        setText(clip)
-        setHasTyped(true)
+      let didSet = false
+      if (navigator.clipboard.read) {
+        const items = await navigator.clipboard.read()
+        for (const item of items) {
+          let textContent = ''
+          let htmlContent = ''
+          if (item.types.includes('text/html')) {
+            const blob = await item.getType('text/html')
+            htmlContent = await blob.text()
+          }
+          if (item.types.includes('text/plain')) {
+            const blob = await item.getType('text/plain')
+            textContent = await blob.text()
+          }
+          if (htmlContent) {
+            const urls = extractImageUrlsFromHtml(htmlContent)
+            if (urls.length > 0) setExtractedImages(urls)
+          }
+          const toSet = textContent || htmlContent
+          if (toSet) {
+            setText(toSet)
+            setHasTyped(true)
+            didSet = true
+            break
+          }
+        }
+      }
+      if (!didSet) {
+        const clip = await navigator.clipboard.readText()
+        if (clip) {
+          setText(clip)
+          setHasTyped(true)
+        }
       }
     } catch {
-      // Clipboard API may be blocked; user can paste manually
+      try {
+        const clip = await navigator.clipboard.readText()
+        if (clip) {
+          setText(clip)
+          setHasTyped(true)
+        }
+      } catch {
+        // Clipboard API may be blocked; user can paste manually
+      }
     }
   }
 

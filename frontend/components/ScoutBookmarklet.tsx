@@ -6,21 +6,24 @@ const FALLBACK_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
 
 /**
  * Build the paste bookmarklet.
- * Extracts page content, copies to clipboard, opens app with paste modal.
+ * Copies page HTML (with images) and text to clipboard, opens app with paste modal.
  */
 function buildPasteBookmarklet(listId: string, appUrl: string): string {
   const base = appUrl || FALLBACK_APP_URL || "https://getawaygather.com";
   const url = `${base}/?list=${listId}&paste=1`;
+  // Prefer HTML to preserve img tags; fallback to text
   const script = [
     "(function(){",
-    "var t='';",
+    "var html=(document.body&&document.body.innerHTML)||(document.documentElement&&document.documentElement.outerHTML)||'';",
+    "var txt=(document.body&&document.body.innerText)||'';",
     "var n=document.getElementById('__NEXT_DATA__');",
-    "if(n&&n.textContent)t=n.textContent;",
-    "if(!t)t=(document.body&&document.body.innerText)||'';",
-    "if(!t)t=(document.documentElement&&document.documentElement.innerText)||'';",
-    "if(!t)t=(document.documentElement&&document.documentElement.outerHTML)||'';",
-    "if(t){navigator.clipboard.writeText(t).then(function(){window.open('" + url + "','_blank');alert('Page copied! Paste in the app (Ctrl+V).');}).catch(function(){window.open('" + url + "','_blank');});}",
-    "else{window.open('" + url + "','_blank');}",
+    "if(!html&&n&&n.textContent){html=n.textContent;txt=html;}",
+    "if(html){",
+    "var done=function(){window.open('" + url + "','_blank');alert('Page copied! Paste in the app.');};",
+    "if(navigator.clipboard.write){",
+    "navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([txt||html],{type:'text/plain'})})]).then(done).catch(function(){navigator.clipboard.writeText(html).then(done);});",
+    "}else{navigator.clipboard.writeText(html).then(done);}",
+    "}else{window.open('" + url + "','_blank');}",
     "})();",
   ].join("");
   return "javascript:" + script;
