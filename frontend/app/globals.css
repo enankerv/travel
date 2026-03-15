@@ -117,10 +117,6 @@ button:focus-visible {
     display: none;
   }
 
-  .list-detail-header__comments-btn {
-    display: none;
-  }
-
   .lists-view__col-desc {
     display: none !important;
   }
@@ -2292,24 +2288,6 @@ button:focus-visible {
 .auth-card .auth-cancel:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-}
-
-/* Comments sidebar - Google Docs style */
-.list-detail-header__comments-btn {
-  margin-left: 1rem;
-  padding: 0.35rem 0.75rem;
-  font-size: 0.85rem;
-  color: var(--muted);
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
-}
-
-.list-detail-header__comments-btn:hover {
-  color: var(--accent);
-  border-color: var(--accent);
 }
 
 /* Map getaway sidebar - full villa info (map view only) */

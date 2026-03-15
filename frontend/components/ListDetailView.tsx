@@ -8,7 +8,6 @@ import { useListVotes } from "@/hooks/useListVotes";
 import { ListDetailProvider } from "@/lib/ListDetailContext";
 import ListGetawaysTab from "./ListGetawaysTab";
 import ListMembersTab from "./ListMembersTab";
-import { CommentIcon } from "./icons";
 
 export default function ListDetailView({
   list,
@@ -153,22 +152,6 @@ export default function ListDetailView({
             ←
           </button>
           <h1 className="list-detail-header__title">{list.name}</h1>
-          {activeTab === "places" && (
-            <button
-              type="button"
-              onClick={() => {
-                setCommentsOpen(true);
-                setFocusedGetawayId(null);
-              }}
-              className="list-detail-header__comments-btn"
-              title="Comments"
-            >
-              <span style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
-                <CommentIcon size={16} />
-                Comments
-              </span>
-            </button>
-          )}
           {presenceOthers.length > 0 && (
             <div
               className="list-detail-presence"

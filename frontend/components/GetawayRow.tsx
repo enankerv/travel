@@ -32,11 +32,10 @@ export default function GetawayRow({
   const signedUrls = useSignedImageUrls(getaway.images || [])
   const thumbUrl = signedUrls[0]
   const visibleKeys = getVisibleColumnKeys(visibleColumns)
-  const colspanLoading = Math.max(1, visibleKeys.length - (visibleKeys.includes('image') ? 1 : 0))
-  const colspanMessage = Math.max(
-    1,
-    visibleKeys.length - (visibleKeys.includes('image') ? 1 : 0) - (visibleKeys.includes('actions') ? 1 : 0)
+  const contentKeys = visibleKeys.filter(
+    (k) => k !== 'votes' && k !== 'image' && k !== 'actions'
   )
+  const colspanMessage = Math.max(1, contentKeys.length)
 
   const handleSave = () => {
     const toSend = { ...editData }
@@ -92,92 +91,121 @@ export default function GetawayRow({
     onUnvote,
   }
 
-  if (getaway.import_status === 'loading') {
+  function renderSpecialRow(
+    message: React.ReactNode,
+    rowStyle: React.CSSProperties,
+    actionsContent: React.ReactNode,
+    rowProps?: { onClick?: (e: React.MouseEvent) => void; title?: string }
+  ) {
+    let contentRendered = false
     return (
-      <tr style={{ opacity: 0.6 }}>
-        {visibleKeys.includes('votes') && <td className="col-votes" />}
-        {visibleKeys.includes('image') && (
-          <td className="col-thumb">
-            <div className="spinner" style={{ width: '2rem', height: '2rem' }}></div>
-          </td>
-        )}
-        <td className="col-name" colSpan={colspanLoading} style={{ color: 'var(--muted)' }}>
-          Processing {(() => {
-            const u = getaway.source_url;
-            if (!u || !u.startsWith('http')) return 'listing';
-            try { return new URL(u).hostname; } catch { return 'listing'; }
-          })()}...
-        </td>
+      <tr style={rowStyle} onClick={rowProps?.onClick} title={rowProps?.title}>
+        {visibleKeys.map((key) => {
+          if (key === 'votes') {
+            return <td key={key} className="col-votes" />
+          }
+          if (key === 'image') {
+            return (
+              <td key={key} className="col-thumb">
+                {getaway.import_status === 'loading' ? (
+                  <div className="spinner" style={{ width: '2rem', height: '2rem' }} />
+                ) : (
+                  <div className="thumb-placeholder">
+                    {getaway.import_status === 'thin' ? '⚠️' : '❌'}
+                  </div>
+                )}
+              </td>
+            )
+          }
+          if (key === 'actions') {
+            return (
+              <td
+                key={key}
+                className="col-catch"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {actionsContent}
+              </td>
+            )
+          }
+          if (!contentRendered) {
+            contentRendered = true
+            return (
+              <td key={key} className="col-name" colSpan={colspanMessage}>
+                {message}
+              </td>
+            )
+          }
+          return null
+        })}
       </tr>
     )
   }
 
+  if (getaway.import_status === 'loading') {
+    return renderSpecialRow(
+      <span style={{ color: 'var(--muted)' }}>
+        Processing {(() => {
+          const u = getaway.source_url
+          if (!u || !u.startsWith('http')) return 'listing'
+          try { return new URL(u).hostname } catch { return 'listing' }
+        })()}...
+      </span>,
+      { opacity: 0.6 },
+      null
+    )
+  }
+
+  const pasteRowProps =
+    onPasteClick
+      ? {
+          onClick: (e: React.MouseEvent) => {
+            if (!(e.target as HTMLElement).closest('button')) onPasteClick(getaway)
+          },
+          title: 'Click to paste listing details',
+        }
+      : undefined
+
   if (getaway.import_status === 'thin') {
-    return (
-      <tr
-        style={{ opacity: 0.7, backgroundColor: 'var(--orange-soft)', cursor: onPasteClick ? 'pointer' : undefined }}
-        onClick={(e) => {
-          if (onPasteClick && !(e.target as HTMLElement).closest('button')) {
-            onPasteClick(getaway)
-          }
-        }}
-        title={onPasteClick ? 'Click to paste listing details' : undefined}
-      >
-        {visibleKeys.includes('votes') && <td className="col-votes" />}
-        {visibleKeys.includes('image') && (
-          <td className="col-thumb">
-            <div className="thumb-placeholder">⚠️</div>
-          </td>
-        )}
-        <td className="col-name" colSpan={colspanMessage} style={{ color: 'var(--orange)' }}>
-          Unable to extract full data. Click here to paste listing details manually.
-        </td>
-        {visibleKeys.includes('actions') && (
-          <td className="col-catch" onClick={(e) => e.stopPropagation()}>
-            <button className="row-action-btn trash" onClick={() => onDelete && onDelete()} title="Delete">
-              <TrashIcon />
-            </button>
-          </td>
-        )}
-      </tr>
+    return renderSpecialRow(
+      <span style={{ color: 'var(--orange)' }}>
+        Unable to extract full data. Click here to paste listing details manually.
+      </span>,
+      {
+        opacity: 0.7,
+        backgroundColor: 'var(--orange-soft)',
+        cursor: onPasteClick ? 'pointer' : undefined,
+      },
+      <div className="row-actions">
+        <button className="row-action-btn trash" onClick={() => onDelete?.()} title="Delete">
+          <TrashIcon />
+        </button>
+      </div>,
+      pasteRowProps
     )
   }
 
   if (getaway.import_status === 'error') {
-    return (
-      <tr
-        style={{ opacity: 0.7, backgroundColor: 'var(--red-soft)', cursor: onPasteClick ? 'pointer' : undefined }}
-        onClick={(e) => {
-          if (onPasteClick && !(e.target as HTMLElement).closest('button')) {
-            onPasteClick(getaway)
-          }
-        }}
-        title={onPasteClick ? 'Click to paste listing details' : undefined}
-      >
-        {visibleKeys.includes('votes') && <td className="col-votes" />}
-        {visibleKeys.includes('image') && (
-          <td className="col-thumb">
-            <div className="thumb-placeholder">❌</div>
-          </td>
+    return renderSpecialRow(
+      <span style={{ color: 'var(--red)' }}>
+        {getaway.import_error || 'Error while processing listing'}
+      </span>,
+      {
+        opacity: 0.7,
+        backgroundColor: 'var(--red-soft)',
+        cursor: onPasteClick ? 'pointer' : undefined,
+      },
+      <div className="row-actions">
+        {getaway.source_url && onRetry && (
+          <button className="row-action-btn" onClick={() => onRetry()} title="Retry">
+            ↻
+          </button>
         )}
-        <td className="col-name" colSpan={colspanMessage} style={{ color: 'var(--red)' }}>
-          {getaway.import_error || 'Error while processing listing'}
-        </td>
-        {visibleKeys.includes('actions') && (
-          <td className="col-catch" onClick={(e) => e.stopPropagation()}>
-            <div className="row-actions">
-              {getaway.source_url && onRetry && (
-                <button className="row-action-btn" onClick={() => onRetry()} title="Retry">
-                  ↻
-                </button>
-              )}
-              <button className="row-action-btn trash" onClick={() => onDelete && onDelete()} title="Delete">
-                <TrashIcon />
-              </button>
-            </div>
-          </td>
-        )}
-      </tr>
+        <button className="row-action-btn trash" onClick={() => onDelete?.()} title="Delete">
+          <TrashIcon />
+        </button>
+      </div>,
+      pasteRowProps
     )
   }
 
