@@ -11,8 +11,8 @@ log = logging.getLogger("scout.images")
 SUPABASE_BUCKET = "getaway-images"
 
 # Regex patterns for image extraction
-MD_IMAGE_RE = re.compile(r"!\[[^\]]*\]\((https?://[^\s\)]+\.(?:jpe?g|png|webp))\)", re.IGNORECASE)
-BARE_IMAGE_RE = re.compile(r"(?<!\()(?<!\])\b(https?://[^\s\)\]]+\.(?:jpe?g|png|webp))(?:\?[^\s\)\]]*)?", re.IGNORECASE)
+MD_IMAGE_RE = re.compile(r"!\[[^\]]*\]\((https?://[^\s\)]+\.(?:jpe?g|png|webp|avif))\)", re.IGNORECASE)
+BARE_IMAGE_RE = re.compile(r"(?<!\()(?<!\])\b(https?://[^\s\)\]]+\.(?:jpe?g|png|webp|avif))(?:\?[^\s\)\]]*)?", re.IGNORECASE)
 # Airbnb uses a0, a1, a2 muscache subdomains
 AIRBNB_PHOTO_RE = re.compile(r"(https?://a[0-9]?\.?muscache\.com/im/pictures/[^\s\)\]\"'<>]+)", re.IGNORECASE)
 # HTML img src (catches URLs that may not have file extensions)

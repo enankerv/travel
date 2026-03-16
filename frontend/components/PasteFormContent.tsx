@@ -17,27 +17,56 @@ const JUNK = [
   "airbnb-logo",
 ];
 
-export function extractImageUrlsFromHtml(html: string): string[] {
+export function extractImageUrlsFromHtml(html: string, baseUrl?: string | null): string[] {
   try {
     const doc = new DOMParser().parseFromString(html, "text/html");
     const imgs = [...doc.querySelectorAll("img[src]")];
+    const sources = [...doc.querySelectorAll("source[srcset]")];
     const seen = new Set<string>();
     const urls: string[] = [];
+
+    function resolveUrl(src: string): string | null {
+      if (src.startsWith("http")) return src;
+      if (baseUrl && src) {
+        try {
+          return new URL(src, baseUrl).href;
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    }
+
+    function addFromSrc(src: string) {
+      const resolved = resolveUrl(src.trim());
+      if (!resolved) return;
+      const low = resolved.toLowerCase();
+      if (JUNK.some((w) => low.includes(w))) return;
+      if (/\.svg|\.gif/i.test(resolved)) return;
+      const isAirbnb = low.includes("muscache.com") && low.includes("/im/pictures/");
+      if (low.includes("muscache.com") && !isAirbnb) return;
+      const key = resolved.replace(/[-_]\d+x\d+/g, "");
+      if (seen.has(key)) return;
+      seen.add(key);
+      if (isAirbnb || /\.(jpe?g|png|webp|avif)/i.test(resolved)) {
+        urls.push(resolved);
+      }
+      if (urls.length >= 10) return;
+    }
+
     for (const img of imgs) {
       const src = img.getAttribute("src") || "";
-      if (!src.startsWith("http")) continue;
-      const low = src.toLowerCase();
-      if (JUNK.some((w) => low.includes(w))) continue;
-      if (/\.svg|\.gif/i.test(src)) continue;
-      const isAirbnb = low.includes("muscache.com") && low.includes("/im/pictures/");
-      if (low.includes("muscache.com") && !isAirbnb) continue;
-      const key = src.replace(/[-_]\d+x\d+/g, "");
-      if (seen.has(key)) continue;
-      seen.add(key);
-      if (isAirbnb || /\.(jpe?g|png|webp)/i.test(src)) {
-        urls.push(src);
-      }
+      if (src) addFromSrc(src);
       if (urls.length >= 10) break;
+    }
+    for (const source of sources) {
+      if (urls.length >= 10) break;
+      const srcset = source.getAttribute("srcset") || "";
+      for (const part of srcset.split(",")) {
+        const url = part.trim().split(/\s+/)[0];
+        if (url) addFromSrc(url);
+        if (urls.length >= 10) break;
+      }
     }
     return urls;
   } catch {
@@ -93,7 +122,7 @@ export default function PasteFormContent({
     setHasTyped(true);
     const html = e.clipboardData.getData("text/html");
     if (html) {
-      const urls = extractImageUrlsFromHtml(html);
+      const urls = extractImageUrlsFromHtml(html, listingUrl);
       if (urls.length > 0) setExtractedImages(urls);
     }
   };
@@ -115,7 +144,7 @@ export default function PasteFormContent({
             textContent = await blob.text();
           }
           if (htmlContent) {
-            const urls = extractImageUrlsFromHtml(htmlContent);
+            const urls = extractImageUrlsFromHtml(htmlContent, listingUrl);
             if (urls.length > 0) setExtractedImages(urls);
           }
           const toSet = textContent || htmlContent;
