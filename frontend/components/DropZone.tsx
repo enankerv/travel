@@ -67,7 +67,7 @@ export default function DropZone({ onUrlSubmit, isLoading }: DropZoneProps) {
           onChange={(e) => setUrl(e.target.value)}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
-          placeholder="Paste a listing URL from Airbnb, VRBO, or any rental site..."
+          placeholder="Paste a listing URL from any rental site..."
           disabled={isLoading}
           className="dropzone__input"
           aria-label="Listing URL"

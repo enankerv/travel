@@ -16,6 +16,17 @@ import ScoutBookmarklet from "./ScoutBookmarklet";
 
 const GetawayMap = dynamic(() => import("./GetawayMap"), { ssr: false });
 
+/** Safely show a notification; no-op when Notification API is unavailable (e.g. mobile). */
+function tryShowNotification(title: string, options?: NotificationOptions): void {
+  try {
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    if (Notification.permission !== "granted") return;
+    new Notification(title, options);
+  } catch {
+    // Notifications not supported (e.g. mobile) - silently ignore
+  }
+}
+
 export default function ListGetawaysTab({
   commentsOpen = false,
   onCommentsOpenChange,
@@ -44,8 +55,12 @@ export default function ListGetawaysTab({
   const [mapGetawayId, setMapGetawayId] = useState<string | null>(null);
 
   useEffect(() => {
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
+    try {
+      if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission();
+      }
+    } catch {
+      // Notifications not supported (e.g. mobile) - silently ignore
     }
   }, []);
 
@@ -64,31 +79,25 @@ export default function ListGetawaysTab({
             ),
           );
         }
-        if (Notification.permission === "granted") {
-          new Notification("Scouting...", {
-            body: "Processing listing...",
-            icon: "⏳",
-          });
-        }
+        tryShowNotification("Scouting...", {
+          body: "Processing listing...",
+          icon: "⏳",
+        });
       } else if (!result.ok) {
         setLastFailedUrl(url);
         setError(result.error || "Failed to scout getaway");
-        if (Notification.permission === "granted") {
-          new Notification("Scouting Failed", {
-            body: result.error || "Failed to scout getaway",
-            icon: "✕",
-          });
-        }
+        tryShowNotification("Scouting Failed", {
+          body: result.error || "Failed to scout getaway",
+          icon: "✕",
+        });
       }
     } catch (err: any) {
       setLastFailedUrl(url);
       setError(err.message || "Failed to scout getaway");
-      if (Notification.permission === "granted") {
-        new Notification("Error", {
-          body: err.message || "Failed to scout getaway",
-          icon: "✕",
-        });
-      }
+      tryShowNotification("Error", {
+        body: err.message || "Failed to scout getaway",
+        icon: "✕",
+      });
     } finally {
       setScoutLoading(false);
     }
@@ -111,33 +120,27 @@ export default function ListGetawaysTab({
             ),
           );
         }
-        if (Notification.permission === "granted") {
-          new Notification("Processing Paste...", {
-            body: "Extracting getaway details...",
-            icon: "⏳",
-          });
-        }
+        tryShowNotification("Processing Paste...", {
+          body: "Extracting getaway details...",
+          icon: "⏳",
+        });
       } else if (!result.ok) {
         setLastFailedPaste(text);
         setError(result.error || "Failed to process paste");
         setShowPasteModal(true);
-        if (Notification.permission === "granted") {
-          new Notification("Error", {
-            body: result.error || "Failed to process paste",
-            icon: "✕",
-          });
-        }
+        tryShowNotification("Error", {
+          body: result.error || "Failed to process paste",
+          icon: "✕",
+        });
       }
     } catch (err: any) {
       setLastFailedPaste(text);
       setError(err.message || "Failed to process paste");
       setShowPasteModal(true);
-      if (Notification.permission === "granted") {
-        new Notification("Error", {
-          body: err.message || "Failed to process paste",
-          icon: "✕",
-        });
-      }
+      tryShowNotification("Error", {
+        body: err.message || "Failed to process paste",
+        icon: "✕",
+      });
     }
   }
 
