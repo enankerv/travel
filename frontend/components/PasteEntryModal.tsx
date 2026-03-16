@@ -12,6 +12,7 @@ interface PasteEntryModalProps {
   onClose: () => void;
   lists: ListItem[];
   defaultListId?: string | null;
+  sourceUrl?: string | null;
   onSuccess: (listId: string) => void;
 }
 
@@ -20,6 +21,7 @@ export default function PasteEntryModal({
   onClose,
   lists,
   defaultListId,
+  sourceUrl,
   onSuccess,
 }: PasteEntryModalProps) {
   const [selectedListId, setSelectedListId] = useState<string>("");
@@ -46,7 +48,7 @@ export default function PasteEntryModal({
     setIsSubmitting(true);
     setError("");
     try {
-      const result = await scoutPaste(text.trim(), selectedListId, undefined, undefined);
+      const result = await scoutPaste(text.trim(), selectedListId, sourceUrl || undefined, undefined);
       if (result.ok) {
         setLastListId(selectedListId);
         onClose();
@@ -140,6 +142,7 @@ export default function PasteEntryModal({
         onClose={onClose}
         isLoading={isSubmitting}
         fromBookmarklet={true}
+        listingUrl={sourceUrl || undefined}
       />
         </>
       )}

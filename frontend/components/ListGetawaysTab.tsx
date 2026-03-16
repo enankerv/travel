@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { scoutUrl, scoutPaste, deleteGetaway, updateGetaway } from "@/lib/api";
 import { useListDetailContext } from "@/lib/ListDetailContext";
@@ -28,18 +29,24 @@ function tryShowNotification(title: string, options?: NotificationOptions): void
 }
 
 export default function ListGetawaysTab({
+  pasteParam,
+  urlParam,
   commentsOpen = false,
   onCommentsOpenChange,
   focusedGetawayId = null,
   onFocusedGetawayChange,
   onStickyContent,
 }: {
+  pasteParam?: string | null;
+  urlParam?: string | null;
   commentsOpen?: boolean;
   onCommentsOpenChange?: (open: boolean) => void;
   focusedGetawayId?: string | null;
   onFocusedGetawayChange?: (id: string | null) => void;
   onStickyContent?: (content: React.ReactNode) => void;
 }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { list, getaways, setGetaways, isLoading, onRefresh, commentsByGetaway } = useListDetailContext();
   const isMobile = useIsMobile();
   const listId = list.id;
@@ -63,6 +70,13 @@ export default function ListGetawaysTab({
       // Notifications not supported (e.g. mobile) - silently ignore
     }
   }, []);
+
+  useEffect(() => {
+    if (pasteParam === "1" && urlParam) {
+      setPasteGetaway(null);
+      setShowPasteModal(true);
+    }
+  }, [pasteParam, urlParam]);
 
 
   async function handleScoutUrl(url: string, getawayId?: string) {
@@ -107,8 +121,9 @@ export default function ListGetawaysTab({
     setError("");
     setLastFailedPaste("");
     setShowPasteModal(false);
+    setScoutLoading(true);
     const getawayId = pasteGetaway?.id ?? undefined;
-    const originalUrl = pasteGetaway?.source_url ?? undefined;
+    const originalUrl = pasteGetaway?.source_url ?? urlParam ?? undefined;
     try {
       const result = await scoutPaste(text, listId, originalUrl, getawayId);
       if (result.ok) {
@@ -141,6 +156,8 @@ export default function ListGetawaysTab({
         body: err.message || "Failed to process paste",
         icon: "✕",
       });
+    } finally {
+      setScoutLoading(false);
     }
   }
 
@@ -206,8 +223,12 @@ export default function ListGetawaysTab({
     () => (
       <div className="list-villas-tab__sticky">
         <div className="list-villas-tab__drop">
-          <DropZone onUrlSubmit={handleScoutUrl} isLoading={scoutLoading} />
-          <ScoutBookmarklet listName={list.name} />
+          <DropZone
+            onUrlSubmit={handleScoutUrl}
+            onError={(msg) => setError(msg)}
+            isLoading={scoutLoading}
+          />
+          <ScoutBookmarklet />
         </div>
 
         {error && (
@@ -344,11 +365,19 @@ export default function ListGetawaysTab({
           setShowPasteModal(false);
           setPasteGetaway(null);
           setLastFailedPaste("");
+          if (pasteParam === "1") {
+            const params = new URLSearchParams(searchParams.toString());
+            params.delete("paste");
+            params.delete("url");
+            const q = params.toString();
+            router.replace(q ? "/?" + q : "/", { scroll: false });
+          }
         }}
         onSubmit={handleScoutPaste}
         isLoading={false}
         initialText={lastFailedPaste}
-        listingUrl={pasteGetaway?.source_url ?? undefined}
+        listingUrl={pasteGetaway?.source_url ?? urlParam ?? undefined}
+        fromBookmarklet={!pasteGetaway}
       />
     </>
   );

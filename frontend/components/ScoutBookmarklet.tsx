@@ -6,35 +6,39 @@ const FALLBACK_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
 
 /**
  * Build the paste bookmarklet.
- * Copies page HTML (with images) and text to clipboard, opens app with paste modal.
+ * Copies page HTML (with images) and text to clipboard, navigates to app with paste modal and source URL.
+ * Uses location.href (not window.open) so mobile browsers don't block it.
+ * Does not include list ID - app uses stored default or shows list picker.
  */
 function buildPasteBookmarklet(appUrl: string): string {
   const base = appUrl || FALLBACK_APP_URL || "https://getawaygather.com";
-  const url = `${base}/?paste=1`;
-  // Prefer HTML to preserve img tags; fallback to text
   const script = [
     "(function(){",
+    "var base='" + base.replace(/'/g, "\\'") + "';",
+    "var params='paste=1';",
+    "var src=encodeURIComponent(window.location.href);",
+    "if(src){params+='&url='+src;}",
+    "var url=base+'/?'+params;",
+    "var go=function(){window.location.href=url;};",
     "var html=(document.body&&document.body.innerHTML)||(document.documentElement&&document.documentElement.outerHTML)||'';",
     "var txt=(document.body&&document.body.innerText)||'';",
     "var n=document.getElementById('__NEXT_DATA__');",
     "if(!html&&n&&n.textContent){html=n.textContent;txt=html;}",
-    "if(html){",
-    "var done=function(){window.open('" + url + "','_blank');alert('Page copied! Paste in the app.');};",
-    "if(navigator.clipboard.write){",
-    "navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([txt||html],{type:'text/plain'})})]).then(done).catch(function(){navigator.clipboard.writeText(html).then(done);});",
-    "}else{navigator.clipboard.writeText(html).then(done);}",
-    "}else{window.open('" + url + "','_blank');}",
+    "if(html&&navigator.clipboard){",
+    "var done=function(){alert('Page copied! Paste in the app.');go();};",
+    "var fail=function(){go();};",
+    "try{",
+    "if(navigator.clipboard.write&&typeof ClipboardItem!='undefined'){",
+    "navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([txt||html],{type:'text/plain'})})]).then(done).catch(function(){navigator.clipboard.writeText(html).then(done).catch(fail);});",
+    "}else{navigator.clipboard.writeText(html).then(done).catch(fail);}",
+    "}catch(e){fail();}",
+    "}else{go();}",
     "})();",
   ].join("");
   return "javascript:" + script;
 }
 
-interface ScoutBookmarkletProps {
-  listId?: string;
-  listName?: string;
-}
-
-export default function ScoutBookmarklet({ listName: _listName }: ScoutBookmarkletProps) {
+export default function ScoutBookmarklet() {
   const [appUrl, setAppUrl] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -66,7 +70,7 @@ export default function ScoutBookmarklet({ listName: _listName }: ScoutBookmarkl
         <div className="scout-bookmarklet__content">
           <p className="scout-bookmarklet__intro">
             Drag this to your bookmarks bar. When you&apos;re on a listing page, click it to copy the page
-            and add to a list.
+            and add to a list. Uses your last selected list by default, or pick one when prompted.
           </p>
 
           <div className="scout-bookmarklet__row">

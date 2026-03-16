@@ -11,9 +11,11 @@ import ListMembersTab from "./ListMembersTab";
 
 export default function ListDetailView({
   list,
+  searchParams = {},
   onBack,
 }: {
   list: any;
+  searchParams?: Record<string, string>;
   onBack: () => void;
   onUpdate?: () => void;
 }) {
@@ -226,6 +228,8 @@ export default function ListDetailView({
         )}
         {activeTab === "places" && (
           <ListGetawaysTab
+            pasteParam={searchParams?.paste}
+            urlParam={searchParams?.url}
             commentsOpen={commentsOpen}
             onCommentsOpenChange={setCommentsOpen}
             focusedGetawayId={focusedGetawayId}

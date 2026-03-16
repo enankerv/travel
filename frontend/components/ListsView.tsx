@@ -19,6 +19,8 @@ interface ListsViewProps {
   error: string
   onDismissError?: () => void
   isLoading?: boolean
+  /** When true, show hint to select a list for pasted content (e.g. from bookmarklet) */
+  pasteMode?: boolean
 }
 
 export default function ListsView({
@@ -29,6 +31,7 @@ export default function ListsView({
   user,
   error,
   onDismissError,
+  pasteMode,
 }: ListsViewProps) {
   return (
     <>
@@ -58,6 +61,21 @@ export default function ListsView({
           </button>
         </div>
       </div>
+
+      {pasteMode && (
+        <div
+          style={{
+            margin: '0 2rem 1rem',
+            padding: '0.75rem 1rem',
+            background: 'var(--accent-soft)',
+            borderRadius: '8px',
+            color: 'var(--accent)',
+            fontSize: '0.9rem',
+          }}
+        >
+          Select a list to add this listing to
+        </div>
+      )}
 
       {/* Action Buttons */}
       <div

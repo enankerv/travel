@@ -15,6 +15,8 @@ MD_IMAGE_RE = re.compile(r"!\[[^\]]*\]\((https?://[^\s\)]+\.(?:jpe?g|png|webp))\
 BARE_IMAGE_RE = re.compile(r"(?<!\()(?<!\])\b(https?://[^\s\)\]]+\.(?:jpe?g|png|webp))(?:\?[^\s\)\]]*)?", re.IGNORECASE)
 # Airbnb uses a0, a1, a2 muscache subdomains
 AIRBNB_PHOTO_RE = re.compile(r"(https?://a[0-9]?\.?muscache\.com/im/pictures/[^\s\)\]\"'<>]+)", re.IGNORECASE)
+# HTML img src (catches URLs that may not have file extensions)
+IMG_SRC_RE = re.compile(r'<img[^>]+src=["\'](https?://[^"\'>\s]+)["\']', re.IGNORECASE)
 
 SIZE_SUFFIX_RE = re.compile(r"[-_]\d+x\d+")
 URL_DIMS_RE = re.compile(r"[-_](\d+)x(\d+)")
@@ -139,12 +141,18 @@ def pick_best_images_from_media(media: dict, villa_name: str = "", base_url: str
 
 
 def extract_image_urls_from_text(text: str) -> list[str]:
-    """Pull image URLs from pasted text, filtering out junk (icons, logos, tiny images).
+    """Pull image URLs from pasted text (including HTML), filtering out junk.
     Dedupes by base key and returns up to 10."""
-    raw = MD_IMAGE_RE.findall(text) + BARE_IMAGE_RE.findall(text) + AIRBNB_PHOTO_RE.findall(text)
+    raw = (
+        MD_IMAGE_RE.findall(text)
+        + BARE_IMAGE_RE.findall(text)
+        + AIRBNB_PHOTO_RE.findall(text)
+        + IMG_SRC_RE.findall(text)
+    )
     seen_keys: set[str] = set()
     urls: list[str] = []
     for url in raw:
+        url = url.rstrip('"\'<>')
         if not is_likely_property_photo(url):
             continue
         key = image_base_key(url)

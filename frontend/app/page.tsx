@@ -6,8 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { getLists, createList } from '@/lib/api'
 import ListsView, { type ListItem } from '@/components/ListsView'
 import ListDetailView from '@/components/ListDetailView'
-import PasteEntryModal from '@/components/PasteEntryModal'
-import { setLastListId } from '@/lib/lastListStorage'
+import { setLastListId, getLastListId } from '@/lib/lastListStorage'
 import TermsConsentModal from '@/components/TermsConsentModal'
 import CreateListModal from '@/components/CreateListModal'
 import AuthDeniedView from '@/components/AuthDeniedView'
@@ -37,12 +36,18 @@ function HomeContent() {
         const data = await getLists()
         setLists(data || [])
         if (applyListFromUrl && data?.length) {
-          if (pasteParam === '1') {
-            setSelectedListId(null)
-          } else if (listParam && data.some((l: ListItem) => l.id === listParam)) {
+          if (listParam && data.some((l: ListItem) => l.id === listParam)) {
             setSelectedListId(listParam)
           } else if (listParam) {
             router.replace('/', { scroll: false })
+          } else if (pasteParam === '1') {
+            const lastId = getLastListId()
+            if (lastId && data.some((l: ListItem) => l.id === lastId)) {
+              setSelectedListId(lastId)
+              const params = new URLSearchParams(searchParams.toString())
+              params.set('list', lastId)
+              router.replace('/?' + params.toString(), { scroll: false })
+            }
           }
         }
       } catch (err) {
@@ -52,7 +57,7 @@ function HomeContent() {
         setIsLoading(false)
       }
     },
-    [listParam, pasteParam, router]
+    [listParam, pasteParam, searchParams, router]
   )
 
   const onTermsNeeded = useCallback(
@@ -88,9 +93,16 @@ function HomeContent() {
     setSelectedListId(id)
     if (id) {
       setLastListId(id)
-      router.replace('/?list=' + encodeURIComponent(id), { scroll: false })
+      const params = new URLSearchParams(searchParams.toString())
+      params.set('list', id)
+      router.replace('/?' + params.toString(), { scroll: false })
     } else {
-      router.replace('/', { scroll: false })
+      const params = new URLSearchParams(searchParams.toString())
+      params.delete('list')
+      params.delete('paste')
+      params.delete('url')
+      const q = params.toString()
+      router.replace(q ? '/?' + q : '/', { scroll: false })
     }
   }
 
@@ -151,18 +163,6 @@ function HomeContent() {
   }
 
   const selectedList = lists.find(l => l.id === selectedListId)
-  const showPasteEntryModal = pasteParam === '1'
-
-  const handlePasteEntryClose = () => {
-    const params = new URLSearchParams(searchParams.toString())
-    params.delete('paste')
-    const q = params.toString()
-    router.replace(q ? '/?' + q : '/', { scroll: false })
-  }
-
-  const handlePasteEntrySuccess = (listId: string) => {
-    handleSelectList(listId)
-  }
 
   return (
     <div className="app" style={{ overflow: 'hidden', height: '100vh' }}>
@@ -188,6 +188,7 @@ function HomeContent() {
           error={error}
           onDismissError={() => setError('')}
           isLoading={isLoading}
+          pasteMode={pasteParam === '1' && !!searchParams.get('url')}
         />
       </div>
 
@@ -207,6 +208,7 @@ function HomeContent() {
         {selectedList && (
           <ListDetailView
             list={selectedList}
+            searchParams={Object.fromEntries(searchParams.entries())}
             onBack={() => {
               handleSelectList(null)
               loadLists(false)
@@ -222,13 +224,6 @@ function HomeContent() {
         onCreate={handleCreateList}
       />
 
-      <PasteEntryModal
-        isOpen={showPasteEntryModal}
-        onClose={handlePasteEntryClose}
-        lists={lists}
-        defaultListId={listParam || undefined}
-        onSuccess={handlePasteEntrySuccess}
-      />
     </div>
   )
 }

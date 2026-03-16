@@ -64,8 +64,8 @@ def create_extraction_client():
     return instructor.from_provider(f"ollama/{OLLAMA_MODEL}", mode=instructor.Mode.JSON)
 
 
-async def extract_fact_sheet(markdown_text: str) -> str:
-    """First pass: convert raw markdown into a clean fact sheet."""
+async def extract_fact_sheet(markdown_text: str) -> tuple[str, dict | None]:
+    """First pass: convert raw markdown into a clean fact sheet. Returns (fact_sheet, usage_dict)."""
     client = create_extraction_client()
     
     stage1_system = (
@@ -85,8 +85,8 @@ async def extract_fact_sheet(markdown_text: str) -> str:
     )
     
     model = GEMINI_MODEL if LLM_PROVIDER == "gemini" else OLLAMA_MODEL
-    result = await asyncio.to_thread(
-        client.create,
+    result, completion = await asyncio.to_thread(
+        client.create_with_completion,
         model=model,
         messages=[
             {"role": "system", "content": stage1_system},
@@ -95,14 +95,28 @@ async def extract_fact_sheet(markdown_text: str) -> str:
         response_model=FactSheet,
         max_retries=2,
     )
+    usage_dict: dict | None = None
+    if completion and hasattr(completion, "usage") and completion.usage:
+        u = completion.usage
+        usage_dict = {
+            "prompt_tokens": getattr(u, "prompt_tokens", None) or getattr(u, "input_tokens", None),
+            "completion_tokens": getattr(u, "completion_tokens", None) or getattr(u, "output_tokens", None),
+            "total_tokens": getattr(u, "total_tokens", None),
+        }
+        log.info(
+            "[SCOUT] Stage 1 tokens: prompt=%s completion=%s total=%s",
+            usage_dict.get("prompt_tokens"),
+            usage_dict.get("completion_tokens"),
+            usage_dict.get("total_tokens"),
+        )
     
     fact_sheet = result.fact_sheet or ""
     log.info("fact sheet extracted: %d chars", len(fact_sheet))
-    return fact_sheet
+    return fact_sheet, usage_dict
 
 
-async def extract_villa_listing(fact_sheet_markdown: str) -> VillaListing:
-    """Second pass: convert fact sheet markdown into structured JSON."""
+async def extract_villa_listing(fact_sheet_markdown: str) -> tuple[VillaListing, dict | None]:
+    """Second pass: convert fact sheet markdown into structured JSON. Returns (listing, usage_dict)."""
     client = create_extraction_client()
     
     stage2_system = (
@@ -123,8 +137,8 @@ async def extract_villa_listing(fact_sheet_markdown: str) -> VillaListing:
     )
     
     model = GEMINI_MODEL if LLM_PROVIDER == "gemini" else OLLAMA_MODEL
-    listing = await asyncio.to_thread(
-        client.create,
+    listing, completion = await asyncio.to_thread(
+        client.create_with_completion,
         model=model,
         messages=[
             {"role": "system", "content": stage2_system},
@@ -133,6 +147,20 @@ async def extract_villa_listing(fact_sheet_markdown: str) -> VillaListing:
         response_model=VillaListing,
         max_retries=2,
     )
+    usage_dict: dict | None = None
+    if completion and hasattr(completion, "usage") and completion.usage:
+        u = completion.usage
+        usage_dict = {
+            "prompt_tokens": getattr(u, "prompt_tokens", None) or getattr(u, "input_tokens", None),
+            "completion_tokens": getattr(u, "completion_tokens", None) or getattr(u, "output_tokens", None),
+            "total_tokens": getattr(u, "total_tokens", None),
+        }
+        log.info(
+            "[SCOUT] Stage 2 tokens: prompt=%s completion=%s total=%s",
+            usage_dict.get("prompt_tokens"),
+            usage_dict.get("completion_tokens"),
+            usage_dict.get("total_tokens"),
+        )
     
     try:
         dumped = listing.model_dump()
@@ -144,15 +172,34 @@ async def extract_villa_listing(fact_sheet_markdown: str) -> VillaListing:
     except Exception as e:
         log.warning("could not log extraction result: %s", e)
     
-    return listing
+    return listing, usage_dict
+
+
+def _sum_usage(u1: dict | None, u2: dict | None) -> dict:
+    """Sum token counts from two usage dicts."""
+    out = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+    for u in (u1, u2):
+        if u:
+            for k in out:
+                out[k] += u.get(k) or 0
+    return out
 
 
 async def extract_villa_two_pass(markdown_text: str) -> VillaListing:
     """Run both extraction passes and return the final VillaListing."""
     print("🧠 Stage 1: Building Fact Sheet (Markdown)...")
-    fact_sheet = await extract_fact_sheet(markdown_text)
+    fact_sheet, usage1 = await extract_fact_sheet(markdown_text)
     
     print("🧠 Stage 2: Extracting JSON from Fact Sheet...")
-    listing = await extract_villa_listing(fact_sheet)
+    listing, usage2 = await extract_villa_listing(fact_sheet)
+    
+    total = _sum_usage(usage1, usage2)
+    if total["total_tokens"]:
+        log.info(
+            "[SCOUT] Total tokens per listing: prompt=%s completion=%s total=%s",
+            total["prompt_tokens"],
+            total["completion_tokens"],
+            total["total_tokens"],
+        )
     
     return listing
