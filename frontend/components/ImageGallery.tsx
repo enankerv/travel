@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useSignedImageUrls } from "@/hooks/useSignedImageUrls";
 import ImageCarousel, { type ImageCarouselHandle } from "./ImageCarousel";
 
@@ -14,6 +15,14 @@ export default function ImageGallery({ images, initialIndex = 0, onClose }: Imag
   const signedUrls = useSignedImageUrls(images || []);
   const validImages = signedUrls.filter(Boolean);
   const carouselRef = useRef<ImageCarouselHandle>(null);
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -34,7 +43,7 @@ export default function ImageGallery({ images, initialIndex = 0, onClose }: Imag
 
   if (validImages.length === 0) return null;
 
-  return (
+  const content = (
     <div className="gallery-modal-overlay open" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="gallery-container" onClick={(e) => e.stopPropagation()}>
         <ImageCarousel
@@ -52,4 +61,6 @@ export default function ImageGallery({ images, initialIndex = 0, onClose }: Imag
       </div>
     </div>
   );
+
+  return typeof document !== "undefined" ? createPortal(content, document.body) : null;
 }

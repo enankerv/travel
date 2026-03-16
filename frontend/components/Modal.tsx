@@ -1,5 +1,8 @@
 'use client'
 
+import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
+
 type ModalProps = {
   open: boolean
   onClose: () => void
@@ -9,9 +12,18 @@ type ModalProps = {
 }
 
 export default function Modal({ open, onClose, children, width }: ModalProps) {
+  useEffect(() => {
+    if (!open) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [open])
+
   if (!open) return null
 
-  return (
+  const content = (
     <div
       className="modal-overlay open"
       onClick={(e) => e.target === e.currentTarget && onClose()}
@@ -23,4 +35,7 @@ export default function Modal({ open, onClose, children, width }: ModalProps) {
       </div>
     </div>
   )
+
+  if (typeof document === 'undefined') return null
+  return createPortal(content, document.body)
 }

@@ -154,8 +154,6 @@ export default function PasteFormContent({
       payload += "\n\n" + extractedImages.join("\n");
     }
     onSubmit(payload);
-    setText("");
-    setExtractedImages([]);
   };
 
   return (

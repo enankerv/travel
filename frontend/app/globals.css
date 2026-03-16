@@ -1457,7 +1457,7 @@ button:focus-visible {
   color: var(--red);
 }
 
-/* Modal overlay */
+/* Modal overlay - portal to body, above footer */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -1465,7 +1465,8 @@ button:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  padding: 1rem;
+  z-index: 9999;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s;
@@ -2202,7 +2203,7 @@ button:focus-visible {
   border-radius: 3px;
 }
 
-/* Image Gallery - above Leaflet map (z-index up to 1000) */
+/* Image Gallery - above footer and Leaflet map */
 .gallery-modal-overlay {
   position: fixed;
   inset: 0;
@@ -2210,7 +2211,8 @@ button:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1101;
+  padding: 1rem;
+  z-index: 9999;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s;

@@ -6,9 +6,10 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { getLists, createList } from '@/lib/api'
 import ListsView, { type ListItem } from '@/components/ListsView'
 import ListDetailView from '@/components/ListDetailView'
-import { setLastListId, getLastListId } from '@/lib/lastListStorage'
+import { setLastListId } from '@/lib/lastListStorage'
 import TermsConsentModal from '@/components/TermsConsentModal'
 import CreateListModal from '@/components/CreateListModal'
+import BookmarkletPasteModal from '@/components/BookmarkletPasteModal'
 import AuthDeniedView from '@/components/AuthDeniedView'
 import LoadingView from '@/components/LoadingView'
 import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
@@ -29,6 +30,13 @@ function HomeContent() {
   const [termsIsReAccept, setTermsIsReAccept] = useState(false)
   const [termsRequiresAge, setTermsRequiresAge] = useState(false)
   const [underAgeDenied, setUnderAgeDenied] = useState(false)
+  const [showBookmarkletModal, setShowBookmarkletModal] = useState(false)
+
+  useEffect(() => {
+    if (pasteParam === '1' && searchParams.get('url')) {
+      setShowBookmarkletModal(true)
+    }
+  }, [pasteParam, searchParams])
 
   const loadLists = useCallback(
     async (applyListFromUrl = true) => {
@@ -40,15 +48,8 @@ function HomeContent() {
             setSelectedListId(listParam)
           } else if (listParam) {
             router.replace('/', { scroll: false })
-          } else if (pasteParam === '1') {
-            const lastId = getLastListId()
-            if (lastId && data.some((l: ListItem) => l.id === lastId)) {
-              setSelectedListId(lastId)
-              const params = new URLSearchParams(searchParams.toString())
-              params.set('list', lastId)
-              router.replace('/?' + params.toString(), { scroll: false })
-            }
           }
+          /* When paste=1: stay on home, BookmarkletPasteModal handles the flow */
         }
       } catch (err) {
         console.error('Failed to load lists:', err)
@@ -57,7 +58,7 @@ function HomeContent() {
         setIsLoading(false)
       }
     },
-    [listParam, pasteParam, searchParams, router]
+    [listParam, router]
   )
 
   const onTermsNeeded = useCallback(
@@ -89,12 +90,22 @@ function HomeContent() {
     }
   }, [authLoading, user, allowlistDenied, underAgeDenied, router])
 
-  function handleSelectList(id: string | null) {
+  useEffect(() => {
+    if (listParam && lists.some((l) => l.id === listParam)) {
+      setSelectedListId(listParam)
+    }
+  }, [listParam, lists])
+
+  function handleSelectList(id: string | null, options?: { clearPaste?: boolean }) {
     setSelectedListId(id)
     if (id) {
       setLastListId(id)
       const params = new URLSearchParams(searchParams.toString())
       params.set('list', id)
+      if (options?.clearPaste) {
+        params.delete('paste')
+        params.delete('url')
+      }
       router.replace('/?' + params.toString(), { scroll: false })
     } else {
       const params = new URLSearchParams(searchParams.toString())
@@ -224,6 +235,24 @@ function HomeContent() {
         onCreate={handleCreateList}
       />
 
+      {showBookmarkletModal && (
+        <BookmarkletPasteModal
+          isOpen
+          onClose={() => {
+            setShowBookmarkletModal(false)
+            const params = new URLSearchParams(searchParams.toString())
+            params.delete('paste')
+            params.delete('url')
+            const q = params.toString()
+            router.replace(q ? '/?' + q : '/', { scroll: false })
+          }}
+          listingUrl={searchParams.get('url')}
+          onSuccess={(listId) => {
+            setShowBookmarkletModal(false)
+            handleSelectList(listId, { clearPaste: true })
+          }}
+        />
+      )}
     </div>
   )
 }

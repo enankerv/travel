@@ -70,7 +70,7 @@ export default function ScoutBookmarklet() {
         <div className="scout-bookmarklet__content">
           <p className="scout-bookmarklet__intro">
             Drag this to your bookmarks bar. When you&apos;re on a listing page, click it to copy the page
-            and add to a list. Uses your last selected list by default, or pick one when prompted.
+            and add to a list. Uses your last list by default; pick another from the dropdown if needed.
           </p>
 
           <div className="scout-bookmarklet__row">

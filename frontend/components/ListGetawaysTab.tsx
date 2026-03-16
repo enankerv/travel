@@ -18,7 +18,10 @@ import ScoutBookmarklet from "./ScoutBookmarklet";
 const GetawayMap = dynamic(() => import("./GetawayMap"), { ssr: false });
 
 /** Safely show a notification; no-op when Notification API is unavailable (e.g. mobile). */
-function tryShowNotification(title: string, options?: NotificationOptions): void {
+function tryShowNotification(
+  title: string,
+  options?: NotificationOptions,
+): void {
   try {
     if (typeof window === "undefined" || !("Notification" in window)) return;
     if (Notification.permission !== "granted") return;
@@ -47,7 +50,14 @@ export default function ListGetawaysTab({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { list, getaways, setGetaways, isLoading, onRefresh, commentsByGetaway } = useListDetailContext();
+  const {
+    list,
+    getaways,
+    setGetaways,
+    isLoading,
+    onRefresh,
+    commentsByGetaway,
+  } = useListDetailContext();
   const isMobile = useIsMobile();
   const listId = list.id;
   const [error, setError] = useState("");
@@ -74,10 +84,9 @@ export default function ListGetawaysTab({
   useEffect(() => {
     if (pasteParam === "1" && urlParam) {
       setPasteGetaway(null);
-      setShowPasteModal(true);
+      setShowPasteModal(false);
     }
   }, [pasteParam, urlParam]);
-
 
   async function handleScoutUrl(url: string, getawayId?: string) {
     setError("");
@@ -234,7 +243,9 @@ export default function ListGetawaysTab({
         {error && (
           <div className="list-villas-tab__error">
             <span>{error}</span>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <div
+              style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+            >
               {showRetry && (
                 <button
                   type="button"
@@ -277,7 +288,7 @@ export default function ListGetawaysTab({
         </div>
       </div>
     ),
-    [scoutLoading, error, showRetry, viewMode]
+    [scoutLoading, error, showRetry, viewMode],
   );
 
   useEffect(() => {
@@ -290,29 +301,30 @@ export default function ListGetawaysTab({
       <div className="list-villas-tab">
         <div className="list-villas-tab__table-wrap">
           {viewMode === "table" ? (
-          <GetawayListView
-            isLoading={isLoading}
-            onDelete={handleDeleteGetaway}
-            onUpdate={handleUpdateGetaway}
-            onImageClick={handleImageClick}
-            onRetry={handleRetryGetaway}
-            onPasteClick={handlePasteClick}
-            onCommentClick={(getawayId: string) => {
-              onCommentsOpenChange?.(true);
-              onFocusedGetawayChange?.(getawayId);
-            }}
-          />
+            <GetawayListView
+              isLoading={isLoading}
+              onDelete={handleDeleteGetaway}
+              onUpdate={handleUpdateGetaway}
+              onImageClick={handleImageClick}
+              onRetry={handleRetryGetaway}
+              onPasteClick={handlePasteClick}
+              onCommentClick={(getawayId: string) => {
+                onCommentsOpenChange?.(true);
+                onFocusedGetawayChange?.(getawayId);
+              }}
+            />
           ) : (
-          <GetawayMap
-            getaways={getaways}
-            onGetawayClick={(id) => setMapGetawayId(id)}
-          />
+            <GetawayMap
+              getaways={getaways}
+              onGetawayClick={(id) => setMapGetawayId(id)}
+            />
           )}
         </div>
       </div>
 
-      {viewMode === "map" && mapGetawayId && (
-        isMobile ? (
+      {viewMode === "map" &&
+        mapGetawayId &&
+        (isMobile ? (
           <GetawayDetailSheet
             getaway={getaways.find((g: any) => g.id === mapGetawayId) ?? null}
             onClose={() => setMapGetawayId(null)}
@@ -338,8 +350,7 @@ export default function ListGetawaysTab({
                 : 0
             }
           />
-        )
-      )}
+        ))}
 
       <CommentsSidebar
         isOpen={commentsOpen}
