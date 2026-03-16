@@ -39,6 +39,7 @@ ${window.location.origin}/auth/callback
 For production (e.g., https://yourapp.com):
 - Add to Google OAuth: `https://yourapp.com/auth/callback`
 - Add to Supabase Site URL: `https://yourapp.com`
+- Add to Supabase Redirect URLs (Authentication → URL Configuration): `https://yourapp.com/auth/reset-password` (for password reset)
 
 ## Step 5: Test It
 
@@ -68,5 +69,6 @@ Users can now sign up and log in with:
 **Local development issues**
 - Make sure your Supabase Site URL is set to `http://localhost:3000` for development
 - Go to Supabase Settings → Configuration → Site URL
+- For password reset: add `http://localhost:3000/auth/reset-password` to Redirect URLs (Authentication → URL Configuration)
 
 Done! 🎉

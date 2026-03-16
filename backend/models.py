@@ -1,6 +1,8 @@
 """Pydantic models for FastAPI endpoints."""
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl
 from typing import Optional, Literal
+
+from utils.scout_limits import SCOUT_MAX_INPUT_CHARS
 
 
 # ============================================================================
@@ -132,7 +134,7 @@ class ScoutRequest(BaseModel):
 
 
 class ScoutPasteRequest(BaseModel):
-    pasted_text: str
+    pasted_text: str = Field(..., max_length=SCOUT_MAX_INPUT_CHARS)
     list_id: str  # Required: which list to save to
     original_url: Optional[str] = None
     getaway_id: Optional[str] = None  # When provided, update this getaway instead of creating new

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { GoogleIcon } from "@/components/icons";
 
@@ -13,6 +13,9 @@ export default function LoginForm() {
   const [error, setError] = useState("");
   const { signIn } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const message = searchParams.get("message");
+  const urlError = searchParams.get("error");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -34,7 +37,8 @@ export default function LoginForm() {
       <span className="auth-tag">Travel Scout</span>
       <h1>Welcome Back</h1>
 
-      {error && <div className="auth-error">{error}</div>}
+      {message && <div className="auth-footer" style={{ color: "var(--green)", marginBottom: "1rem" }}>{message}</div>}
+      {(error || urlError) && <div className="auth-error">{error || urlError}</div>}
 
       <form onSubmit={handleSubmit}>
         <div className="auth-field">
@@ -59,6 +63,9 @@ export default function LoginForm() {
             placeholder="••••••••"
             required
           />
+          <p className="auth-footer" style={{ marginTop: "0.5rem", marginBottom: 0 }}>
+            <Link href="/auth/forgot-password">Forgot password?</Link>
+          </p>
         </div>
 
         <button type="submit" className="auth-submit" disabled={loading}>

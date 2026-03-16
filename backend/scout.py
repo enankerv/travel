@@ -16,7 +16,7 @@ from utils.images import (
     fetch_og_image,
 )
 from utils.crawler import crawl_page
-from utils.extraction import extract_villa_two_pass, extract_price_from_text
+from utils.extraction import extract_villa_two_pass, extract_price_from_text, truncate_for_extraction
 from utils.geocode import geocode as geocode_location
 
 logging.basicConfig(level=logging.INFO)
@@ -105,6 +105,7 @@ async def generate_getaway_page(
         print("[WARN] Thin scrape — skipping LLM, user will paste manually")
         return {"path": None, "thin_scrape": True, "getaway_id": getaway_id}
 
+    extraction_md = truncate_for_extraction(extraction_md)
     listing = await extract_villa_two_pass(extraction_md)
 
     title = url.split("/")[-1].split("?")[0].replace("-", " ").title()
@@ -157,6 +158,7 @@ async def generate_getaway_page_from_paste(
         raise ValueError("Pasted text is empty.")
     log.info("manual paste: len=%d chars", len(extraction_md))
 
+    extraction_md = truncate_for_extraction(extraction_md)
     listing = await extract_villa_two_pass(extraction_md)
     title = (listing.villa_name or "").strip() or "Manual entry"
     slug = generate_slug(title)
