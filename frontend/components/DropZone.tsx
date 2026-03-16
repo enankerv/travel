@@ -112,7 +112,6 @@ export default function DropZone({ onUrlSubmit, onError, isLoading }: DropZonePr
           </>
         )}
       </button>
-      <span className="dropzone__hint">or drag a link here</span>
     </form>
   )
 }
