@@ -91,6 +91,9 @@ function GetawayMobileCard({
         </div>
         <div className="getaway-mobile-card__body">
           <span className="getaway-mobile-card__name">Tap to paste details</span>
+          <span style={{ fontSize: "0.8rem", color: "var(--muted)", display: "block", marginTop: "0.2rem" }}>
+            No credit used
+          </span>
         </div>
       </div>
     );

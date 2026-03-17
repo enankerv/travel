@@ -53,7 +53,7 @@ Three layers of protection for Scout API costs:
 
 ---
 
-## 3. Per-User Quota (for charging)
+## 3. Per-User Quota (for charging) ✅ IMPLEMENTED
 
 **Goal:** Track scout usage per user per billing period; enforce quota before starting a scout.
 

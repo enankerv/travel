@@ -170,6 +170,9 @@ export default function GetawayRow({
     return renderSpecialRow(
       <span style={{ color: 'var(--orange)' }}>
         Unable to extract full data. Click here to paste listing details manually.
+        <span style={{ display: 'block', fontSize: '0.85em', color: 'var(--muted)', marginTop: '0.25rem' }}>
+          No scout credit was used.
+        </span>
       </span>,
       {
         opacity: 0.7,

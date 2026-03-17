@@ -75,6 +75,8 @@ export function extractImageUrlsFromHtml(html: string, baseUrl?: string | null):
 }
 
 const THIN_WORD_THRESHOLD = 40;
+const SCOUT_MAX_INPUT_CHARS =
+  parseInt(process.env.NEXT_PUBLIC_SCOUT_MAX_INPUT_CHARS || "9000", 10) || 9000;
 
 function isThinPaste(text: string): boolean {
   const words = text.trim().split(/\s+/).filter(Boolean);
@@ -112,6 +114,7 @@ export default function PasteFormContent({
   const isThin = listingUrl && isThinPaste(trimmed);
   const canSubmit = trimmed.length > 0 && !isThin;
   const showThinWarning = isThin && hasTyped;
+  const willTruncate = trimmed.length > SCOUT_MAX_INPUT_CHARS;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setHasTyped(true);
@@ -249,6 +252,25 @@ export default function PasteFormContent({
           {extractedImages.length} photo{extractedImages.length !== 1 ? "s" : ""} detected from
           clipboard
         </p>
+      )}
+      {willTruncate && (
+        <div
+          role="status"
+          style={{
+            margin: "1rem 0 0",
+            padding: "1rem",
+            background: "var(--accent-soft)",
+            border: "1px solid var(--accent)",
+            borderRadius: "8px",
+            color: "var(--light)",
+            fontSize: "0.9rem",
+            lineHeight: 1.5,
+          }}
+        >
+          <p style={{ margin: 0, color: "var(--light)" }}>
+            Text exceeds {SCOUT_MAX_INPUT_CHARS.toLocaleString()} characters and will be truncated for processing.
+          </p>
+        </div>
       )}
       {showThinWarning && (
         <div

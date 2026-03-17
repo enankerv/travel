@@ -6,8 +6,10 @@ import { useAuth } from "@/lib/AuthContext";
 import { useListRealtime, useListPresence, PresenceUser } from "@/lib/realtime";
 import { useListVotes } from "@/hooks/useListVotes";
 import { ListDetailProvider } from "@/lib/ListDetailContext";
+import { dispatchScoutComplete } from "@/components/ScoutCredits";
 import ListGetawaysTab from "./ListGetawaysTab";
 import ListMembersTab from "./ListMembersTab";
+import ScoutCredits from "./ScoutCredits";
 
 export default function ListDetailView({
   list,
@@ -48,8 +50,11 @@ export default function ListDetailView({
     listId: list.id,
     enabled: dataLoaded && !!user,
     onInsert: (row) => setGetaways((prev) => [row, ...prev]),
-    onUpdate: (row) =>
-      setGetaways((prev) => prev.map((g) => (g.id === row.id ? row : g))),
+    onUpdate: (row) => {
+      setGetaways((prev) => prev.map((g) => (g.id === row.id ? row : g)));
+      // Refresh credits only when a full scrape completes (thin scrapes don't use credits)
+      if (row.import_status === "loaded") dispatchScoutComplete();
+    },
     onDelete: (id) => setGetaways((prev) => prev.filter((g) => g.id !== id)),
     onImagesChange: () => loadData(true),
     onVoteInsert: votes.onVoteInsert,
@@ -187,6 +192,9 @@ export default function ListDetailView({
               </div>
             </div>
           )}
+        </div>
+        <div className="list-detail-header__right">
+          <ScoutCredits />
         </div>
       </header>
 

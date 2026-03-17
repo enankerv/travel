@@ -1,6 +1,7 @@
 'use client'
 
 import type { User } from '@supabase/supabase-js'
+import ScoutCredits from './ScoutCredits'
 
 export interface ListItem {
   id: string
@@ -42,6 +43,7 @@ export default function ListsView({
           <span className="tag header__tag">Travel Scout</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: 0 }}>
+          <ScoutCredits />
           <span className="header__email" style={{ color: 'var(--muted)', fontSize: '0.9rem' }} title={user?.email ?? undefined}>
             {user?.email}
           </span>

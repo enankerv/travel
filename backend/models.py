@@ -2,8 +2,6 @@
 from pydantic import BaseModel, Field, HttpUrl
 from typing import Optional, Literal
 
-from utils.scout_limits import SCOUT_MAX_INPUT_CHARS
-
 
 # ============================================================================
 # LIST MODELS
@@ -134,7 +132,7 @@ class ScoutRequest(BaseModel):
 
 
 class ScoutPasteRequest(BaseModel):
-    pasted_text: str = Field(..., max_length=SCOUT_MAX_INPUT_CHARS)
+    pasted_text: str = Field(...)  # Truncated in backend after cutting, before LLM
     list_id: str  # Required: which list to save to
     original_url: Optional[str] = None
     getaway_id: Optional[str] = None  # When provided, update this getaway instead of creating new
@@ -146,6 +144,7 @@ class ScoutResponse(BaseModel):
     error: Optional[str] = None
     thin_scrape: bool = False
     getaway_id: Optional[str] = None
+    truncated: bool = False  # True when pasted text was truncated for length limits
 
 
 # ============================================================================

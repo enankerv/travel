@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { scoutPaste } from "@/lib/api";
+import { dispatchScoutComplete } from "@/components/ScoutCredits";
 import { getLastListId, setLastListId } from "@/lib/lastListStorage";
 import Modal from "./Modal";
 import PasteFormContent from "./PasteFormContent";
@@ -27,6 +28,7 @@ export default function PasteEntryModal({
   const [selectedListId, setSelectedListId] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [truncatedMessage, setTruncatedMessage] = useState("");
 
   useEffect(() => {
     if (isOpen && lists.length > 0) {
@@ -38,6 +40,7 @@ export default function PasteEntryModal({
         defaultId && lists.some((l) => l.id === defaultId) ? defaultId : lists[0].id;
       setSelectedListId(fallback);
       setError("");
+      setTruncatedMessage("");
     } else if (isOpen && lists.length === 0) {
       setSelectedListId("");
     }
@@ -50,9 +53,19 @@ export default function PasteEntryModal({
     try {
       const result = await scoutPaste(text.trim(), selectedListId, sourceUrl || undefined, undefined);
       if (result.ok) {
+        dispatchScoutComplete();
         setLastListId(selectedListId);
-        onClose();
-        onSuccess(selectedListId);
+        if (result.truncated) {
+          setTruncatedMessage("Text was truncated for length limits. Processing...");
+          setTimeout(() => {
+            setTruncatedMessage("");
+            onClose();
+            onSuccess(selectedListId);
+          }, 2000);
+        } else {
+          onClose();
+          onSuccess(selectedListId);
+        }
       } else {
         setError(result.error || "Failed to process paste");
       }
@@ -134,6 +147,22 @@ export default function PasteEntryModal({
           }}
         >
           {error}
+        </div>
+      )}
+      {truncatedMessage && (
+        <div
+          role="status"
+          style={{
+            marginBottom: "1rem",
+            padding: "0.75rem",
+            background: "var(--accent-soft)",
+            border: "1px solid var(--accent)",
+            borderRadius: "6px",
+            color: "var(--light)",
+            fontSize: "0.9rem",
+          }}
+        >
+          {truncatedMessage}
         </div>
       )}
 

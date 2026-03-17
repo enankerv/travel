@@ -146,6 +146,16 @@ async function scoutErrorFromResponse(res: Response, fallback: string): Promise<
     }
     return 'Too many scout requests. Please wait a minute and try again.'
   }
+  if (res.status === 402) {
+    try {
+      const data = await res.json()
+      const detail = data?.detail
+      if (typeof detail === 'string') return detail
+    } catch {
+      /* ignore parse error */
+    }
+    return "You're out of scout credits. Buy a pack to continue."
+  }
   return fallback
 }
 
@@ -179,6 +189,16 @@ export async function scoutPaste(pasted_text: string, listId: string, original_u
     const msg = await scoutErrorFromResponse(res, 'Scout paste failed')
     throw new Error(msg)
   }
+  return res.json()
+}
+
+export async function getScoutQuota(): Promise<{
+  credits: number
+  can_scout: boolean
+}> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_URL}/api/scout-quota`, { headers })
+  if (!res.ok) throw new Error('Failed to fetch scout quota')
   return res.json()
 }
 

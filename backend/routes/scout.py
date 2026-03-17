@@ -5,24 +5,29 @@ from fastapi import APIRouter, HTTPException, Header
 
 from models import ScoutRequest, ScoutPasteRequest, ScoutResponse
 from db.getaways import create_loading_getaway, update_getaway
+from db.scout_quota import check_and_use_quota, get_quota_status
 from scout import generate_getaway_page, generate_getaway_page_from_paste
 from routes.auth import extract_auth_token, extract_user_id_from_token
 from utils.rate_limit import check_scout_rate_limit
-from utils.scout_limits import scout_semaphore
+from utils.scout_limits import scout_semaphore, SCOUT_MAX_INPUT_CHARS
+from utils.text_cleaning import strip_other_villas_block, extract_main_property_only
 
 router = APIRouter(tags=["scout"])
 
 
-async def _process_scout(url: str, list_id: str, getaway_id: str, check_in: str, check_out: str, guests: int, auth_token: str):
+async def _process_scout(url: str, list_id: str, getaway_id: str, check_in: str, check_out: str, guests: int, auth_token: str, user_id: str):
     """Background task to process scout and update the getaway row."""
     async with scout_semaphore:
         try:
             result = await generate_getaway_page(
                 url, check_in=check_in, check_out=check_out, guests=guests,
                 list_id=list_id, auth_token=auth_token, getaway_id=getaway_id,
+                user_id=user_id,
             )
             if result.get("thin_scrape"):
                 update_getaway(getaway_id, {"import_status": "thin"}, auth_token)
+            elif result.get("quota_exceeded"):
+                pass  # Already updated to error in scout.py
             else:
                 updates = {
                     "import_status": "loaded",
@@ -65,7 +70,7 @@ async def scout_listing(req: ScoutRequest, authorization: Optional[str] = Header
             if not loading_getaway:
                 raise Exception("Failed to create loading getaway")
             getaway_id = loading_getaway.get("id")
-        asyncio.create_task(_process_scout(url, list_id, getaway_id, req.check_in, req.check_out, req.guests, token))
+        asyncio.create_task(_process_scout(url, list_id, getaway_id, req.check_in, req.check_out, req.guests, token, user_id))
         return ScoutResponse(ok=True, getaway_id=getaway_id)
     except HTTPException:
         raise
@@ -82,6 +87,9 @@ async def scout_from_paste(req: ScoutPasteRequest, authorization: Optional[str] 
         user_id = extract_user_id_from_token(token)
         if not check_scout_rate_limit(user_id):
             raise HTTPException(status_code=429, detail="Too many scout requests. Try again in a minute.")
+        allowed, quota_error = check_and_use_quota(user_id)
+        if not allowed:
+            raise HTTPException(status_code=402, detail=quota_error)
         if req.getaway_id:
             getaway_id = req.getaway_id
             update_getaway(getaway_id, {"import_status": "loading"}, auth_token=token)
@@ -91,9 +99,21 @@ async def scout_from_paste(req: ScoutPasteRequest, authorization: Optional[str] 
             if not loading_getaway:
                 raise Exception("Failed to create loading getaway")
             getaway_id = loading_getaway.get("id")
+        # Check if truncation will occur (same logic as scout.py: cut then truncate)
+        cut = strip_other_villas_block(req.pasted_text or "")
+        cut = extract_main_property_only(cut)
+        truncated = len(cut) > SCOUT_MAX_INPUT_CHARS
         asyncio.create_task(_process_scout_paste(req.pasted_text, list_id, getaway_id, req.original_url, token))
-        return ScoutResponse(ok=True, getaway_id=getaway_id)
+        return ScoutResponse(ok=True, getaway_id=getaway_id, truncated=truncated)
     except HTTPException:
         raise
     except Exception as e:
         return ScoutResponse(ok=False, error=str(e))
+
+
+@router.get("/scout-quota")
+async def scout_quota_status(authorization: Optional[str] = Header(None)):
+    """Get current user's scout quota status (free remaining, credits)."""
+    token = extract_auth_token(authorization)
+    user_id = extract_user_id_from_token(token)
+    return get_quota_status(user_id)

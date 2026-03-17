@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { scoutUrl, scoutPaste, deleteGetaway, updateGetaway } from "@/lib/api";
+import { dispatchScoutComplete } from "@/components/ScoutCredits";
 import { useListDetailContext } from "@/lib/ListDetailContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import DropZone from "./DropZone";
@@ -95,6 +96,7 @@ export default function ListGetawaysTab({
     try {
       const result = await scoutUrl(url, listId, getawayId);
       if (result.ok) {
+        // Credits refresh when scout completes via realtime (only for full scrapes, not thin)
         if (getawayId) {
           setGetaways((prev) =>
             prev.map((g) =>
@@ -136,6 +138,7 @@ export default function ListGetawaysTab({
     try {
       const result = await scoutPaste(text, listId, originalUrl, getawayId);
       if (result.ok) {
+        dispatchScoutComplete();
         setPasteGetaway(null);
         if (getawayId) {
           setGetaways((prev) =>
@@ -145,7 +148,9 @@ export default function ListGetawaysTab({
           );
         }
         tryShowNotification("Processing Paste...", {
-          body: "Extracting getaway details...",
+          body: result.truncated
+            ? "Text was truncated for length limits. Extracting getaway details..."
+            : "Extracting getaway details...",
           icon: "⏳",
         });
       } else if (!result.ok) {

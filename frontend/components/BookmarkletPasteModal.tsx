@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Modal from './Modal'
 import PasteFormContent from './PasteFormContent'
 import { getLists, scoutPaste } from '@/lib/api'
+import { dispatchScoutComplete } from '@/components/ScoutCredits'
 import { getLastListId, setLastListId } from '@/lib/lastListStorage'
 
 interface BookmarkletPasteModalProps {
@@ -24,11 +25,13 @@ export default function BookmarkletPasteModal({
   const [submitLoading, setSubmitLoading] = useState(false)
   const [selectedListId, setSelectedListId] = useState<string>('')
   const [error, setError] = useState('')
+  const [truncatedMessage, setTruncatedMessage] = useState('')
 
   useEffect(() => {
     if (!isOpen) return
     setListsLoading(true)
     setError('')
+    setTruncatedMessage('')
     getLists()
       .then((data) => {
         const arr = data || []
@@ -59,8 +62,19 @@ export default function BookmarkletPasteModal({
     try {
       const result = await scoutPaste(text, selectedListId, listingUrl ?? undefined, undefined)
       if (result.ok) {
+        dispatchScoutComplete()
         setLastListId(selectedListId)
-        onSuccess(selectedListId)
+        if (result.truncated) {
+          setTruncatedMessage('Text was truncated for length limits. Processing...')
+          setTimeout(() => {
+            setTruncatedMessage('')
+            onClose()
+            onSuccess(selectedListId)
+          }, 2000)
+        } else {
+          onClose()
+          onSuccess(selectedListId)
+        }
       } else {
         setError(result.error || 'Failed to process paste')
       }
@@ -143,6 +157,22 @@ export default function BookmarkletPasteModal({
               }}
             >
               {error}
+            </div>
+          )}
+          {truncatedMessage && (
+            <div
+              role="status"
+              style={{
+                marginBottom: '1rem',
+                padding: '0.75rem',
+                background: 'var(--accent-soft)',
+                border: '1px solid var(--accent)',
+                borderRadius: '8px',
+                color: 'var(--light)',
+                fontSize: '0.9rem',
+              }}
+            >
+              {truncatedMessage}
             </div>
           )}
 

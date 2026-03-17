@@ -17,8 +17,10 @@ from utils.images import (
 )
 from utils.crawler import crawl_page
 from utils.extraction import extract_villa_two_pass, extract_price_from_text
-from utils.scout_limits import truncate_for_extraction
+from utils.scout_limits import truncate_for_extraction, truncate_for_extraction_preserving_images
 from utils.geocode import geocode as geocode_location
+from db.scout_quota import check_and_use_quota
+from db import update_getaway as db_update_getaway
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("scout")
@@ -81,6 +83,7 @@ async def generate_getaway_page(
     list_id: str | None = None,
     auth_token: str | None = None,
     getaway_id: str | None = None,
+    user_id: str | None = None,
 ):
     """Scrape a listing URL and extract structured data. If getaway_id is provided, updates that getaway."""
     print(f"[SCOUT] Scouting: {url}")
@@ -102,11 +105,23 @@ async def generate_getaway_page(
 
     raw_markdown = strip_other_villas_block(raw_markdown)
     extraction_md = extract_main_property_only(raw_markdown)
+    extraction_md = truncate_for_extraction(extraction_md)
     if is_thin_scrape(extraction_md):
         print("[WARN] Thin scrape — skipping LLM, user will paste manually")
         return {"path": None, "thin_scrape": True, "getaway_id": getaway_id}
 
-    extraction_md = truncate_for_extraction(extraction_md)
+    # Require user_id for LLM scouts (no anonymous scouting)
+    if not user_id:
+        if getaway_id and auth_token:
+            db_update_getaway(getaway_id, {"import_status": "error", "import_error": "Sign in to scout listings."}, auth_token)
+        return {"path": None, "thin_scrape": False, "getaway_id": getaway_id, "quota_exceeded": True}
+
+    allowed, quota_error = check_and_use_quota(user_id)
+    if not allowed:
+        if getaway_id and auth_token:
+            db_update_getaway(getaway_id, {"import_status": "error", "import_error": quota_error}, auth_token)
+        return {"path": None, "thin_scrape": False, "getaway_id": getaway_id, "quota_exceeded": True}
+
     listing = await extract_villa_two_pass(extraction_md)
 
     title = url.split("/")[-1].split("?")[0].replace("-", " ").title()
@@ -159,7 +174,9 @@ async def generate_getaway_page_from_paste(
         raise ValueError("Pasted text is empty.")
     log.info("manual paste: len=%d chars", len(extraction_md))
 
-    extraction_md = truncate_for_extraction(extraction_md)
+    extraction_md = strip_other_villas_block(extraction_md)
+    extraction_md = extract_main_property_only(extraction_md)
+    extraction_md = truncate_for_extraction_preserving_images(extraction_md)
     listing = await extract_villa_two_pass(extraction_md)
     title = (listing.villa_name or "").strip() or "Manual entry"
     slug = generate_slug(title)
