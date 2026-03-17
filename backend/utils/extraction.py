@@ -54,17 +54,6 @@ LLM_PROVIDER = os.getenv("LLM_PROVIDER") or ("gemini" if os.getenv("GEMINI_API_K
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite-preview")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3-coder:30b")
 
-from utils.scout_limits import SCOUT_MAX_INPUT_CHARS
-
-
-def truncate_for_extraction(text: str) -> str:
-    """Truncate text to SCOUT_MAX_INPUT_CHARS to cap LLM cost. Preserves start (usually most relevant)."""
-    if not text or len(text) <= SCOUT_MAX_INPUT_CHARS:
-        return text
-    suffix = "\n\n[... truncated for cost limits ...]"
-    return text[: SCOUT_MAX_INPUT_CHARS - len(suffix)] + suffix
-
-
 def create_extraction_client():
     """Create an instructor client for LLM extraction."""
     if LLM_PROVIDER == "gemini":

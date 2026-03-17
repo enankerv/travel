@@ -16,7 +16,8 @@ from utils.images import (
     fetch_og_image,
 )
 from utils.crawler import crawl_page
-from utils.extraction import extract_villa_two_pass, extract_price_from_text, truncate_for_extraction
+from utils.extraction import extract_villa_two_pass, extract_price_from_text
+from utils.scout_limits import truncate_for_extraction
 from utils.geocode import geocode as geocode_location
 
 logging.basicConfig(level=logging.INFO)

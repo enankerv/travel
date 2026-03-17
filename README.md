@@ -76,6 +76,9 @@ A: `cd frontend && npm run dev`
 ### Q: How do I test the endpoints?
 A: http://localhost:8000/docs (Swagger UI)
 
+### Q: How do I run backend tests?
+A: `cd backend && python -m pytest tests/ -v`
+
 ### Q: How do I deploy?
 A: Backend → Railway/Render; Frontend → Vercel. Set env vars for Supabase.
 

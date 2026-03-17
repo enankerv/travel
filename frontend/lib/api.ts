@@ -135,6 +135,20 @@ export async function deleteGetaway(listId: string, slug: string) {
   return res.json()
 }
 
+async function scoutErrorFromResponse(res: Response, fallback: string): Promise<string> {
+  if (res.status === 429) {
+    try {
+      const data = await res.json()
+      const detail = data?.detail
+      if (typeof detail === 'string') return detail
+    } catch {
+      /* ignore parse error */
+    }
+    return 'Too many scout requests. Please wait a minute and try again.'
+  }
+  return fallback
+}
+
 // Scout
 export async function scoutUrl(url: string, listId: string, getawayId?: string) {
   const headers = await getAuthHeaders()
@@ -145,7 +159,10 @@ export async function scoutUrl(url: string, listId: string, getawayId?: string) 
     headers,
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error('Scout failed')
+  if (!res.ok) {
+    const msg = await scoutErrorFromResponse(res, 'Scout failed')
+    throw new Error(msg)
+  }
   return res.json()
 }
 
@@ -158,7 +175,10 @@ export async function scoutPaste(pasted_text: string, listId: string, original_u
     headers,
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error('Scout paste failed')
+  if (!res.ok) {
+    const msg = await scoutErrorFromResponse(res, 'Scout paste failed')
+    throw new Error(msg)
+  }
   return res.json()
 }
 

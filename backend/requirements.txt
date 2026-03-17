@@ -1,5 +1,7 @@
 crawl4ai
 fastapi
+pytest
+pytest-asyncio
 instructor[google-genai]
 ollama
 uvicorn[standard]
