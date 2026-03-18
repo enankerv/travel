@@ -147,6 +147,12 @@ class ScoutResponse(BaseModel):
     truncated: bool = False  # True when pasted text was truncated for length limits
 
 
+class ScoutPackCheckout(BaseModel):
+    pack_id: str
+    success_url: str
+    cancel_url: str
+
+
 # ============================================================================
 # ERROR MODELS
 # ============================================================================

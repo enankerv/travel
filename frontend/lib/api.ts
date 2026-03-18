@@ -202,6 +202,39 @@ export async function getScoutQuota(): Promise<{
   return res.json()
 }
 
+export type ScoutPack = {
+  id: string
+  credits: number
+  price_usd: number
+  name: string
+  description: string
+}
+
+export async function getScoutPacks(): Promise<{ packs: ScoutPack[] }> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_URL}/api/scout-packs`, { headers })
+  if (!res.ok) throw new Error('Failed to fetch scout packs')
+  return res.json()
+}
+
+export async function createScoutCheckout(
+  packId: string,
+  successUrl: string,
+  cancelUrl: string
+): Promise<{ checkout_url: string; session_id: string }> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_URL}/api/scout-packs/checkout`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ pack_id: packId, success_url: successUrl, cancel_url: cancelUrl }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.detail || 'Failed to create checkout')
+  }
+  return res.json()
+}
+
 // Invites
 export async function createInvite(listId: string, role: string = 'viewer') {
   const headers = await getAuthHeaders()

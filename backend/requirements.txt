@@ -1,4 +1,5 @@
 crawl4ai
+stripe
 fastapi
 pytest
 pytest-asyncio

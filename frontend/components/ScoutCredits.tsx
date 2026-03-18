@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { getScoutQuota } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
 import { SCOUT_OPTIMISTIC_DECREMENT, SCOUT_OPTIMISTIC_REFUND } from "@/lib/realtime";
+import BuyCreditsModal from "./BuyCreditsModal";
 
 export function dispatchScoutOptimisticDecrement() {
   window.dispatchEvent(new CustomEvent(SCOUT_OPTIMISTIC_DECREMENT));
@@ -16,12 +17,17 @@ export function dispatchScoutOptimisticRefund() {
 export default function ScoutCredits() {
   const { user } = useAuth();
   const [credits, setCredits] = useState<number | null>(null);
+  const [showBuyModal, setShowBuyModal] = useState(false);
 
-  useEffect(() => {
+  const refetch = useCallback(() => {
     getScoutQuota()
       .then((q) => setCredits(q.credits))
       .catch(() => setCredits(null));
-  }, [user?.id]);
+  }, []);
+
+  useEffect(() => {
+    refetch();
+  }, [user?.id, refetch]);
 
   useEffect(() => {
     const dec = () => setCredits((c) => (c !== null && c > 0 ? c - 1 : c));
@@ -36,20 +42,37 @@ export default function ScoutCredits() {
 
   if (credits === null) return null;
 
+  const isLow = credits <= 5;
+
   return (
-    <span
-      className="scout-credits"
-      title="Scout credits remaining"
-      style={{
-        color: "var(--muted)",
-        fontSize: "0.9rem",
-        display: "flex",
-        alignItems: "center",
-        gap: "0.25rem",
-      }}
-    >
-      <span aria-hidden>⚡</span>
-      {credits} scout{credits !== 1 ? "s" : ""} remaining
-    </span>
+    <>
+      <button
+        type="button"
+        className="scout-credits"
+        onClick={() => setShowBuyModal(true)}
+        title="Scout credits remaining — click to buy more"
+        style={{
+          background: "none",
+          border: "none",
+          color: isLow ? "var(--accent)" : "var(--muted)",
+          fontSize: "0.9rem",
+          display: "flex",
+          alignItems: "center",
+          gap: "0.25rem",
+          cursor: "pointer",
+          padding: 0,
+          textDecoration: "none",
+        }}
+      >
+        <span aria-hidden>⚡</span>
+        <span style={{ textDecoration: isLow ? "underline" : "none" }}>
+          {credits} scout{credits !== 1 ? "s" : ""} remaining
+        </span>
+      </button>
+      <BuyCreditsModal
+        isOpen={showBuyModal}
+        onClose={() => setShowBuyModal(false)}
+      />
+    </>
   );
 }

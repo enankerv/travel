@@ -9,6 +9,8 @@ from routes.getaways import router as getaways_router
 from routes.scout import router as scout_router
 from routes.votes import router as votes_router
 from routes.comments import router as comments_router
+from routes.scout_packs import router as scout_packs_router
+from routes.webhooks import router as webhooks_router
 
 router = APIRouter(prefix="/api", tags=["api"])
 router.include_router(auth_router)
@@ -19,3 +21,5 @@ router.include_router(getaways_router)
 router.include_router(votes_router)
 router.include_router(comments_router)
 router.include_router(scout_router)
+router.include_router(scout_packs_router)
+router.include_router(webhooks_router)
