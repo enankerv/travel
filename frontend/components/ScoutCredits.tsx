@@ -49,7 +49,7 @@ export default function ScoutCredits() {
       }}
     >
       <span aria-hidden>⚡</span>
-      {credits} scout{credits !== 1 ? "s" : ""}
+      {credits} scout{credits !== 1 ? "s" : ""} remaining
     </span>
   );
 }
