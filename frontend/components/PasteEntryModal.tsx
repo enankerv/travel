@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { scoutPaste } from "@/lib/api";
-import { dispatchScoutComplete } from "@/components/ScoutCredits";
+import { dispatchScoutOptimisticDecrement, dispatchScoutOptimisticRefund } from "@/components/ScoutCredits";
 import { getLastListId, setLastListId } from "@/lib/lastListStorage";
 import Modal from "./Modal";
 import PasteFormContent from "./PasteFormContent";
@@ -50,10 +50,10 @@ export default function PasteEntryModal({
     if (!selectedListId || !text.trim()) return;
     setIsSubmitting(true);
     setError("");
+    dispatchScoutOptimisticDecrement();
     try {
       const result = await scoutPaste(text.trim(), selectedListId, sourceUrl || undefined, undefined);
       if (result.ok) {
-        dispatchScoutComplete();
         setLastListId(selectedListId);
         if (result.truncated) {
           setTruncatedMessage("Text was truncated for length limits. Processing...");
@@ -70,6 +70,7 @@ export default function PasteEntryModal({
         setError(result.error || "Failed to process paste");
       }
     } catch (err: unknown) {
+      dispatchScoutOptimisticRefund();
       setError(err instanceof Error ? err.message : "Failed to process paste");
     } finally {
       setIsSubmitting(false);

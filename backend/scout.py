@@ -75,19 +75,17 @@ def _listing_to_getaway_row(
     }
 
 
-async def generate_getaway_page(
+async def scrape_and_thin_check(
     url: str,
     check_in: str | None = None,
     check_out: str | None = None,
     guests: int | None = None,
-    list_id: str | None = None,
-    auth_token: str | None = None,
-    getaway_id: str | None = None,
-    user_id: str | None = None,
-):
-    """Scrape a listing URL and extract structured data. If getaway_id is provided, updates that getaway."""
-    print(f"[SCOUT] Scouting: {url}")
-
+) -> dict:
+    """
+    Scrape URL and run thin check. Returns {is_thin: bool, extraction_md?, crawl_image_urls?, url}.
+    When is_thin=True, extraction_md and crawl_image_urls are None.
+    """
+    print(f"[SCOUT] Scraping: {url}")
     crawl_url = add_search_params(url, check_in, check_out, guests)
     js_code = generate_js_params(check_in, check_out, guests)
     if is_js_heavy_site(crawl_url):
@@ -97,7 +95,7 @@ async def generate_getaway_page(
     raw_markdown, media = await crawl_page(crawl_url, js_code, is_js_heavy_site(crawl_url))
     if not raw_markdown:
         print("[WARN] Crawl failed — skipping extraction")
-        return {"path": None, "thin_scrape": True, "getaway_id": getaway_id}
+        return {"is_thin": True, "extraction_md": None, "crawl_image_urls": None, "url": url}
 
     url_slug = extract_url_slug(url)
     crawl_image_urls = pick_best_images_from_media(media, villa_name=url_slug, base_url=crawl_url)
@@ -108,20 +106,19 @@ async def generate_getaway_page(
     extraction_md = truncate_for_extraction(extraction_md)
     if is_thin_scrape(extraction_md):
         print("[WARN] Thin scrape — skipping LLM, user will paste manually")
-        return {"path": None, "thin_scrape": True, "getaway_id": getaway_id}
+        return {"is_thin": True, "extraction_md": None, "crawl_image_urls": None, "url": url}
 
-    # Require user_id for LLM scouts (no anonymous scouting)
-    if not user_id:
-        if getaway_id and auth_token:
-            db_update_getaway(getaway_id, {"import_status": "error", "import_error": "Sign in to scout listings."}, auth_token)
-        return {"path": None, "thin_scrape": False, "getaway_id": getaway_id, "quota_exceeded": True}
+    return {"is_thin": False, "extraction_md": extraction_md, "crawl_image_urls": crawl_image_urls, "url": url}
 
-    allowed, quota_error = check_and_use_quota(user_id)
-    if not allowed:
-        if getaway_id and auth_token:
-            db_update_getaway(getaway_id, {"import_status": "error", "import_error": quota_error}, auth_token)
-        return {"path": None, "thin_scrape": False, "getaway_id": getaway_id, "quota_exceeded": True}
 
+async def run_llm_and_update_getaway(
+    extraction_md: str,
+    crawl_image_urls: list,
+    url: str,
+    getaway_id: str,
+    auth_token: str,
+):
+    """Run LLM extraction and update getaway. Assumes quota already consumed."""
     listing = await extract_villa_two_pass(extraction_md)
 
     title = url.split("/")[-1].split("?")[0].replace("-", " ").title()
@@ -132,14 +129,12 @@ async def generate_getaway_page(
     slug = generate_slug(title)
 
     image_urls: list[str] = []
-    if getaway_id and crawl_image_urls:
+    if crawl_image_urls:
         image_urls = await upload_images_to_supabase(crawl_image_urls, getaway_id, auth_token) or []
     if image_urls:
         print(f"[IMG] Uploaded {len(image_urls)} images to Supabase")
 
     from db import update_getaway, insert_getaway_images
-    if not getaway_id or not auth_token:
-        raise ValueError("getaway_id and auth_token required")
 
     lat, lng = None, None
     loc = (listing.location or "").strip()
@@ -158,7 +153,40 @@ async def generate_getaway_page(
     if image_urls:
         insert_getaway_images(getaway_id, image_urls, auth_token)
     print("[OK] Success! Getaway updated in Supabase")
-    return {"path": f"/getaways/{slug}", "thin_scrape": False, "getaway_id": getaway_id}
+    return {"path": f"/getaways/{slug}", "getaway_id": getaway_id}
+
+
+async def generate_getaway_page(
+    url: str,
+    check_in: str | None = None,
+    check_out: str | None = None,
+    guests: int | None = None,
+    list_id: str | None = None,
+    auth_token: str | None = None,
+    getaway_id: str | None = None,
+    user_id: str | None = None,
+):
+    """Full flow: scrape, thin check, charge, LLM, update. Used when route awaits everything."""
+    scraped = await scrape_and_thin_check(url, check_in, check_out, guests)
+    if scraped["is_thin"]:
+        return {"path": None, "thin_scrape": True, "getaway_id": getaway_id}
+
+    if not user_id:
+        if getaway_id and auth_token:
+            db_update_getaway(getaway_id, {"import_status": "error", "import_error": "Sign in to scout listings."}, auth_token)
+        return {"path": None, "thin_scrape": False, "getaway_id": getaway_id, "quota_exceeded": True}
+
+    allowed, quota_error = check_and_use_quota(user_id)
+    if not allowed:
+        if getaway_id and auth_token:
+            db_update_getaway(getaway_id, {"import_status": "error", "import_error": quota_error}, auth_token)
+        return {"path": None, "thin_scrape": False, "getaway_id": getaway_id, "quota_exceeded": True}
+
+    result = await run_llm_and_update_getaway(
+        scraped["extraction_md"], scraped["crawl_image_urls"] or [], scraped["url"],
+        getaway_id, auth_token,
+    )
+    return {**result, "thin_scrape": False}
 
 
 async def generate_getaway_page_from_paste(
@@ -167,6 +195,7 @@ async def generate_getaway_page_from_paste(
     list_id: str | None = None,
     auth_token: str | None = None,
     getaway_id: str | None = None,
+    user_id: str | None = None,
 ) -> dict:
     """Build a getaway report from pasted listing text. If getaway_id is provided, updates that getaway."""
     extraction_md = (pasted_text or "").strip()
@@ -177,6 +206,8 @@ async def generate_getaway_page_from_paste(
     extraction_md = strip_other_villas_block(extraction_md)
     extraction_md = extract_main_property_only(extraction_md)
     extraction_md = truncate_for_extraction_preserving_images(extraction_md)
+
+    # Quota consumed in route before task started
     listing = await extract_villa_two_pass(extraction_md)
     title = (listing.villa_name or "").strip() or "Manual entry"
     slug = generate_slug(title)

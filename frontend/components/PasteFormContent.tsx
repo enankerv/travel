@@ -112,7 +112,7 @@ export default function PasteFormContent({
 
   const trimmed = text.trim();
   const isThin = listingUrl && isThinPaste(trimmed);
-  const canSubmit = trimmed.length > 0 && !isThin;
+  const canSubmit = trimmed.length > 0;
   const showThinWarning = isThin && hasTyped;
   const willTruncate = trimmed.length > SCOUT_MAX_INPUT_CHARS;
 

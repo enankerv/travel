@@ -3,6 +3,15 @@
 import { useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 
+/** Event to trigger optimistic credit decrement (before realtime confirms). */
+export const SCOUT_OPTIMISTIC_DECREMENT = "scout-credits-optimistic-decrement";
+
+/** Event to revert optimistic decrement (e.g. thin scrape - no charge). */
+export const SCOUT_OPTIMISTIC_REFUND = "scout-credits-optimistic-refund";
+
+/** Event to refetch credits from API (e.g. after successful scout when realtime may be delayed). */
+export const SCOUT_REFETCH_CREDITS = "scout-credits-refetch";
+
 export type PresenceUser = {
   user_id: string;
   first_name?: string;
@@ -350,3 +359,4 @@ export function useListPresence({
     };
   }, [listId, enabled, user?.id]);
 }
+

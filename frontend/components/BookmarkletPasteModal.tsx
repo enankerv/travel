@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Modal from './Modal'
 import PasteFormContent from './PasteFormContent'
 import { getLists, scoutPaste } from '@/lib/api'
-import { dispatchScoutComplete } from '@/components/ScoutCredits'
+import { dispatchScoutOptimisticDecrement, dispatchScoutOptimisticRefund } from '@/components/ScoutCredits'
 import { getLastListId, setLastListId } from '@/lib/lastListStorage'
 
 interface BookmarkletPasteModalProps {
@@ -59,10 +59,10 @@ export default function BookmarkletPasteModal({
     }
     setError('')
     setSubmitLoading(true)
+    dispatchScoutOptimisticDecrement()
     try {
       const result = await scoutPaste(text, selectedListId, listingUrl ?? undefined, undefined)
       if (result.ok) {
-        dispatchScoutComplete()
         setLastListId(selectedListId)
         if (result.truncated) {
           setTruncatedMessage('Text was truncated for length limits. Processing...')
@@ -76,9 +76,11 @@ export default function BookmarkletPasteModal({
           onSuccess(selectedListId)
         }
       } else {
+        dispatchScoutOptimisticRefund()
         setError(result.error || 'Failed to process paste')
       }
     } catch (err: unknown) {
+      dispatchScoutOptimisticRefund()
       setError(err instanceof Error ? err.message : 'Failed to process paste')
     } finally {
       setSubmitLoading(false)

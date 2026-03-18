@@ -2,27 +2,36 @@
 
 import { useEffect, useState } from "react";
 import { getScoutQuota } from "@/lib/api";
+import { useAuth } from "@/lib/AuthContext";
+import { SCOUT_OPTIMISTIC_DECREMENT, SCOUT_OPTIMISTIC_REFUND } from "@/lib/realtime";
 
-const SCOUT_COMPLETE_EVENT = "scout-credits-refresh";
+export function dispatchScoutOptimisticDecrement() {
+  window.dispatchEvent(new CustomEvent(SCOUT_OPTIMISTIC_DECREMENT));
+}
 
-export function dispatchScoutComplete() {
-  window.dispatchEvent(new CustomEvent(SCOUT_COMPLETE_EVENT));
+export function dispatchScoutOptimisticRefund() {
+  window.dispatchEvent(new CustomEvent(SCOUT_OPTIMISTIC_REFUND));
 }
 
 export default function ScoutCredits() {
+  const { user } = useAuth();
   const [credits, setCredits] = useState<number | null>(null);
 
-  const fetchCredits = () => {
+  useEffect(() => {
     getScoutQuota()
       .then((q) => setCredits(q.credits))
       .catch(() => setCredits(null));
-  };
+  }, [user?.id]);
 
   useEffect(() => {
-    fetchCredits();
-    const handler = () => fetchCredits();
-    window.addEventListener(SCOUT_COMPLETE_EVENT, handler);
-    return () => window.removeEventListener(SCOUT_COMPLETE_EVENT, handler);
+    const dec = () => setCredits((c) => (c !== null && c > 0 ? c - 1 : c));
+    const refund = () => setCredits((c) => (c !== null ? c + 1 : c));
+    window.addEventListener(SCOUT_OPTIMISTIC_DECREMENT, dec);
+    window.addEventListener(SCOUT_OPTIMISTIC_REFUND, refund);
+    return () => {
+      window.removeEventListener(SCOUT_OPTIMISTIC_DECREMENT, dec);
+      window.removeEventListener(SCOUT_OPTIMISTIC_REFUND, refund);
+    };
   }, []);
 
   if (credits === null) return null;

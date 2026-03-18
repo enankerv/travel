@@ -56,3 +56,14 @@ BEGIN
   RETURN v_updated = 1;
 END;
 $$;
+
+-- Remove scout_credits from realtime (no longer using realtime for credits)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'scout_credits'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime DROP TABLE scout_credits;
+  END IF;
+END $$;

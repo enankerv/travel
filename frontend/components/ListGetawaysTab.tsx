@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { scoutUrl, scoutPaste, deleteGetaway, updateGetaway } from "@/lib/api";
-import { dispatchScoutComplete } from "@/components/ScoutCredits";
 import { useListDetailContext } from "@/lib/ListDetailContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import DropZone from "./DropZone";
@@ -15,6 +14,7 @@ import MapGetawaySidebar from "./MapGetawaySidebar";
 import GetawayDetailSheet from "./GetawayDetailSheet";
 import GetawayListView from "./GetawayListView";
 import ScoutBookmarklet from "./ScoutBookmarklet";
+import { dispatchScoutOptimisticDecrement, dispatchScoutOptimisticRefund } from "@/components/ScoutCredits";
 
 const GetawayMap = dynamic(() => import("./GetawayMap"), { ssr: false });
 
@@ -93,10 +93,17 @@ export default function ListGetawaysTab({
     setError("");
     setLastFailedUrl("");
     setScoutLoading(true);
+    dispatchScoutOptimisticDecrement();
     try {
       const result = await scoutUrl(url, listId, getawayId);
       if (result.ok) {
-        // Credits refresh when scout completes via realtime (only for full scrapes, not thin)
+        if (result.thin_scrape) {
+          dispatchScoutOptimisticRefund();
+          tryShowNotification("Credit refunded", {
+            body: "Credit refunded for thin scrape.",
+            icon: "↩️",
+          });
+        }
         if (getawayId) {
           setGetaways((prev) =>
             prev.map((g) =>
@@ -108,7 +115,7 @@ export default function ListGetawaysTab({
           body: "Processing listing...",
           icon: "⏳",
         });
-      } else if (!result.ok) {
+      } else {
         setLastFailedUrl(url);
         setError(result.error || "Failed to scout getaway");
         tryShowNotification("Scouting Failed", {
@@ -117,6 +124,7 @@ export default function ListGetawaysTab({
         });
       }
     } catch (err: any) {
+      dispatchScoutOptimisticRefund();
       setLastFailedUrl(url);
       setError(err.message || "Failed to scout getaway");
       tryShowNotification("Error", {
@@ -133,12 +141,12 @@ export default function ListGetawaysTab({
     setLastFailedPaste("");
     setShowPasteModal(false);
     setScoutLoading(true);
+    dispatchScoutOptimisticDecrement();
     const getawayId = pasteGetaway?.id ?? undefined;
     const originalUrl = pasteGetaway?.source_url ?? urlParam ?? undefined;
     try {
       const result = await scoutPaste(text, listId, originalUrl, getawayId);
       if (result.ok) {
-        dispatchScoutComplete();
         setPasteGetaway(null);
         if (getawayId) {
           setGetaways((prev) =>
@@ -153,7 +161,8 @@ export default function ListGetawaysTab({
             : "Extracting getaway details...",
           icon: "⏳",
         });
-      } else if (!result.ok) {
+      } else {
+        dispatchScoutOptimisticRefund();
         setLastFailedPaste(text);
         setError(result.error || "Failed to process paste");
         setShowPasteModal(true);
@@ -163,6 +172,7 @@ export default function ListGetawaysTab({
         });
       }
     } catch (err: any) {
+      dispatchScoutOptimisticRefund();
       setLastFailedPaste(text);
       setError(err.message || "Failed to process paste");
       setShowPasteModal(true);
