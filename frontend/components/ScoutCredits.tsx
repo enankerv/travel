@@ -30,6 +30,19 @@ export default function ScoutCredits() {
   }, [user?.id, refetch]);
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.search.includes('credits=success')) {
+      const t = setTimeout(refetch, 800);
+      return () => clearTimeout(t);
+    }
+  }, [user?.id, refetch]);
+
+  useEffect(() => {
+    const onVisible = () => refetch();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [refetch]);
+
+  useEffect(() => {
     const dec = () => setCredits((c) => (c !== null && c > 0 ? c - 1 : c));
     const refund = () => setCredits((c) => (c !== null ? c + 1 : c));
     window.addEventListener(SCOUT_OPTIMISTIC_DECREMENT, dec);
@@ -62,10 +75,11 @@ export default function ScoutCredits() {
           cursor: "pointer",
           padding: 0,
           textDecoration: "none",
+          flexShrink: 0,
         }}
       >
         <span aria-hidden>⚡</span>
-        <span style={{ textDecoration: isLow ? "underline" : "none" }}>
+        <span className="scout-credits__text--low">
           {credits} scout{credits !== 1 ? "s" : ""} remaining
         </span>
       </button>

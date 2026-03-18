@@ -197,7 +197,10 @@ export async function getScoutQuota(): Promise<{
   can_scout: boolean
 }> {
   const headers = await getAuthHeaders()
-  const res = await fetch(`${API_URL}/api/scout-quota`, { headers })
+  const res = await fetch(`${API_URL}/api/scout-quota`, {
+    headers,
+    cache: 'no-store',
+  })
   if (!res.ok) throw new Error('Failed to fetch scout quota')
   return res.json()
 }

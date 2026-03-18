@@ -1732,6 +1732,13 @@ button:focus-visible {
   gap: 1rem;
 }
 
+/* Scout credits - always underlined */
+.scout-credits .scout-credits__text--low {
+  display: inline-block;
+  border-bottom: 1px solid currentColor;
+  padding-bottom: 1px;
+}
+
 /* Scout bookmarklet - drag to bookmarks bar */
 .scout-bookmarklet {
   margin-top: 0;
