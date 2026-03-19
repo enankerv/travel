@@ -12,7 +12,7 @@
 -- 1. HELPER FUNCTIONS
 -- ============================================================================
 
--- terms + age gate (TERMS_CUTOFF = 2025-03-18; bump when you update Terms/Privacy)
+-- terms + age gate (TERMS_CUTOFF = 2026-03-18; bump when you update Terms/Privacy)
 CREATE OR REPLACE FUNCTION public.user_has_verified_terms_and_age()
 RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
@@ -20,7 +20,7 @@ AS $$
   SELECT COALESCE(
     (SELECT p.terms_accepted_at IS NOT NULL
         AND p.age_verified_at   IS NOT NULL
-        AND p.terms_accepted_at >= '2025-03-18T00:00:00+00'::timestamptz
+        AND p.terms_accepted_at >= '2026-03-18T00:00:00+00'::timestamptz
      FROM profiles p WHERE p.id = auth.uid()),
     false
   );

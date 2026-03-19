@@ -8,7 +8,7 @@ from typing import Optional
 from db import get_supabase_client
 
 # Bump this when you update Terms/Privacy. Must match frontend lib/constants.ts
-TERMS_UPDATED_AT = os.getenv("TERMS_UPDATED_AT", "2025-03-18T00:00:00Z")
+TERMS_UPDATED_AT = os.getenv("TERMS_UPDATED_AT", "2026-03-18T00:00:00Z")
 
 
 def _get_user_id_from_token(token: str) -> Optional[str]:

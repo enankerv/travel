@@ -8,7 +8,7 @@ export default function TermsPage() {
       </Link>
       <h1 style={{ marginBottom: '0.5rem' }}>Terms of Service</h1>
       <p style={{ color: 'var(--muted)', marginBottom: '2rem', fontSize: '0.9rem' }}>
-        Last updated: March 18, 2025
+        Last updated: March 18, 2026
       </p>
 
       <section style={{ marginBottom: '2rem' }}>
