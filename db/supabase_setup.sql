@@ -1,6 +1,8 @@
 -- ============================================================================
--- SUPABASE SETUP — single source of truth
+-- SUPABASE SETUP — legacy combined schema (deprecated)
 -- ============================================================================
+-- PREFER: schema_tables.sql then schema_policies.sql (tables and policies split).
+--
 -- Idempotent: safe to re-run. Uses IF NOT EXISTS / CREATE OR REPLACE /
 -- DROP POLICY IF EXISTS so nothing breaks on repeat execution.
 --

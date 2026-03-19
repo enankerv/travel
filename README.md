@@ -22,7 +22,8 @@ Collaborative lists for tracking vacation rentals. Scout listings from URLs or p
 ### Data
 - **Images** - Supabase Storage (`getaway-images`, legacy `villa-images`)
 - **Database** - Supabase Postgres (lists, getaways, list_members, invite_tokens)
-- **`db/supabase_setup.sql`** - Schema & RLS policies
+- **`db/schema_tables.sql`** - Table definitions, triggers, RPCs
+- **`db/schema_policies.sql`** - RLS policies (run after schema_tables)
 
 ---
 
@@ -36,7 +37,7 @@ Collaborative lists for tracking vacation rentals. Scout listings from URLs or p
 - OAuth: `frontend/GOOGLE_OAUTH_SETUP.md`
 
 ### For Database
-- Schema: `db/supabase_setup.sql`
+- Schema: `db/schema_tables.sql` then `db/schema_policies.sql`
 - Migration: `db/supabase_migrate_villas_to_getaways.sql`
 
 ---
