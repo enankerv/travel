@@ -8,7 +8,7 @@ export default function PrivacyPage() {
       </Link>
       <h1 style={{ marginBottom: '0.5rem' }}>Privacy Policy</h1>
       <p style={{ color: 'var(--muted)', marginBottom: '2rem', fontSize: '0.9rem' }}>
-        Last updated: March 7, 2025
+        Last updated: March 18, 2025
       </p>
 
       <section style={{ marginBottom: '2rem' }}>
@@ -83,9 +83,10 @@ export default function PrivacyPage() {
         </p>
         <p style={{ color: 'var(--light)', lineHeight: 1.7, marginBottom: '0.5rem' }}>
           <strong>With service providers.</strong> We use third-party services to host and operate the
-          Service. These include Supabase (database and authentication), Vercel (frontend hosting), and Railway
-          (backend hosting). They process data on our behalf under data processing agreements and their
-          respective privacy policies. We do not share your data with advertisers or data brokers.
+          Service. These include Supabase (database and authentication), Vercel (frontend hosting), Railway
+          (backend hosting), and Stripe (payment processing). They process data on our behalf under data
+          processing agreements and their respective privacy policies. We do not share your data with
+          advertisers or data brokers.
         </p>
         <p style={{ color: 'var(--light)', lineHeight: 1.7, marginBottom: '0.5rem' }}>
           <strong>For legal reasons.</strong> We may disclose your information if required by law, court order,

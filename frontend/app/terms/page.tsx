@@ -8,7 +8,7 @@ export default function TermsPage() {
       </Link>
       <h1 style={{ marginBottom: '0.5rem' }}>Terms of Service</h1>
       <p style={{ color: 'var(--muted)', marginBottom: '2rem', fontSize: '0.9rem' }}>
-        Last updated: March 7, 2025
+        Last updated: March 18, 2025
       </p>
 
       <section style={{ marginBottom: '2rem' }}>
@@ -35,8 +35,10 @@ export default function TermsPage() {
           (including data extracted from external sources), add notes and images, and share lists with other
           invited users. The Service includes features such as voting on getaways and lists (e.g., to indicate
           preferences or rankings) and note taking on lists and individual getaways. The Service may use automated
-          tools to extract and structure getaway information. We reserve the right to modify, suspend, or
-          discontinue any part of the Service at any time.
+          tools to extract and structure getaway information. Certain features, such as scouting villa listings from
+          URLs or pasted content, consume scout credits. New users receive a limited number of free credits; additional
+          credits may be purchased. We reserve the right to modify, suspend, or discontinue any part of the Service
+          at any time.
         </p>
       </section>
 
@@ -84,15 +86,31 @@ export default function TermsPage() {
       <section style={{ marginBottom: '2rem' }}>
         <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>7. Third-Party Services</h2>
         <p style={{ color: 'var(--light)', lineHeight: 1.7, marginBottom: '0.5rem' }}>
-          The Service relies on third-party providers (e.g., Supabase, Vercel, Railway) for hosting,
-          authentication, and infrastructure. Getaway data may be sourced from external websites. We are not
-          responsible for the availability, accuracy, or practices of these third parties. Your use of their
-          services may be subject to their own terms and policies.
+          The Service relies on third-party providers (e.g., Supabase, Vercel, Railway, Stripe) for hosting,
+          authentication, payment processing, and infrastructure. Getaway data may be sourced from external websites.
+          We are not responsible for the availability, accuracy, or practices of these third parties. Your use of
+          their services may be subject to their own terms and policies.
         </p>
       </section>
 
       <section style={{ marginBottom: '2rem' }}>
-        <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>8. Disclaimer of Warranties</h2>
+        <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>8. Payments and Refunds</h2>
+        <p style={{ color: 'var(--light)', lineHeight: 1.7, marginBottom: '0.5rem' }}>
+          Scout credits are used to power certain features (e.g., extracting getaway data from URLs or pasted
+          content). Credits are consumed when you use these features. New users receive a limited number of free
+          credits; you may purchase additional credits in packs. Prices are displayed in USD and may change at any
+          time. Payment processing is handled by Stripe; by purchasing, you agree to Stripe&apos;s terms. Credits are
+          non-transferable and tied to your account.
+        </p>
+        <p style={{ color: 'var(--light)', lineHeight: 1.7, marginBottom: '0.5rem' }}>
+          <strong>Refunds.</strong> All purchases of scout credits are final. Credits are consumed upon use and
+          cannot be refunded. We do not offer refunds for unused credits or for scout results that do not meet your
+          expectations.
+        </p>
+      </section>
+
+      <section style={{ marginBottom: '2rem' }}>
+        <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>9. Disclaimer of Warranties</h2>
         <p style={{ color: 'var(--light)', lineHeight: 1.7, marginBottom: '0.5rem' }}>
           The Service is provided &quot;as is&quot; and &quot;as available&quot; without warranties of any kind, express or
           implied. We do not guarantee the accuracy, completeness, or reliability of getaway data, including
@@ -102,7 +120,7 @@ export default function TermsPage() {
       </section>
 
       <section style={{ marginBottom: '2rem' }}>
-        <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>9. Limitation of Liability</h2>
+        <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>10. Limitation of Liability</h2>
         <p style={{ color: 'var(--light)', lineHeight: 1.7, marginBottom: '0.5rem' }}>
           To the maximum extent permitted by law, Nankervis Digital LLC and its officers, directors, and
           affiliates shall not be liable for any indirect, incidental, special, consequential, or punitive
@@ -114,7 +132,7 @@ export default function TermsPage() {
       </section>
 
       <section style={{ marginBottom: '2rem' }}>
-        <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>10. Indemnification</h2>
+        <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>11. Indemnification</h2>
         <p style={{ color: 'var(--light)', lineHeight: 1.7, marginBottom: '0.5rem' }}>
           You agree to indemnify and hold harmless Nankervis Digital LLC and its officers, directors, and
           affiliates from any claims, damages, losses, or expenses (including reasonable attorneys&apos; fees)
@@ -123,16 +141,16 @@ export default function TermsPage() {
       </section>
 
       <section style={{ marginBottom: '2rem' }}>
-        <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>11. Termination</h2>
+        <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>12. Termination</h2>
         <p style={{ color: 'var(--light)', lineHeight: 1.7, marginBottom: '0.5rem' }}>
           We may suspend or terminate your access at any time, with or without cause or notice. You may stop
           using the Service at any time. Upon termination, your right to use the Service ceases immediately.
-          Sections that by their nature should survive (including 8, 9, 10, and 12) will survive termination.
+          Sections that by their nature should survive (including 9, 10, 11, and 13) will survive termination.
         </p>
       </section>
 
       <section style={{ marginBottom: '2rem' }}>
-        <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>12. Changes to Terms</h2>
+        <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>13. Changes to Terms</h2>
         <p style={{ color: 'var(--light)', lineHeight: 1.7, marginBottom: '0.5rem' }}>
           We may update these Terms from time to time. We will notify you of material changes by posting the
           updated Terms and updating the &quot;Last updated&quot; date. If we make material changes, we may also
@@ -142,7 +160,7 @@ export default function TermsPage() {
       </section>
 
       <section style={{ marginBottom: '2rem' }}>
-        <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>13. General</h2>
+        <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>14. General</h2>
         <p style={{ color: 'var(--light)', lineHeight: 1.7, marginBottom: '0.5rem' }}>
           These Terms constitute the entire agreement between you and Nankervis Digital LLC regarding the
           Service. If any provision is found unenforceable, the remaining provisions will remain in effect.
@@ -152,7 +170,7 @@ export default function TermsPage() {
       </section>
 
       <section style={{ marginBottom: '2rem' }}>
-        <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>14. Contact</h2>
+        <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>15. Contact</h2>
         <p style={{ color: 'var(--light)', lineHeight: 1.7, marginBottom: '0.5rem' }}>
           Questions about these Terms may be directed to Nankervis Digital LLC at{' '}
           <a href="mailto:ethan@nankervisdigital.com" style={{ color: 'var(--accent)' }}>ethan@nankervisdigital.com</a>.

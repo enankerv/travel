@@ -55,10 +55,23 @@ export default function BuyCreditsModal({
         style={{
           color: "var(--muted)",
           fontSize: "0.9rem",
-          marginBottom: "1.25rem",
+          marginBottom: "0.5rem",
         }}
       >
         Add credits to scout villa listings from URLs or pasted content.
+      </p>
+      <p
+        style={{
+          color: "var(--muted)",
+          fontSize: "0.8rem",
+          marginBottom: "1.25rem",
+        }}
+      >
+        All purchases are final. See our{" "}
+        <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>
+          Terms of Service
+        </a>{" "}
+        for details.
       </p>
 
       {error && (
