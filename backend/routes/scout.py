@@ -4,6 +4,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Header
 
 from models import ScoutRequest, ScoutPasteRequest, ScoutResponse
+from db.client import get_service_client
 from db.getaways import create_loading_getaway, update_getaway
 from db.scout_quota import check_and_use_quota, get_quota_status
 from scout import scrape_and_thin_check, run_llm_and_update_getaway, generate_getaway_page_from_paste
@@ -37,7 +38,9 @@ async def _process_scout_paste(pasted_text: str, list_id: str, getaway_id: str, 
                 pasted_text=pasted_text, original_url=original_url, list_id=list_id,
                 auth_token=auth_token, getaway_id=getaway_id, user_id=user_id,
             )
-            updates = {"import_status": "loaded", **{k: v for k, v in result.items() if k not in ["getaway_id", "path"]}}
+            if result.get("quota_exceeded"):
+                return
+            updates = {"import_status": "loaded", **{k: v for k, v in result.items() if k not in ["getaway_id", "path", "quota_exceeded"]}}
             update_getaway(getaway_id, updates, auth_token)
         except Exception as e:
             update_getaway(getaway_id, {"import_status": "error", "import_error": str(e)}, auth_token)
@@ -89,9 +92,15 @@ async def scout_from_paste(req: ScoutPasteRequest, authorization: Optional[str] 
         if not check_scout_rate_limit(user_id):
             raise HTTPException(status_code=429, detail="Too many scout requests. Try again in a minute.")
 
-        allowed, quota_error = check_and_use_quota(user_id)
-        if not allowed:
-            raise HTTPException(status_code=402, detail=quota_error)
+        # Preflight only: actual credit is consumed in generate_getaway_page_from_paste (same as URL flow
+        # splitting scrape vs LLM — avoids double-charging). Skip when no service role (dev).
+        if get_service_client():
+            quota_status = get_quota_status(user_id)
+            if not quota_status.get("can_scout"):
+                raise HTTPException(
+                    status_code=402,
+                    detail="You're out of scout credits. Buy a pack to continue.",
+                )
 
         if req.getaway_id:
             getaway_id = req.getaway_id

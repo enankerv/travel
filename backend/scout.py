@@ -1,7 +1,7 @@
 """Getaway scouting and data extraction engine."""
 import logging
-from urllib.parse import urlparse
 
+from schema import VillaListing
 from utils.urls import (
     add_search_params, generate_js_params, is_js_heavy_site,
     extract_url_slug, generate_slug
@@ -20,7 +20,7 @@ from utils.extraction import extract_villa_two_pass, extract_price_from_text
 from utils.scout_limits import truncate_for_extraction, truncate_for_extraction_preserving_images
 from utils.geocode import geocode as geocode_location
 from db.scout_quota import check_and_use_quota
-from db import update_getaway as db_update_getaway
+from db import update_getaway, insert_getaway_images
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("scout")
@@ -75,6 +75,68 @@ def _listing_to_getaway_row(
     }
 
 
+def _display_title_for_listing(
+    listing: VillaListing,
+    *,
+    url_for_path_title: str | None = None,
+    name_if_no_villa: str = "Listing",
+) -> str:
+    """Prefer villa_name; else last URL path segment as title; else fixed default."""
+    villa = (listing.villa_name or "").strip()
+    if villa:
+        return villa
+    if url_for_path_title:
+        seg = url_for_path_title.split("/")[-1].split("?")[0].replace("-", " ").strip()
+        if seg:
+            return seg.title()
+    return name_if_no_villa
+
+
+def _geocode_listing(listing: VillaListing) -> tuple[float | None, float | None]:
+    loc = (listing.location or "").strip()
+    reg = (listing.region or "").strip()
+    geocode_query = ", ".join(p for p in [loc, reg] if p)
+    if not geocode_query:
+        return None, None
+    lat, lng = geocode_location(geocode_query)
+    if lat is not None:
+        log.info("geocoded %r -> %.4f, %.4f", geocode_query, lat, lng)
+    return lat, lng
+
+
+async def persist_listing_to_getaway(
+    listing: VillaListing,
+    *,
+    name: str,
+    slug: str,
+    source_url: str,
+    raw_text_for_price: str | None,
+    image_candidate_urls: list[str],
+    getaway_id: str,
+    auth_token: str,
+) -> dict:
+    """
+    Upload candidate images, geocode, map listing to row, update getaway + images.
+    Shared by URL scout and paste flows after LLM extraction.
+    """
+    image_urls: list[str] = []
+    if image_candidate_urls:
+        image_urls = await upload_images_to_supabase(image_candidate_urls, getaway_id, auth_token) or []
+    if image_urls:
+        print(f"[IMG] Uploaded {len(image_urls)} images to Supabase")
+
+    lat, lng = _geocode_listing(listing)
+    row = _listing_to_getaway_row(
+        listing, slug=slug, source_url=source_url, name=name,
+        raw_text=raw_text_for_price, lat=lat, lng=lng,
+    )
+    update_getaway(getaway_id, row, auth_token=auth_token)
+    if image_urls:
+        insert_getaway_images(getaway_id, image_urls, auth_token)
+    print("[OK] Success! Getaway updated in Supabase")
+    return {"path": f"/getaways/{slug}", "getaway_id": getaway_id}
+
+
 async def scrape_and_thin_check(
     url: str,
     check_in: str | None = None,
@@ -120,40 +182,48 @@ async def run_llm_and_update_getaway(
 ):
     """Run LLM extraction and update getaway. Assumes quota already consumed."""
     listing = await extract_villa_two_pass(extraction_md)
-
-    title = url.split("/")[-1].split("?")[0].replace("-", " ").title()
-    if not title:
-        title = "Listing"
-    if listing.villa_name:
-        title = (listing.villa_name or "").strip() or title
-    slug = generate_slug(title)
-
-    image_urls: list[str] = []
-    if crawl_image_urls:
-        image_urls = await upload_images_to_supabase(crawl_image_urls, getaway_id, auth_token) or []
-    if image_urls:
-        print(f"[IMG] Uploaded {len(image_urls)} images to Supabase")
-
-    from db import update_getaway, insert_getaway_images
-
-    lat, lng = None, None
-    loc = (listing.location or "").strip()
-    reg = (listing.region or "").strip()
-    geocode_query = ", ".join(p for p in [loc, reg] if p)
-    if geocode_query:
-        lat, lng = geocode_location(geocode_query)
-        if lat is not None:
-            log.info("geocoded %r -> %.4f, %.4f", geocode_query, lat, lng)
-
-    row = _listing_to_getaway_row(
-        listing, slug=slug, source_url=url, name=title, raw_text=extraction_md,
-        lat=lat, lng=lng,
+    name = _display_title_for_listing(
+        listing, url_for_path_title=url, name_if_no_villa="Listing",
     )
-    update_getaway(getaway_id, row, auth_token=auth_token)
-    if image_urls:
-        insert_getaway_images(getaway_id, image_urls, auth_token)
-    print("[OK] Success! Getaway updated in Supabase")
-    return {"path": f"/getaways/{slug}", "getaway_id": getaway_id}
+    slug = generate_slug(name)
+    return await persist_listing_to_getaway(
+        listing,
+        name=name,
+        slug=slug,
+        source_url=url,
+        raw_text_for_price=extraction_md,
+        image_candidate_urls=crawl_image_urls or [],
+        getaway_id=getaway_id,
+        auth_token=auth_token,
+    )
+
+
+def prepare_manual_paste_extraction_md(pasted_text: str) -> str:
+    """Normalize pasted listing text the same way as the paste scout pipeline before LLM."""
+    extraction_md = (pasted_text or "").strip()
+    if not extraction_md:
+        raise ValueError("Pasted text is empty.")
+    log.info("manual paste: len=%d chars", len(extraction_md))
+    extraction_md = strip_other_villas_block(extraction_md)
+    extraction_md = extract_main_property_only(extraction_md)
+    return truncate_for_extraction_preserving_images(extraction_md)
+
+
+async def image_candidate_urls_for_paste(
+    extraction_md: str,
+    original_url: str | None,
+) -> list[str]:
+    """Resolve image URLs for a paste flow: og:image first, else markdown image links."""
+    og_url = await fetch_og_image(original_url)
+    if og_url:
+        print("[IMG] Using og:image from original URL")
+        return [og_url]
+    candidates = extract_image_urls_from_text(extraction_md)
+    if candidates:
+        print(f"[IMG] Using {len(candidates)} images extracted from paste")
+    else:
+        print("[IMG] No images found in paste text")
+    return candidates
 
 
 async def generate_getaway_page(
@@ -173,13 +243,13 @@ async def generate_getaway_page(
 
     if not user_id:
         if getaway_id and auth_token:
-            db_update_getaway(getaway_id, {"import_status": "error", "import_error": "Sign in to scout listings."}, auth_token)
+            update_getaway(getaway_id, {"import_status": "error", "import_error": "Sign in to scout listings."}, auth_token)
         return {"path": None, "thin_scrape": False, "getaway_id": getaway_id, "quota_exceeded": True}
 
     allowed, quota_error = check_and_use_quota(user_id)
     if not allowed:
         if getaway_id and auth_token:
-            db_update_getaway(getaway_id, {"import_status": "error", "import_error": quota_error}, auth_token)
+            update_getaway(getaway_id, {"import_status": "error", "import_error": quota_error}, auth_token)
         return {"path": None, "thin_scrape": False, "getaway_id": getaway_id, "quota_exceeded": True}
 
     result = await run_llm_and_update_getaway(
@@ -191,66 +261,58 @@ async def generate_getaway_page(
 
 async def generate_getaway_page_from_paste(
     pasted_text: str,
-    original_url: str | None = None,
+    original_url: str |  None = None,
     list_id: str | None = None,
     auth_token: str | None = None,
     getaway_id: str | None = None,
     user_id: str | None = None,
 ) -> dict:
-    """Build a getaway report from pasted listing text. If getaway_id is provided, updates that getaway."""
-    extraction_md = (pasted_text or "").strip()
-    if not extraction_md:
+    """
+    Build a getaway report from pasted listing text. Updates the given getaway row.
+
+    Mirrors generate_getaway_page: requires user_id and consumes scout quota here (not only in the route)
+    so callers always hit the same billing rules.
+    """
+    if not (pasted_text or "").strip():
         raise ValueError("Pasted text is empty.")
-    log.info("manual paste: len=%d chars", len(extraction_md))
-
-    extraction_md = strip_other_villas_block(extraction_md)
-    extraction_md = extract_main_property_only(extraction_md)
-    extraction_md = truncate_for_extraction_preserving_images(extraction_md)
-
-    # Quota consumed in route before task started
-    listing = await extract_villa_two_pass(extraction_md)
-    title = (listing.villa_name or "").strip() or "Manual entry"
-    slug = generate_slug(title)
-
-    og_url = await fetch_og_image(original_url)
-    if og_url:
-        image_candidates = [og_url]
-        print("[IMG] Using og:image from original URL")
-    else:
-        image_candidates = extract_image_urls_from_text(extraction_md)
-        if image_candidates:
-            print(f"[IMG] Using {len(image_candidates)} images extracted from paste")
-        else:
-            print("[IMG] No images found in paste text")
-
-    image_urls: list[str] = []
-    if getaway_id and image_candidates:
-        image_urls = await upload_images_to_supabase(image_candidates, getaway_id, auth_token) or []
-    if image_urls:
-        print(f"[IMG] Uploaded {len(image_urls)} images to Supabase")
-
-    from db import update_getaway, insert_getaway_images
     if not getaway_id or not auth_token:
         raise ValueError("getaway_id and auth_token required")
 
-    lat, lng = None, None
-    loc = (listing.location or "").strip()
-    reg = (listing.region or "").strip()
-    geocode_query = ", ".join(p for p in [loc, reg] if p)
-    if geocode_query:
-        lat, lng = geocode_location(geocode_query)
-        if lat is not None:
-            log.info("geocoded %r -> %.4f, %.4f", geocode_query, lat, lng)
+    if not user_id:
+        update_getaway(
+            getaway_id,
+            {"import_status": "error", "import_error": "Sign in to scout listings."},
+            auth_token,
+        )
+        return {"path": None, "getaway_id": getaway_id, "quota_exceeded": True}
 
-    row = _listing_to_getaway_row(
-        listing, slug=slug, source_url=original_url or "", name=title, raw_text=pasted_text,
-        lat=lat, lng=lng,
+    allowed, quota_error = check_and_use_quota(user_id)
+    if not allowed:
+        update_getaway(
+            getaway_id,
+            {"import_status": "error", "import_error": quota_error},
+            auth_token,
+        )
+        return {"path": None, "getaway_id": getaway_id, "quota_exceeded": True}
+
+    extraction_md = prepare_manual_paste_extraction_md(pasted_text)
+    listing = await extract_villa_two_pass(extraction_md)
+    name = _display_title_for_listing(
+        listing, url_for_path_title=None, name_if_no_villa="Manual entry",
     )
-    update_getaway(getaway_id, row, auth_token=auth_token)
-    if image_urls:
-        insert_getaway_images(getaway_id, image_urls, auth_token)
-    print("[OK] Success! Getaway updated in Supabase")
-    return {"path": f"/getaways/{slug}", "getaway_id": getaway_id}
+    slug = generate_slug(name)
+    image_candidates = await image_candidate_urls_for_paste(extraction_md, original_url)
+
+    return await persist_listing_to_getaway(
+        listing,
+        name=name,
+        slug=slug,
+        source_url=original_url or "",
+        raw_text_for_price=pasted_text,
+        image_candidate_urls=image_candidates,
+        getaway_id=getaway_id,
+        auth_token=auth_token,
+    )
 
 
 if __name__ == "__main__":
