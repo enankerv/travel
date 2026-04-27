@@ -1,5 +1,5 @@
 """Pydantic models for FastAPI endpoints."""
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 from typing import Optional, Literal
 
 
@@ -116,6 +116,30 @@ class GetawayResponse(GetawayData):
     import_error: Optional[str] = None
     created_at: str
     updated_at: str
+
+
+class GetawayEditorUpdate(BaseModel):
+    """
+    Fields users may edit in the listing editor (GetawayEditForm / table inline edit).
+
+    Extra JSON keys are ignored; only these fields are passed through to the DB update.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    name: Optional[str] = None
+    location: Optional[str] = None
+    region: Optional[str] = None
+    bedrooms: Optional[int] = None
+    bathrooms: Optional[int] = None
+    max_guests: Optional[int] = None
+    price: Optional[float] = None
+    price_currency: Optional[str] = None
+    price_period: Optional[str] = None
+    amenities: Optional[list[str]] = None
+    included: Optional[list[str]] = None
+    description: Optional[str] = None
+    caveats: Optional[str] = None
 
 
 # ============================================================================

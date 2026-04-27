@@ -2,7 +2,7 @@
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Header
 
-from models import GetawayResponse
+from models import GetawayEditorUpdate, GetawayResponse
 from db.getaways import (
     get_list_getaways,
     get_getaway_by_slug,
@@ -29,11 +29,19 @@ async def get_getaways_endpoint(list_id: str, authorization: Optional[str] = Hea
 
 
 @router.put("/{list_id}/getaways/{getaway_slug}")
-async def update_getaway_endpoint(list_id: str, getaway_slug: str, updates: dict, authorization: Optional[str] = Header(None)):
-    """Update getaway fields."""
+async def update_getaway_endpoint(
+    list_id: str,
+    getaway_slug: str,
+    body: GetawayEditorUpdate,
+    authorization: Optional[str] = Header(None),
+):
+    """Update getaway fields allowed by the listing editor (extra body keys ignored)."""
     try:
         from utils.storage_urls import sign_getaway_images
         token = extract_auth_token(authorization)
+        updates = body.model_dump(exclude_unset=True)
+        if not updates:
+            raise HTTPException(status_code=400, detail="No fields to update.")
         result = update_getaway_by_slug(list_id, getaway_slug, updates, token)
         if not result:
             raise HTTPException(status_code=404, detail="Getaway not found")
