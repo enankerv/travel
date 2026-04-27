@@ -81,13 +81,21 @@ def _apply_scout_result_to_getaway(getaway_id: str, auth_token: str, result: dic
     update_getaway(getaway_id, _loaded_updates_from_scout_result(result), auth_token)
 
 
+def _record_scout_background_failure(getaway_id: str, auth_token: str, exc: BaseException) -> None:
+    update_getaway(
+        getaway_id,
+        {"import_status": "error", "import_error": str(exc)},
+        auth_token,
+    )
+
+
 async def _run_url_scout_llm_background(
     bundle: ScoutExtractionBundle,
     getaway_id: str,
     auth_token: str,
     user_id: str,
 ) -> None:
-    """Background: consume scout credit, then LLM + persist from a ScoutExtractionBundle."""
+    """Background: scout bundle (quota + LLM + persist) for URL listings."""
     async with scout_semaphore:
         try:
             result = await execute_scout_bundle_to_getaway(
@@ -95,11 +103,7 @@ async def _run_url_scout_llm_background(
             )
             _apply_scout_result_to_getaway(getaway_id, auth_token, result)
         except Exception as e:
-            update_getaway(
-                getaway_id,
-                {"import_status": "error", "import_error": str(e)},
-                auth_token,
-            )
+            _record_scout_background_failure(getaway_id, auth_token, e)
 
 
 async def _run_paste_scout_background(
@@ -123,11 +127,7 @@ async def _run_paste_scout_background(
             )
             _apply_scout_result_to_getaway(getaway_id, auth_token, result)
         except Exception as e:
-            update_getaway(
-                getaway_id,
-                {"import_status": "error", "import_error": str(e)},
-                auth_token,
-            )
+            _record_scout_background_failure(getaway_id, auth_token, e)
 
 
 @router.post("/scout", response_model=ScoutResponse)
