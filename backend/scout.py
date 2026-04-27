@@ -1,5 +1,6 @@
 """Getaway scouting and data extraction engine."""
 import logging
+from dataclasses import dataclass
 
 from schema import VillaListing
 from utils.urls import (
@@ -17,13 +18,97 @@ from utils.images import (
 )
 from utils.crawler import crawl_page
 from utils.extraction import extract_villa_two_pass, extract_price_from_text
-from utils.scout_limits import truncate_for_extraction, truncate_for_extraction_preserving_images
+from utils.scout_limits import (
+    SCOUT_MAX_INPUT_CHARS,
+    truncate_for_extraction,
+    truncate_for_extraction_preserving_images,
+)
 from utils.geocode import geocode as geocode_location
 from db.scout_quota import check_and_use_quota
 from db import update_getaway, insert_getaway_images
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("scout")
+
+
+@dataclass(frozen=True)
+class ScoutExtractionBundle:
+    """
+    Normalized input for LLM extraction + persist (URL scout and paste scout).
+
+    Same shape for both paths: markdown for the model, image URLs to try, listing URL,
+    raw text for regex price hints, and title fallback hints.
+    """
+
+    extraction_md: str
+    image_candidate_urls: tuple[str, ...]
+    source_url: str
+    raw_text_for_price: str
+    url_for_path_title: str | None
+    name_if_no_villa: str
+
+
+def scout_bundle_from_scrape_dict(scraped: dict) -> ScoutExtractionBundle:
+    """
+    Build a bundle from scrape_and_thin_check output.
+
+    Callers must return early when ``scraped["is_thin"]`` is true (no LLM work); this
+    function only validates that contract for clearer misuse errors.
+    """
+    md = scraped.get("extraction_md") or ""
+    if scraped.get("is_thin") or not md.strip():
+        raise ValueError(
+            "Expected a non-thin scrape with extraction_md — handle is_thin before building a bundle."
+        )
+    source = scraped.get("url") or ""
+    images = scraped.get("crawl_image_urls") or scraped.get("image_candidate_urls") or []
+    return ScoutExtractionBundle(
+        extraction_md=md,
+        image_candidate_urls=tuple(images),
+        source_url=source,
+        raw_text_for_price=md,
+        url_for_path_title=source,
+        name_if_no_villa="Listing",
+    )
+
+
+async def scout_bundle_from_paste_inputs(
+    pasted_text: str,
+    original_url: str | None,
+) -> ScoutExtractionBundle:
+    """Normalize paste text and resolve image candidates (og:image or markdown URLs)."""
+    extraction_md = prepare_manual_paste_extraction_md(pasted_text)
+    listing_url = (original_url or "").strip() or None
+    images = await image_candidate_urls_for_paste(extraction_md, listing_url)
+    return ScoutExtractionBundle(
+        extraction_md=extraction_md,
+        image_candidate_urls=tuple(images),
+        source_url=listing_url or "",
+        raw_text_for_price=pasted_text,
+        url_for_path_title=listing_url,
+        name_if_no_villa="Manual entry",
+    )
+
+
+async def execute_scout_bundle_to_getaway(
+    bundle: ScoutExtractionBundle,
+    getaway_id: str,
+    auth_token: str,
+    user_id: str | None,
+) -> dict:
+    """Sign-in + scout quota, then LLM extraction + DB update from a bundle."""
+    if early := _early_return_unless_user_and_quota(getaway_id, auth_token, user_id):
+        return early
+    return await _llm_extract_and_persist_from_md(
+        bundle.extraction_md,
+        source_url=bundle.source_url,
+        raw_text_for_price=bundle.raw_text_for_price,
+        image_candidate_urls=list(bundle.image_candidate_urls),
+        url_for_path_title=bundle.url_for_path_title,
+        name_if_no_villa=bundle.name_if_no_villa,
+        getaway_id=getaway_id,
+        auth_token=auth_token,
+    )
 
 
 def _listing_to_getaway_row(
@@ -141,16 +226,12 @@ def _early_return_unless_user_and_quota(
     getaway_id: str | None,
     auth_token: str | None,
     user_id: str | None,
-    *,
-    thin_scrape_false_on_error: bool = False,
 ) -> dict | None:
     """
     If the user is missing or scout quota is exhausted, update the getaway (when possible)
     and return a response dict the caller should return. Otherwise return None.
     """
     err: dict = {"path": None, "getaway_id": getaway_id, "quota_exceeded": True}
-    if thin_scrape_false_on_error:
-        err["thin_scrape"] = False
 
     if not user_id:
         if getaway_id and auth_token:
@@ -209,8 +290,11 @@ async def scrape_and_thin_check(
     guests: int | None = None,
 ) -> dict:
     """
-    Scrape URL and run thin check. Returns {is_thin: bool, extraction_md?, crawl_image_urls?, url}.
-    When is_thin=True, extraction_md and crawl_image_urls are None.
+    Scrape URL and run thin check.
+
+    Returns a dict with ``is_thin``, ``url`` / ``source_url`` (listing URL), and when not thin:
+    ``extraction_md``, ``crawl_image_urls`` (legacy name), and ``image_candidate_urls`` (same list
+    as paste bundle field). Thin or failed crawls set text/image fields to None.
     """
     print(f"[SCOUT] Scraping: {url}")
     crawl_url = add_search_params(url, check_in, check_out, guests)
@@ -222,7 +306,14 @@ async def scrape_and_thin_check(
     raw_markdown, media = await crawl_page(crawl_url, js_code, is_js_heavy_site(crawl_url))
     if not raw_markdown:
         print("[WARN] Crawl failed — skipping extraction")
-        return {"is_thin": True, "extraction_md": None, "crawl_image_urls": None, "url": url}
+        return {
+            "is_thin": True,
+            "extraction_md": None,
+            "crawl_image_urls": None,
+            "image_candidate_urls": None,
+            "url": url,
+            "source_url": url,
+        }
 
     url_slug = extract_url_slug(url)
     crawl_image_urls = pick_best_images_from_media(media, villa_name=url_slug, base_url=crawl_url)
@@ -233,29 +324,33 @@ async def scrape_and_thin_check(
     extraction_md = truncate_for_extraction(extraction_md)
     if is_thin_scrape(extraction_md):
         print("[WARN] Thin scrape — skipping LLM, user will paste manually")
-        return {"is_thin": True, "extraction_md": None, "crawl_image_urls": None, "url": url}
+        return {
+            "is_thin": True,
+            "extraction_md": None,
+            "crawl_image_urls": None,
+            "image_candidate_urls": None,
+            "url": url,
+            "source_url": url,
+        }
 
-    return {"is_thin": False, "extraction_md": extraction_md, "crawl_image_urls": crawl_image_urls, "url": url}
+    return {
+        "is_thin": False,
+        "extraction_md": extraction_md,
+        "crawl_image_urls": crawl_image_urls,
+        "image_candidate_urls": crawl_image_urls,
+        "url": url,
+        "source_url": url,
+    }
 
 
-async def run_llm_and_update_getaway(
-    extraction_md: str,
-    crawl_image_urls: list,
-    url: str,
-    getaway_id: str,
-    auth_token: str,
-):
-    """Run LLM extraction and update getaway. Assumes quota already consumed."""
-    return await _llm_extract_and_persist_from_md(
-        extraction_md,
-        source_url=url,
-        raw_text_for_price=extraction_md,
-        image_candidate_urls=crawl_image_urls or [],
-        url_for_path_title=url,
-        name_if_no_villa="Listing",
-        getaway_id=getaway_id,
-        auth_token=auth_token,
-    )
+def manual_paste_exceeds_scout_input_limit(pasted_text: str | None) -> bool:
+    """True when text will be truncated by prepare_manual_paste_extraction_md (same pre-truncate steps)."""
+    extraction_md = (pasted_text or "").strip()
+    if not extraction_md:
+        return False
+    extraction_md = strip_other_villas_block(extraction_md)
+    extraction_md = extract_main_property_only(extraction_md)
+    return len(extraction_md) > SCOUT_MAX_INPUT_CHARS
 
 
 def prepare_manual_paste_extraction_md(pasted_text: str) -> str:
@@ -301,14 +396,9 @@ async def generate_getaway_page(
     if scraped["is_thin"]:
         return {"path": None, "thin_scrape": True, "getaway_id": getaway_id}
 
-    if early := _early_return_unless_user_and_quota(
-        getaway_id, auth_token, user_id, thin_scrape_false_on_error=True,
-    ):
-        return early
-
-    result = await run_llm_and_update_getaway(
-        scraped["extraction_md"], scraped["crawl_image_urls"] or [], scraped["url"],
-        getaway_id, auth_token,
+    bundle = scout_bundle_from_scrape_dict(scraped)
+    result = await execute_scout_bundle_to_getaway(
+        bundle, getaway_id, auth_token, user_id,
     )
     return {**result, "thin_scrape": False}
 
@@ -332,20 +422,9 @@ async def generate_getaway_page_from_paste(
     if not getaway_id or not auth_token:
         raise ValueError("getaway_id and auth_token required")
 
-    if early := _early_return_unless_user_and_quota(getaway_id, auth_token, user_id):
-        return early
-
-    extraction_md = prepare_manual_paste_extraction_md(pasted_text)
-    image_candidates = await image_candidate_urls_for_paste(extraction_md, original_url)
-    return await _llm_extract_and_persist_from_md(
-        extraction_md,
-        source_url=original_url or "",
-        raw_text_for_price=pasted_text,
-        image_candidate_urls=image_candidates,
-        url_for_path_title=None,
-        name_if_no_villa="Manual entry",
-        getaway_id=getaway_id,
-        auth_token=auth_token,
+    bundle = await scout_bundle_from_paste_inputs(pasted_text, original_url)
+    return await execute_scout_bundle_to_getaway(
+        bundle, getaway_id, auth_token, user_id,
     )
 
 
