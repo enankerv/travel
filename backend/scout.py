@@ -137,6 +137,71 @@ async def persist_listing_to_getaway(
     return {"path": f"/getaways/{slug}", "getaway_id": getaway_id}
 
 
+def _early_return_unless_user_and_quota(
+    getaway_id: str | None,
+    auth_token: str | None,
+    user_id: str | None,
+    *,
+    thin_scrape_false_on_error: bool = False,
+) -> dict | None:
+    """
+    If the user is missing or scout quota is exhausted, update the getaway (when possible)
+    and return a response dict the caller should return. Otherwise return None.
+    """
+    err: dict = {"path": None, "getaway_id": getaway_id, "quota_exceeded": True}
+    if thin_scrape_false_on_error:
+        err["thin_scrape"] = False
+
+    if not user_id:
+        if getaway_id and auth_token:
+            update_getaway(
+                getaway_id,
+                {"import_status": "error", "import_error": "Sign in to scout listings."},
+                auth_token,
+            )
+        return err
+
+    allowed, quota_error = check_and_use_quota(user_id)
+    if not allowed:
+        if getaway_id and auth_token:
+            update_getaway(
+                getaway_id,
+                {"import_status": "error", "import_error": quota_error},
+                auth_token,
+            )
+        return err
+    return None
+
+
+async def _llm_extract_and_persist_from_md(
+    extraction_md: str,
+    *,
+    source_url: str,
+    raw_text_for_price: str | None,
+    image_candidate_urls: list[str],
+    url_for_path_title: str | None,
+    name_if_no_villa: str,
+    getaway_id: str,
+    auth_token: str,
+) -> dict:
+    """Run two-pass LLM extraction on markdown, derive title/slug, persist row + images."""
+    listing = await extract_villa_two_pass(extraction_md)
+    name = _display_title_for_listing(
+        listing, url_for_path_title=url_for_path_title, name_if_no_villa=name_if_no_villa,
+    )
+    slug = generate_slug(name)
+    return await persist_listing_to_getaway(
+        listing,
+        name=name,
+        slug=slug,
+        source_url=source_url,
+        raw_text_for_price=raw_text_for_price,
+        image_candidate_urls=image_candidate_urls or [],
+        getaway_id=getaway_id,
+        auth_token=auth_token,
+    )
+
+
 async def scrape_and_thin_check(
     url: str,
     check_in: str | None = None,
@@ -181,18 +246,13 @@ async def run_llm_and_update_getaway(
     auth_token: str,
 ):
     """Run LLM extraction and update getaway. Assumes quota already consumed."""
-    listing = await extract_villa_two_pass(extraction_md)
-    name = _display_title_for_listing(
-        listing, url_for_path_title=url, name_if_no_villa="Listing",
-    )
-    slug = generate_slug(name)
-    return await persist_listing_to_getaway(
-        listing,
-        name=name,
-        slug=slug,
+    return await _llm_extract_and_persist_from_md(
+        extraction_md,
         source_url=url,
         raw_text_for_price=extraction_md,
         image_candidate_urls=crawl_image_urls or [],
+        url_for_path_title=url,
+        name_if_no_villa="Listing",
         getaway_id=getaway_id,
         auth_token=auth_token,
     )
@@ -241,16 +301,10 @@ async def generate_getaway_page(
     if scraped["is_thin"]:
         return {"path": None, "thin_scrape": True, "getaway_id": getaway_id}
 
-    if not user_id:
-        if getaway_id and auth_token:
-            update_getaway(getaway_id, {"import_status": "error", "import_error": "Sign in to scout listings."}, auth_token)
-        return {"path": None, "thin_scrape": False, "getaway_id": getaway_id, "quota_exceeded": True}
-
-    allowed, quota_error = check_and_use_quota(user_id)
-    if not allowed:
-        if getaway_id and auth_token:
-            update_getaway(getaway_id, {"import_status": "error", "import_error": quota_error}, auth_token)
-        return {"path": None, "thin_scrape": False, "getaway_id": getaway_id, "quota_exceeded": True}
+    if early := _early_return_unless_user_and_quota(
+        getaway_id, auth_token, user_id, thin_scrape_false_on_error=True,
+    ):
+        return early
 
     result = await run_llm_and_update_getaway(
         scraped["extraction_md"], scraped["crawl_image_urls"] or [], scraped["url"],
@@ -278,38 +332,18 @@ async def generate_getaway_page_from_paste(
     if not getaway_id or not auth_token:
         raise ValueError("getaway_id and auth_token required")
 
-    if not user_id:
-        update_getaway(
-            getaway_id,
-            {"import_status": "error", "import_error": "Sign in to scout listings."},
-            auth_token,
-        )
-        return {"path": None, "getaway_id": getaway_id, "quota_exceeded": True}
-
-    allowed, quota_error = check_and_use_quota(user_id)
-    if not allowed:
-        update_getaway(
-            getaway_id,
-            {"import_status": "error", "import_error": quota_error},
-            auth_token,
-        )
-        return {"path": None, "getaway_id": getaway_id, "quota_exceeded": True}
+    if early := _early_return_unless_user_and_quota(getaway_id, auth_token, user_id):
+        return early
 
     extraction_md = prepare_manual_paste_extraction_md(pasted_text)
-    listing = await extract_villa_two_pass(extraction_md)
-    name = _display_title_for_listing(
-        listing, url_for_path_title=None, name_if_no_villa="Manual entry",
-    )
-    slug = generate_slug(name)
     image_candidates = await image_candidate_urls_for_paste(extraction_md, original_url)
-
-    return await persist_listing_to_getaway(
-        listing,
-        name=name,
-        slug=slug,
+    return await _llm_extract_and_persist_from_md(
+        extraction_md,
         source_url=original_url or "",
         raw_text_for_price=pasted_text,
         image_candidate_urls=image_candidates,
+        url_for_path_title=None,
+        name_if_no_villa="Manual entry",
         getaway_id=getaway_id,
         auth_token=auth_token,
     )
