@@ -75,3 +75,15 @@ def geocode(query: str) -> tuple[float | None, float | None]:
     if lat is not None and lng is not None:
         return (float(lat), float(lng))
     return (None, None)
+
+
+def geocode_from_location_region(
+    location: str | None, region: str | None
+) -> tuple[float | None, float | None]:
+    """Geocode using the same query shape as scout (location, region comma-joined)."""
+    loc = (location or "").strip()
+    reg = (region or "").strip()
+    q = ", ".join(p for p in [loc, reg] if p)
+    if not q:
+        return (None, None)
+    return geocode(q)

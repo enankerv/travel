@@ -23,7 +23,7 @@ from utils.scout_limits import (
     truncate_for_extraction,
     truncate_for_extraction_preserving_images,
 )
-from utils.geocode import geocode as geocode_location
+from utils.geocode import geocode_from_location_region
 from db.scout_quota import check_and_use_quota
 from db import update_getaway, insert_getaway_images
 
@@ -178,14 +178,14 @@ def _display_title_for_listing(
 
 
 def _geocode_listing(listing: VillaListing) -> tuple[float | None, float | None]:
-    loc = (listing.location or "").strip()
-    reg = (listing.region or "").strip()
-    geocode_query = ", ".join(p for p in [loc, reg] if p)
-    if not geocode_query:
-        return None, None
-    lat, lng = geocode_location(geocode_query)
+    lat, lng = geocode_from_location_region(listing.location, listing.region)
     if lat is not None:
-        log.info("geocoded %r -> %.4f, %.4f", geocode_query, lat, lng)
+        q = ", ".join(
+            p
+            for p in [(listing.location or "").strip(), (listing.region or "").strip()]
+            if p
+        )
+        log.info("geocoded %r -> %.4f, %.4f", q, lat, lng)
     return lat, lng
 
 

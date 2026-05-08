@@ -3,6 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Header
 
 from models import GetawayEditorUpdate, GetawayResponse
+from utils.geocode import geocode_from_location_region
 from db.getaways import (
     get_list_getaways,
     get_getaway_by_slug,
@@ -12,6 +13,26 @@ from db.getaways import (
 from routes.auth import extract_auth_token
 
 router = APIRouter(prefix="/lists", tags=["getaways"])
+
+
+def _apply_geocode_if_location_changed(current: dict, updates: dict) -> None:
+    """When location or region in `updates` differs from `current`, re-geocode into lat/lng."""
+
+    def _strip(s: Optional[str]) -> str:
+        return (s or "").strip()
+
+    touched_loc = "location" in updates
+    touched_reg = "region" in updates
+    if not touched_loc and not touched_reg:
+        return
+    old_loc = _strip(current.get("location"))
+    old_reg = _strip(current.get("region"))
+    new_loc = _strip(updates["location"]) if touched_loc else old_loc
+    new_reg = _strip(updates["region"]) if touched_reg else old_reg
+    if new_loc != old_loc or new_reg != old_reg:
+        lat, lng = geocode_from_location_region(new_loc, new_reg)
+        updates["lat"] = lat
+        updates["lng"] = lng
 
 
 @router.get("/{list_id}/getaways", response_model=list[GetawayResponse])
@@ -39,9 +60,14 @@ async def update_getaway_endpoint(
     try:
         from utils.storage_urls import sign_getaway_images
         token = extract_auth_token(authorization)
+        current = get_getaway_by_slug(list_id, getaway_slug, token)
+        if not current:
+            raise HTTPException(status_code=404, detail="Getaway not found")
         updates = body.model_dump(exclude_unset=True)
         if not updates:
             raise HTTPException(status_code=400, detail="No fields to update.")
+        _apply_geocode_if_location_changed(current, updates)
+
         result = update_getaway_by_slug(list_id, getaway_slug, updates, token)
         if not result:
             raise HTTPException(status_code=404, detail="Getaway not found")
