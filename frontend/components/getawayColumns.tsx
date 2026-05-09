@@ -297,7 +297,7 @@ const COLUMN_CONFIG: Record<ColumnKey, ColumnDef> = {
         <ExpandableCell
           value={getaway.amenities}
           cellClassName={className}
-          truncateLen={50}
+          wrap
         />
       ),
   },
@@ -319,7 +319,7 @@ const COLUMN_CONFIG: Record<ColumnKey, ColumnDef> = {
         <ExpandableCell
           value={getaway.description}
           cellClassName={className}
-          truncateLen={50}
+          wrap
         />
       ),
   },
@@ -339,7 +339,7 @@ const COLUMN_CONFIG: Record<ColumnKey, ColumnDef> = {
         <ExpandableCell
           value={getaway.caveats}
           cellClassName={className}
-          truncateLen={50}
+          wrap
         />
       ),
   },
@@ -362,7 +362,7 @@ const COLUMN_CONFIG: Record<ColumnKey, ColumnDef> = {
         <ExpandableCell
           value={getaway.included}
           cellClassName={className}
-          truncateLen={50}
+          wrap
         />
       ),
   },

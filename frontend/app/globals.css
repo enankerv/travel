@@ -1042,6 +1042,35 @@ button:focus-visible {
   user-select: none;
 }
 
+.col-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  user-select: none;
+  z-index: 3;
+}
+.col-resize-handle::after {
+  content: "";
+  display: block;
+  position: absolute;
+  top: 25%;
+  bottom: 25%;
+  right: 2px;
+  width: 1px;
+  background: transparent;
+  transition: background 0.15s;
+}
+.sheet thead th:hover .col-resize-handle::after,
+.col-resize-handle:hover::after {
+  background: var(--border-strong);
+}
+.col-resize-handle:active::after {
+  background: var(--accent);
+}
+
 .sheet tbody tr {
   border-bottom: 1px solid var(--border);
   transition: background 0.15s;
@@ -1184,6 +1213,58 @@ button:focus-visible {
   align-items: center;
   gap: 0.4rem;
   min-width: 0;
+}
+
+.expandable-cell-inner--wrap {
+  align-items: flex-start;
+}
+
+.sheet td.expandable-wrap {
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: clip;
+  vertical-align: top;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.expandable-wrap-text {
+  flex: 1;
+  min-width: 0;
+  display: block;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+.expandable-wrap-text--clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--wrap-max-lines, 4);
+  line-clamp: var(--wrap-max-lines, 4);
+  overflow: hidden;
+}
+
+.expandable-wrap--clickable {
+  cursor: pointer;
+}
+
+.expandable-wrap-toggle {
+  margin-top: 0.25rem;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.expandable-wrap-toggle:hover,
+.expandable-wrap--clickable:hover .expandable-wrap-toggle {
+  color: var(--accent);
 }
 
 .expandable-cell-inner .expandable-content,

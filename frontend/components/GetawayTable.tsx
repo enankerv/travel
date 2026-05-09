@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { useListDetailContext } from '@/lib/ListDetailContext'
+import { useResizableColumns } from '@/hooks/useResizableColumns'
 import GetawayRow from './GetawayRow'
 import ColumnPopover from './ColumnPopover'
 import PartySizeControls from './PartySizeControls'
@@ -32,6 +33,7 @@ export default function GetawayTable({
   const [visibleColumns, setVisibleColumns] = useState<VisibleColumns>(DEFAULT_VISIBLE)
   const [showColumnMenu, setShowColumnMenu] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const { getColStyle, startResize } = useResizableColumns<ColumnKey>()
 
   const handleEditStart = (getawayId: any) => {
     setEditingId(getawayId)
@@ -91,11 +93,24 @@ export default function GetawayTable({
       />
       <div className="sheet-scroll" style={{ flex: 1 }}>
         <table className="sheet">
+          <colgroup>
+            {getVisibleColumnKeys(visibleColumns).map((key) => (
+              <col key={key} className={COLUMN_BY_KEY[key].className} style={getColStyle(key)} />
+            ))}
+          </colgroup>
           <thead>
             <tr>
               {getVisibleColumnKeys(visibleColumns).map((key) => (
                 <th key={key} className={COLUMN_BY_KEY[key].className}>
-                  {COLUMN_BY_KEY[key].label}
+                  <span className="th-label">{COLUMN_BY_KEY[key].label}</span>
+                  <span
+                    role="separator"
+                    aria-orientation="vertical"
+                    className="col-resize-handle"
+                    onMouseDown={(e) => startResize(key, e)}
+                    onClick={(e) => e.stopPropagation()}
+                    title="Drag to resize column"
+                  />
                 </th>
               ))}
             </tr>
