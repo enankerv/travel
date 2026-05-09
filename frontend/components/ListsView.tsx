@@ -51,7 +51,7 @@ export default function ListsView({
             onClick={onSignOut}
             style={{
               background: 'var(--accent)',
-              color: '#fff',
+              color: 'var(--on-accent)',
               padding: '0.5rem 1rem',
               borderRadius: '6px',
               border: 'none',
@@ -91,7 +91,7 @@ export default function ListsView({
           onClick={onCreateList}
           style={{
             background: 'var(--accent)',
-            color: '#fff',
+            color: 'var(--on-accent)',
             padding: '0.6rem 1.25rem',
             borderRadius: '8px',
             border: 'none',

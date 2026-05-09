@@ -171,7 +171,7 @@ export default function GetawayRow({
 
   if (getaway.import_status === 'thin') {
     return renderSpecialRow(
-      <span style={{ color: 'var(--orange)' }}>
+      <span style={{ color: 'var(--accent)' }}>
         Unable to extract full data. Click here to paste listing details manually.
         <span style={{ display: 'block', fontSize: '0.85em', color: 'var(--muted)', marginTop: '0.25rem' }}>
           No scout credit was used.
@@ -179,7 +179,7 @@ export default function GetawayRow({
       </span>,
       {
         opacity: 0.7,
-        backgroundColor: 'var(--orange-soft)',
+        backgroundColor: 'var(--accent-soft)',
         cursor: onPasteClick ? 'pointer' : undefined,
       },
       <div className="row-actions">

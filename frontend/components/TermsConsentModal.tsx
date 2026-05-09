@@ -189,7 +189,7 @@ export default function TermsConsentModal({
           style={{
             width: '100%',
             background: canSubmit ? 'var(--accent)' : 'var(--border)',
-            color: '#fff',
+            color: canSubmit ? 'var(--on-accent)' : 'var(--muted)',
             border: 'none',
             padding: '0.75rem 1.25rem',
             borderRadius: '8px',

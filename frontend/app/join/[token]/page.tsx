@@ -59,8 +59,9 @@ export default function JoinPage() {
           <h1 className="text-2xl font-bold text-white mb-2">You&apos;re not on the invite list yet</h1>
           <p className="text-gray-400 mb-4">This app is currently invite-only. Ask the owner to add your email.</p>
           <button
+            type="button"
             onClick={() => router.push('/auth/login')}
-            className="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2 px-4 rounded transition"
+            className="btn-primary w-full font-semibold rounded-lg px-4 py-2"
           >
             Back to Login
           </button>

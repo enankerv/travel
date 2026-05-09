@@ -135,7 +135,7 @@ export default function BuyCreditsModal({
               disabled={purchasingPackId !== null}
               style={{
                 background: "var(--accent)",
-                color: "#fff",
+                color: "var(--on-accent)",
                 border: "none",
                 borderRadius: "6px",
                 padding: "0.5rem 1rem",

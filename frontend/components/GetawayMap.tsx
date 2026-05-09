@@ -69,7 +69,7 @@ export default function GetawayMap({
         html: `<div style="
           width: 20px;
           height: 20px;
-          background: #c45c26;
+          background: var(--accent);
           border: 2px solid rgba(255,255,255,0.9);
           border-radius: 50%;
           box-shadow: 0 2px 6px rgba(0,0,0,0.4);

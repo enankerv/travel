@@ -34,7 +34,7 @@ export default function AuthDeniedView({
         onClick={onAction}
         style={{
           background: 'var(--accent)',
-          color: '#fff',
+          color: 'var(--on-accent)',
           border: 'none',
           padding: '0.6rem 1.25rem',
           borderRadius: '8px',
