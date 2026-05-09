@@ -1,6 +1,6 @@
 'use client'
 
-import { ThumbsUpIcon } from '@/components/icons'
+import { CommentIcon, ThumbsUpIcon } from '@/components/icons'
 
 type Voter = { user_id: string; first_name?: string; avatar_url?: string }
 
@@ -11,6 +11,8 @@ type VoteCellProps = {
   onVote: () => void
   onUnvote: () => void
   className: string
+  onCommentClick?: () => void
+  commentCount?: number
 }
 
 function displayName(v: Voter): string {
@@ -24,11 +26,13 @@ export default function VoteCell({
   onVote,
   onUnvote,
   className,
+  onCommentClick,
+  commentCount = 0,
 }: VoteCellProps) {
   const myVote = currentUserId && voters.some((v) => v.user_id === currentUserId)
 
   return (
-    <td className={className}>
+    <td className={className} onClick={(e) => e.stopPropagation()}>
       <div className="vote-cell">
         <div className="vote-cell__avatars" title={voters.map((v) => displayName(v)).join(', ')}>
           {voters.slice(0, 5).map((v) => (
@@ -62,6 +66,23 @@ export default function VoteCell({
             aria-label={myVote ? 'Remove vote' : 'Vote'}
           >
             <ThumbsUpIcon size={16} filled={!!myVote} />
+          </button>
+        )}
+        {onCommentClick && (
+          <button
+            type="button"
+            className="vote-cell__btn vote-cell__btn--comment"
+            onClick={(e) => {
+              e.stopPropagation()
+              onCommentClick()
+            }}
+            title="Comments"
+            aria-label="Comments"
+          >
+            <CommentIcon />
+            {commentCount > 0 && (
+              <span className="vote-cell__btn-count">{commentCount}</span>
+            )}
           </button>
         )}
       </div>

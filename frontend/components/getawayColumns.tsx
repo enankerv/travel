@@ -5,7 +5,7 @@ import ExpandableCell from "@/components/ExpandableCell";
 import { formatPerPersonLine } from "@/lib/pricePerPerson";
 import EditableCell from "@/components/EditableCell";
 import VoteCell from "@/components/VoteCell";
-import { TrashIcon, ExternalLinkIcon, CommentIcon } from "@/components/icons";
+import { TrashIcon, ExternalLinkIcon } from "@/components/icons";
 
 export const COLUMN_KEYS = [
   "votes",
@@ -94,9 +94,12 @@ const COLUMN_CONFIG: Record<ColumnKey, ColumnDef> = {
       canVote,
       onVote,
       onUnvote,
+      onCommentClick,
+      commentsByGetaway,
       className,
     }) => {
       const voters = (votesByGetaway && votesByGetaway[getaway.id]) || [];
+      const commentCount = commentsByGetaway?.[getaway.id]?.length ?? 0;
       return (
         <VoteCell
           voters={voters}
@@ -105,6 +108,8 @@ const COLUMN_CONFIG: Record<ColumnKey, ColumnDef> = {
           onVote={() => onVote?.(getaway.id)}
           onUnvote={() => onUnvote?.(getaway.id)}
           className={className}
+          onCommentClick={onCommentClick}
+          commentCount={commentCount}
         />
       );
     },
@@ -371,12 +376,9 @@ const COLUMN_CONFIG: Record<ColumnKey, ColumnDef> = {
     className: "col-catch",
     label: "Actions",
     render: ({
-      getaway,
       isEditing,
       onEditStart,
       onDelete,
-      onCommentClick,
-      commentsByGetaway,
       handleSave,
       handleCancel,
       className,
@@ -403,20 +405,6 @@ const COLUMN_CONFIG: Record<ColumnKey, ColumnDef> = {
       ) : (
         <td className={className} onClick={(e) => e.stopPropagation()}>
           <div className="row-actions">
-            {onCommentClick && (
-              <button
-                className="row-action-btn row-action-btn-comment"
-                onClick={() => onCommentClick?.()}
-                title="Comments"
-              >
-                <CommentIcon />
-                {(commentsByGetaway?.[getaway.id]?.length ?? 0) > 0 && (
-                  <span className="row-action-btn-comment__count">
-                    {commentsByGetaway?.[getaway.id]?.length ?? 0}
-                  </span>
-                )}
-              </button>
-            )}
             <button
               className="row-action-btn"
               onClick={() => onEditStart?.()}

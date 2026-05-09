@@ -1094,8 +1094,8 @@ button:focus-visible {
 
 /* Column widths - compact so many columns can fit; expandable cells grow when expanded */
 .col-votes {
-  width: 72px;
-  min-width: 72px;
+  width: 110px;
+  min-width: 96px;
   vertical-align: middle;
 }
 
@@ -1162,6 +1162,28 @@ button:focus-visible {
 
 .vote-cell__btn.voted {
   color: var(--accent);
+}
+
+.vote-cell__btn--comment {
+  position: relative;
+}
+
+.vote-cell__btn-count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  font-size: 0.6rem;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  line-height: 1;
 }
 
 .col-thumb {
