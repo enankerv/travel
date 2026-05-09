@@ -176,20 +176,20 @@ function HomeContent() {
   const selectedList = lists.find(l => l.id === selectedListId)
 
   return (
-    <div className="app" style={{ overflow: 'hidden', height: '100vh' }}>
-      {/* Fade between views */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          opacity: selectedListId ? 0 : 1,
-          pointerEvents: selectedListId ? 'none' : 'auto',
-          transition: 'opacity 0.3s ease-out',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        {/* Lists View */}
+    <div className="app">
+      {selectedListId && selectedList ? (
+        <div className="app-detail-view">
+          <ListDetailView
+            list={selectedList}
+            searchParams={Object.fromEntries(searchParams.entries())}
+            onBack={() => {
+              handleSelectList(null)
+              loadLists(false)
+            }}
+            onUpdate={() => loadLists()}
+          />
+        </div>
+      ) : (
         <ListsView
           lists={lists}
           onSelectList={handleSelectList}
@@ -201,33 +201,7 @@ function HomeContent() {
           isLoading={isLoading}
           pasteMode={pasteParam === '1' && !!searchParams.get('url')}
         />
-      </div>
-
-      {/* Detail View */}
-      <div
-        className="app-detail-view"
-        style={{
-          position: 'absolute',
-          inset: 0,
-          opacity: selectedListId ? 1 : 0,
-          pointerEvents: selectedListId ? 'auto' : 'none',
-          transition: 'opacity 0.3s ease-out',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        {selectedList && (
-          <ListDetailView
-            list={selectedList}
-            searchParams={Object.fromEntries(searchParams.entries())}
-            onBack={() => {
-              handleSelectList(null)
-              loadLists(false)
-            }}
-            onUpdate={() => loadLists()}
-          />
-        )}
-      </div>
+      )}
 
       <CreateListModal
         open={createModalOpen}

@@ -313,7 +313,9 @@ export default function ListGetawaysTab({
 
   return (
     <>
-      <div className="list-villas-tab">
+      <div
+        className={`list-villas-tab${viewMode === "map" ? " list-villas-tab--map" : ""}`}
+      >
         <div className="list-villas-tab__table-wrap">
           {viewMode === "table" ? (
             <GetawayListView

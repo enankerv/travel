@@ -149,14 +149,6 @@ button:focus-visible {
     -webkit-overflow-scrolling: touch;
   }
 
-  .app-detail-view .list-detail-sticky {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background: var(--dark);
-    flex-shrink: 0;
-  }
-
   .app-detail-view .list-detail-content {
     flex: none;
     min-height: auto;
@@ -941,7 +933,6 @@ button:focus-visible {
   border-radius: 10px;
   overflow: hidden;
   background: var(--dark-2);
-  flex: 1;
 }
 .sheet-toolbar {
   display: flex;
@@ -1928,7 +1919,12 @@ button:focus-visible {
 .list-villas-tab {
   display: flex;
   flex-direction: column;
-  flex: 1;
+}
+
+/* Map view needs an explicit viewport-bound height so Leaflet can render. */
+.list-villas-tab--map {
+  height: calc(100vh - 220px);
+  min-height: 400px;
   overflow: hidden;
 }
 
@@ -2109,11 +2105,14 @@ button:focus-visible {
 }
 
 .list-villas-tab__table-wrap {
-  flex: 1;
-  min-height: 0;
   display: flex;
   flex-direction: column;
   padding: 0 2rem 1.5rem;
+}
+
+.list-villas-tab--map .list-villas-tab__table-wrap {
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -2382,11 +2381,16 @@ button:focus-visible {
 }
 
 .list-detail-content {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
   display: flex;
   flex-direction: column;
+}
+
+.list-detail-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--dark);
+  flex-shrink: 0;
 }
 
 .img-badge-modal {
@@ -2400,11 +2404,12 @@ button:focus-visible {
 }
 
 /* Scrollable table body */
+/* Default: no internal scroll \u2014 the page scrolls naturally and the footer flows below. */
 .sheet-scroll {
-  max-height: calc(100vh - 220px);
-  overflow-y: auto;
+  /* No max-height / overflow so the page is the scroll container. */
 }
 
+/* Internal scroll only when needed (e.g. forced via parent) */
 .sheet-scroll::-webkit-scrollbar {
   width: 6px;
 }
