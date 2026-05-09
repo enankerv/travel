@@ -5,6 +5,7 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { useListDetailContext } from "@/lib/ListDetailContext";
 import GetawayTable from "./GetawayTable";
 import GetawayMobileCards from "./GetawayMobileCards";
+import PartySizeControls from "./PartySizeControls";
 import GetawayDetailSheet from "./GetawayDetailSheet";
 
 export default function GetawayListView({
@@ -39,7 +40,11 @@ export default function GetawayListView({
               <p>Loading getaways…</p>
             </div>
           ) : (
-            <GetawayMobileCards
+            <>
+              <div className="getaway-list-mobile__party-wrap">
+                <PartySizeControls />
+              </div>
+              <GetawayMobileCards
               getaways={getaways}
               votesByGetaway={votesByGetaway}
               currentUserId={currentUserId}
@@ -54,6 +59,7 @@ export default function GetawayListView({
                 }
               }}
             />
+            </>
           )}
         </div>
         {detailGetaway && (

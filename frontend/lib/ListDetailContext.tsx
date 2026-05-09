@@ -7,7 +7,7 @@ import type { CommentRecord } from "./api";
 export type CommentsByGetaway = Record<string, CommentRecord[]>;
 
 export type ListDetailContextValue = {
-  list: { id: string; name: string; user_id?: string };
+  list: { id: string; name: string; user_id?: string; member_count?: number };
   members: any[];
   getaways: any[];
   setGetaways: React.Dispatch<React.SetStateAction<any[]>>;
@@ -23,6 +23,9 @@ export type ListDetailContextValue = {
   error: string;
   setError: (msg: string) => void;
   onRefresh: () => Promise<void>;
+  /** Local party size for price-per-person (min 1); default from list member count. */
+  partySize: number;
+  setPartySize: (n: number) => void;
 };
 
 const ListDetailContext = createContext<ListDetailContextValue | null>(null);

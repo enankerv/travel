@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import { useListDetailContext } from '@/lib/ListDetailContext'
 import GetawayRow from './GetawayRow'
 import ColumnPopover from './ColumnPopover'
+import PartySizeControls from './PartySizeControls'
 import {
   COLUMN_BY_KEY,
   COLUMN_KEYS,
@@ -25,7 +26,8 @@ export default function GetawayTable({
   onPasteClick,
   onCommentClick,
 }: any) {
-  const { votesByGetaway, commentsByGetaway, currentUserId, isListMember, onVote, onUnvote } = useListDetailContext();
+  const { votesByGetaway, commentsByGetaway, currentUserId, isListMember, onVote, onUnvote } =
+    useListDetailContext();
   const [editingId, setEditingId] = useState(null)
   const [visibleColumns, setVisibleColumns] = useState<VisibleColumns>(DEFAULT_VISIBLE)
   const [showColumnMenu, setShowColumnMenu] = useState(false)
@@ -69,6 +71,7 @@ export default function GetawayTable({
   return (
     <div className="sheet-wrap" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
       <div className="sheet-toolbar">
+        <PartySizeControls />
         <button
           ref={triggerRef}
           type="button"

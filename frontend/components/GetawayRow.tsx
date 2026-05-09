@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useListDetailContext } from '@/lib/ListDetailContext'
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls'
 import { parseAmenitiesInput } from '@/components/AmenitiesCell'
 import { TrashIcon } from '@/components/icons'
@@ -28,6 +29,7 @@ export default function GetawayRow({
   onVote,
   onUnvote,
 }: any) {
+  const { partySize } = useListDetailContext()
   const [editData, setEditData] = useState(getaway)
   const signedUrls = useSignedImageUrls(getaway.images || [])
   const thumbUrl = signedUrls[0]
@@ -89,6 +91,7 @@ export default function GetawayRow({
     canVote,
     onVote,
     onUnvote,
+    partySize,
   }
 
   function renderSpecialRow(

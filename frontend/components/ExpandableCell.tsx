@@ -26,6 +26,8 @@ type ExpandableCellProps = {
   truncateLen?: number
   cellClassName: string
   suffix?: ReactNode
+  /** Optional second line (e.g. price per person). */
+  subline?: ReactNode
 }
 
 /** Reusable cell with expand/collapse for long text. Shrinks to fit, expands on click. */
@@ -34,6 +36,7 @@ export default function ExpandableCell({
   truncateLen = DEFAULT_TRUNCATE_LEN,
   cellClassName,
   suffix,
+  subline,
 }: ExpandableCellProps) {
   const [expanded, setExpanded] = useState(false)
   const fullText = toDisplayString(value)
@@ -103,6 +106,9 @@ export default function ExpandableCell({
         {renderContent()}
         {suffix}
       </span>
+      {subline != null && subline !== "" && (
+        <div className="expandable-cell-subline">{subline}</div>
+      )}
     </td>
   )
 }

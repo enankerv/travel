@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import ExpandableCell from "@/components/ExpandableCell";
+import { formatPerPersonLine } from "@/lib/pricePerPerson";
 import EditableCell from "@/components/EditableCell";
 import VoteCell from "@/components/VoteCell";
 import { TrashIcon, ExternalLinkIcon, CommentIcon } from "@/components/icons";
@@ -71,6 +72,7 @@ export type CellRenderContext = {
   canVote?: boolean;
   onVote?: (getawayId: string) => void;
   onUnvote?: (getawayId: string) => void;
+  partySize?: number;
 };
 
 type ColumnDef = {
@@ -249,7 +251,14 @@ const COLUMN_CONFIG: Record<ColumnKey, ColumnDef> = {
     key: "price",
     className: "col-price",
     label: "Price",
-    render: ({ getaway, editData, setEditData, isEditing, className }) =>
+    render: ({
+      getaway,
+      editData,
+      setEditData,
+      isEditing,
+      className,
+      partySize,
+    }) =>
       isEditing ? (
         <EditableCell
           type="price"
@@ -260,6 +269,11 @@ const COLUMN_CONFIG: Record<ColumnKey, ColumnDef> = {
       ) : (
         <ExpandableCell
           value={formatPrice(getaway.price, getaway.price_currency)}
+          subline={formatPerPersonLine(
+            getaway.price,
+            getaway.price_currency,
+            partySize,
+          )}
           cellClassName={className}
           truncateLen={15}
         />
@@ -452,6 +466,7 @@ export type CellRenderContextInput = Pick<
   | "canVote"
   | "onVote"
   | "onUnvote"
+  | "partySize"
 >;
 
 /** Render a cell for the given column key. */

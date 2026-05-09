@@ -10,6 +10,12 @@ import ListGetawaysTab from "./ListGetawaysTab";
 import ListMembersTab from "./ListMembersTab";
 import ScoutCredits from "./ScoutCredits";
 
+function defaultPartySizeFromList(list: { member_count?: number }): number {
+  const n = Number(list?.member_count);
+  if (Number.isFinite(n) && n >= 1) return Math.min(999, Math.floor(n));
+  return 1;
+}
+
 export default function ListDetailView({
   list,
   searchParams = {},
@@ -33,6 +39,9 @@ export default function ListDetailView({
   const [error, setError] = useState("");
   const [dataLoaded, setDataLoaded] = useState(false);
   const [placesStickyContent, setPlacesStickyContent] = useState<ReactNode>(null);
+  const [partySize, setPartySizeInternal] = useState(() =>
+    defaultPartySizeFromList(list),
+  );
 
   const votes = useListVotes({
     listId: list.id,
@@ -103,6 +112,13 @@ export default function ListDetailView({
     error,
     setError,
     onRefresh: () => loadData(true),
+    partySize,
+    setPartySize: (n: number) => {
+      const v = Math.floor(Number(n));
+      if (!Number.isFinite(v) || v < 1) setPartySizeInternal(1);
+      else if (v > 999) setPartySizeInternal(999);
+      else setPartySizeInternal(v);
+    },
   };
 
   async function loadData(silent = false) {
@@ -115,7 +131,11 @@ export default function ListDetailView({
         getListComments(list.id),
       ]);
       setGetaways(getawaysData || []);
-      setMembers(membersData?.members || []);
+      const memberRows = membersData?.members || [];
+      setMembers(memberRows);
+      if (!dataLoaded) {
+        setPartySizeInternal(Math.max(1, memberRows.length));
+      }
       const votesList = votesData?.votes || [];
       const commentsList = commentsData?.comments || [];
       const commentsByGid: Record<string, any[]> = {};

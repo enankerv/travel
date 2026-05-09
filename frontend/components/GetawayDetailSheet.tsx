@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useListDetailContext } from "@/lib/ListDetailContext";
+import { formatPerPersonLine } from "@/lib/pricePerPerson";
 import { useSignedImageUrls } from "@/hooks/useSignedImageUrls";
 import { parseAmenitiesInput } from "@/components/AmenitiesCell";
 import { ExternalLinkIcon, TrashIcon } from "./icons";
@@ -30,11 +32,18 @@ export default function GetawayDetailSheet({
   onDelete?: (getawayId: string) => void;
   onUpdate?: (getawayId: string, updates: any) => void;
 }) {
+  const { partySize } = useListDetailContext();
   const signedUrls = useSignedImageUrls(getaway?.images || []);
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<any>(() => ({ ...getaway }));
 
   if (!getaway) return null;
+
+  const pricePerPersonLine = formatPerPersonLine(
+    getaway.price,
+    getaway.price_currency,
+    partySize,
+  );
 
   const handleSave = () => {
     if (!onUpdate) return;
@@ -170,6 +179,11 @@ export default function GetawayDetailSheet({
                     <dd>
                       {formatPrice(getaway.price, getaway.price_currency)}
                       {getaway.price_period && ` / ${getaway.price_period}`}
+                      {pricePerPersonLine && (
+                        <div className="getaway-detail-sheet__price-per">
+                          {pricePerPersonLine}
+                        </div>
+                      )}
                     </dd>
                   </>
                 )}

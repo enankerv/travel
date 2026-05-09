@@ -1,7 +1,15 @@
 "use client";
 
 import { useSignedImageUrls } from "@/hooks/useSignedImageUrls";
+import { useListDetailContext } from "@/lib/ListDetailContext";
+import { formatPerPersonLine } from "@/lib/pricePerPerson";
 import { ThumbsUpIcon } from "./icons";
+
+function formatListingPrice(price: number | null | undefined, currency?: string | null) {
+  if (price == null) return "—";
+  const sym = currency === "EUR" ? "€" : "$";
+  return `${sym}${Number(price).toLocaleString()}`;
+}
 
 export default function GetawayMobileCards({
   getaways,
@@ -20,6 +28,8 @@ export default function GetawayMobileCards({
   onUnvote?: (getawayId: string) => void;
   onCardClick: (getaway: any) => void;
 }) {
+  const { partySize } = useListDetailContext();
+
   if (!getaways || getaways.length === 0) {
     return (
       <div className="getaway-mobile-cards">
@@ -37,6 +47,7 @@ export default function GetawayMobileCards({
         <GetawayMobileCard
           key={getaway.id}
           getaway={getaway}
+          partySize={partySize}
           voters={votesByGetaway?.[getaway.id] || []}
           currentUserId={currentUserId}
           canVote={!!canVote}
@@ -51,6 +62,7 @@ export default function GetawayMobileCards({
 
 function GetawayMobileCard({
   getaway,
+  partySize,
   voters,
   currentUserId,
   canVote,
@@ -59,6 +71,7 @@ function GetawayMobileCard({
   onClick,
 }: {
   getaway: any;
+  partySize: number;
   voters: { user_id: string; first_name?: string; avatar_url?: string }[];
   currentUserId?: string;
   canVote: boolean;
@@ -69,6 +82,11 @@ function GetawayMobileCard({
   const signedUrls = useSignedImageUrls(getaway?.images || []);
   const thumbUrl = signedUrls[0];
   const myVote = currentUserId && voters.some((v) => v.user_id === currentUserId);
+  const perPersonLine = formatPerPersonLine(
+    getaway.price,
+    getaway.price_currency,
+    partySize,
+  );
 
   if (getaway.import_status === "loading") {
     return (
@@ -122,7 +140,17 @@ function GetawayMobileCard({
         )}
       </div>
       <div className="getaway-mobile-card__body">
-        <span className="getaway-mobile-card__name">{getaway.name || "Getaway"}</span>
+        <div className="getaway-mobile-card__body-main">
+          <span className="getaway-mobile-card__name">{getaway.name || "Getaway"}</span>
+          {getaway.price != null && (
+            <div className="getaway-mobile-card__price">
+              <span>{formatListingPrice(getaway.price, getaway.price_currency)}</span>
+              {perPersonLine && (
+                <span className="getaway-mobile-card__price-per">{perPersonLine}</span>
+              )}
+            </div>
+          )}
+        </div>
         <div className="getaway-mobile-card__likes" onClick={(e) => e.stopPropagation()}>
           {canVote && (
             <button

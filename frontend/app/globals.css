@@ -130,6 +130,18 @@ button:focus-visible {
   padding: 0 1rem 1rem;
 }
 
+.getaway-list-mobile__party-wrap {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0 0.65rem;
+  margin-bottom: 0.35rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.getaway-list-mobile__party-wrap .sheet-toolbar-party {
+  margin-right: 0;
+}
+
 /* Mobile: single tall page scroll instead of nested scroll areas */
 @media (max-width: 639px) {
   .app-detail-view {
@@ -228,13 +240,33 @@ button:focus-visible {
   padding: 0.75rem 1rem;
 }
 
+.getaway-mobile-card__body-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
 .getaway-mobile-card__name {
   font-weight: 600;
   font-size: 0.95rem;
-  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.getaway-mobile-card__price {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  font-size: 0.8rem;
+  color: var(--light);
+}
+
+.getaway-mobile-card__price-per {
+  font-size: 0.75rem;
+  color: var(--muted);
 }
 
 .getaway-mobile-card__likes {
@@ -535,6 +567,12 @@ button:focus-visible {
 
 .getaway-detail-sheet__meta dd {
   margin: 0;
+}
+
+.getaway-detail-sheet__price-per {
+  margin-top: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted);
 }
 
 .getaway-detail-sheet__section {
@@ -908,9 +946,76 @@ button:focus-visible {
 .sheet-toolbar {
   display: flex;
   align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
   padding: 0.35rem 0.75rem;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
+}
+
+.sheet-toolbar-party {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-right: auto;
+}
+
+.sheet-toolbar-party__label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: 0.15rem;
+}
+
+.sheet-toolbar-party__step {
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--dark-2);
+  color: var(--light);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sheet-toolbar-party__step:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.sheet-toolbar-party__step:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.sheet-toolbar-party__input {
+  width: 3rem;
+  padding: 0.25rem 0.35rem;
+  text-align: center;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--light);
+  font-size: 0.85rem;
+  -moz-appearance: textfield;
+}
+
+.sheet-toolbar-party__input::-webkit-outer-spin-button,
+.sheet-toolbar-party__input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.expandable-cell-subline {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
 /* Table */
@@ -2620,6 +2725,12 @@ button:focus-visible {
 
 .map-getaway-sidebar__meta dd {
   margin: 0;
+}
+
+.map-getaway-sidebar__price-per {
+  margin-top: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted);
 }
 
 .map-getaway-sidebar__section {

@@ -1,6 +1,8 @@
 "use client";
 
 import { useSignedImageUrls } from "@/hooks/useSignedImageUrls";
+import { useListDetailContext } from "@/lib/ListDetailContext";
+import { formatPerPersonLine } from "@/lib/pricePerPerson";
 import { CommentIcon, ExternalLinkIcon } from "./icons";
 
 function formatPrice(price: number | null | undefined, currency?: string | null) {
@@ -27,10 +29,17 @@ export default function MapGetawaySidebar({
   onCommentClick?: () => void;
   commentsCount?: number;
 }) {
+  const { partySize } = useListDetailContext();
   const signedUrls = useSignedImageUrls(getaway?.images || []);
   const thumbUrl = signedUrls[0];
 
   if (!getaway) return null;
+
+  const pricePerPersonLine = formatPerPersonLine(
+    getaway.price,
+    getaway.price_currency,
+    partySize,
+  );
 
   return (
     <div className="map-getaway-sidebar">
@@ -87,6 +96,9 @@ export default function MapGetawaySidebar({
               <dd>
                 {formatPrice(getaway.price, getaway.price_currency)}
                 {getaway.price_period && ` / ${getaway.price_period}`}
+                {pricePerPersonLine && (
+                  <div className="map-getaway-sidebar__price-per">{pricePerPersonLine}</div>
+                )}
               </dd>
             </>
           )}
