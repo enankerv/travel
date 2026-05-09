@@ -25,6 +25,13 @@ export const COLUMN_KEYS = [
 
 export type ColumnKey = (typeof COLUMN_KEYS)[number];
 
+/** Columns the user cannot hide (votes/comments + row actions). */
+export const ALWAYS_VISIBLE_COLUMNS: ReadonlySet<ColumnKey> = new Set(["votes", "actions"]);
+
+export function isAlwaysVisibleColumn(key: ColumnKey): boolean {
+  return ALWAYS_VISIBLE_COLUMNS.has(key);
+}
+
 export type VisibleColumns = Record<ColumnKey, boolean>;
 
 export const DEFAULT_VISIBLE: VisibleColumns = {
@@ -431,7 +438,7 @@ export const COLUMN_DEFS = COLUMN_KEYS.map((k) => COLUMN_BY_KEY[k]);
 
 /** Get visible column keys in display order. */
 export function getVisibleColumnKeys(visible: VisibleColumns): ColumnKey[] {
-  return COLUMN_KEYS.filter((k) => visible[k]);
+  return COLUMN_KEYS.filter((k) => ALWAYS_VISIBLE_COLUMNS.has(k) || visible[k]);
 }
 
 /** Context passed from GetawayRow; key and className are filled in by renderColumnCell. */

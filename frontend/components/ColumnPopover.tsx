@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import {
   COLUMN_BY_KEY,
   COLUMN_KEYS,
+  isAlwaysVisibleColumn,
   type ColumnKey,
   type VisibleColumns,
 } from './getawayColumns'
@@ -71,7 +72,7 @@ export default function ColumnPopover({
       >
         <div className="column-popover-title">Show columns</div>
         <div className="column-popover-list">
-          {COLUMN_KEYS.map((key) => (
+          {COLUMN_KEYS.filter((key) => !isAlwaysVisibleColumn(key)).map((key) => (
             <label key={key} className="column-popover-item">
               <input
                 type="checkbox"

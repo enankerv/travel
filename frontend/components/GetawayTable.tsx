@@ -11,6 +11,7 @@ import {
   COLUMN_KEYS,
   DEFAULT_VISIBLE,
   getVisibleColumnKeys,
+  isAlwaysVisibleColumn,
   type ColumnKey,
   type VisibleColumns,
 } from './getawayColumns'
@@ -47,6 +48,7 @@ export default function GetawayTable({
   }
 
   const toggleColumn = (key: ColumnKey) => {
+    if (isAlwaysVisibleColumn(key)) return
     setVisibleColumns((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
