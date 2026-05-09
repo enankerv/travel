@@ -31,21 +31,28 @@ export async function getCurrentUser() {
   return user;
 }
 
-export async function signInWithGoogle() {
+function buildCallbackUrl(next?: string | null): string {
+  const base = `${getRedirectBase()}/auth/callback`;
+  if (!next) return base;
+  const safe = next.startsWith("/") && !next.startsWith("//") ? next : "/";
+  return `${base}?next=${encodeURIComponent(safe)}`;
+}
+
+export async function signInWithGoogle(next?: string | null) {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${getRedirectBase()}/auth/callback`,
+      redirectTo: buildCallbackUrl(next),
     },
   });
   return { data, error };
 }
 
-export async function signInWithGithub() {
+export async function signInWithGithub(next?: string | null) {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "github",
     options: {
-      redirectTo: `${getRedirectBase()}/auth/callback`,
+      redirectTo: buildCallbackUrl(next),
     },
   });
   return { data, error };

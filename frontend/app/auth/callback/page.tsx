@@ -1,30 +1,36 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { getSafeRedirectPath, POST_AUTH_REDIRECT_KEY } from '@/lib/safeRedirect'
 
 export default function AuthCallback() {
-  const router = useRouter()
-
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        // Supabase will handle the callback automatically
         const { data: { session } } = await supabase.auth.getSession()
         if (session) {
-          router.push('/')
+          const qs = new URLSearchParams(window.location.search)
+          const nextFromUrl = qs.get('next')
+          let target = '/'
+          if (nextFromUrl != null && nextFromUrl !== '') {
+            target = getSafeRedirectPath(nextFromUrl)
+          } else {
+            target = getSafeRedirectPath(sessionStorage.getItem(POST_AUTH_REDIRECT_KEY))
+          }
+          sessionStorage.removeItem(POST_AUTH_REDIRECT_KEY)
+          window.location.replace(`${window.location.origin}${target}`)
         } else {
-          router.push('/auth/login')
+          window.location.replace(`${window.location.origin}/auth/login`)
         }
       } catch (error) {
         console.error('Auth callback error:', error)
-        router.push('/auth/login')
+        window.location.replace(`${window.location.origin}/auth/login`)
       }
     }
 
     handleCallback()
-  }, [router])
+  }, [])
 
   return (
     <div className="flex items-center justify-center min-h-screen">

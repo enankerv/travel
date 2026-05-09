@@ -2,7 +2,9 @@
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import { User, Session } from '@supabase/supabase-js'
+import { usePathname } from 'next/navigation'
 import { supabase, signInWithGoogle, signInWithGithub } from './supabase'
+import { repairHistoryBareHashSuffix } from './safeRedirect'
 
 interface AuthContextType {
   user: User | null
@@ -10,17 +12,23 @@ interface AuthContextType {
   loading: boolean
   signUp: (email: string, password: string) => Promise<any>
   signIn: (email: string, password: string) => Promise<any>
-  signInWithGoogle: () => Promise<any>
-  signInWithGithub: () => Promise<any>
+  signInWithGoogle: (next?: string | null) => Promise<any>
+  signInWithGithub: (next?: string | null) => Promise<any>
   signOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => repairHistoryBareHashSuffix())
+    return () => cancelAnimationFrame(id)
+  }, [pathname])
 
   useEffect(() => {
     const initAuth = async () => {

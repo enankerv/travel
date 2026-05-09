@@ -1,22 +1,38 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/AuthContext'
 import { GoogleIcon } from '@/components/icons'
+import { getSafeRedirectPath, POST_AUTH_REDIRECT_KEY } from '@/lib/safeRedirect'
 
 export default function OAuthConsent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { signInWithGoogle } = useAuth()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  const loginHref = useMemo(() => {
+    const safe = getSafeRedirectPath(searchParams.get('redirect'))
+    if (safe !== '/') return `/auth/login?redirect=${encodeURIComponent(safe)}`
+    return '/auth/login'
+  }, [searchParams])
+
+  useEffect(() => {
+    const raw = searchParams.get('redirect')
+    if (typeof window === 'undefined' || !raw) return
+    sessionStorage.setItem(POST_AUTH_REDIRECT_KEY, getSafeRedirectPath(raw))
+  }, [searchParams])
 
   async function handleAccept() {
     setError('')
     setLoading(true)
     try {
-      const { data, error } = await signInWithGoogle()
+      const safeNext = getSafeRedirectPath(searchParams.get('redirect'))
+      const next = safeNext === '/' ? null : safeNext
+      const { data, error } = await signInWithGoogle(next)
       if (error) throw error
       if (data?.url) {
         window.location.href = data.url
@@ -65,7 +81,7 @@ export default function OAuthConsent() {
         </button>
         <button
           type="button"
-          onClick={() => router.push('/auth/login')}
+          onClick={() => router.push(loginHref)}
           disabled={loading}
           className="auth-cancel"
         >
@@ -74,7 +90,7 @@ export default function OAuthConsent() {
       </div>
 
       <p className="auth-footer" style={{ marginTop: '1.5rem' }}>
-        <Link href="/auth/login">Back to login</Link>
+        <Link href={loginHref}>Back to login</Link>
       </p>
     </div>
   )

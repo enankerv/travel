@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { GoogleIcon } from "@/components/icons";
+import { getSafeRedirectPath, POST_AUTH_REDIRECT_KEY, replaceBrowserPathStripHash } from "@/lib/safeRedirect";
 
 export default function LoginForm() {
   const [email, setEmail] = useState("");
@@ -17,6 +18,22 @@ export default function LoginForm() {
   const message = searchParams.get("message");
   const urlError = searchParams.get("error");
 
+  const afterAuthPath = useMemo(
+    () => getSafeRedirectPath(searchParams.get("redirect")),
+    [searchParams]
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const raw = searchParams.get("redirect");
+    if (raw) {
+      const path = getSafeRedirectPath(raw);
+      sessionStorage.setItem(POST_AUTH_REDIRECT_KEY, path);
+    } else {
+      sessionStorage.removeItem(POST_AUTH_REDIRECT_KEY);
+    }
+  }, [searchParams]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -24,7 +41,9 @@ export default function LoginForm() {
     try {
       const { error } = await signIn(email, password);
       if (error) throw error;
-      router.push("/");
+      if (typeof window !== "undefined") sessionStorage.removeItem(POST_AUTH_REDIRECT_KEY);
+      router.push(afterAuthPath);
+      replaceBrowserPathStripHash(afterAuthPath);
     } catch (err: any) {
       setError(err.message || "Failed to sign in");
     } finally {
@@ -79,7 +98,14 @@ export default function LoginForm() {
 
       <button
         type="button"
-        onClick={() => router.push("/oauth/consent")}
+        onClick={() => {
+          const raw = searchParams.get("redirect");
+          router.push(
+            raw != null && raw !== ""
+              ? `/oauth/consent?redirect=${encodeURIComponent(getSafeRedirectPath(raw))}`
+              : "/oauth/consent"
+          );
+        }}
         disabled={loading}
         className="auth-google"
       >
@@ -88,7 +114,17 @@ export default function LoginForm() {
       </button>
 
       <p className="auth-footer">
-        Don&apos;t have an account? <Link href="/auth/signup">Sign up</Link>
+        Don&apos;t have an account?{" "}
+        <Link
+          href={(() => {
+            const raw = searchParams.get("redirect");
+            if (raw != null && raw !== "")
+              return `/auth/signup?redirect=${encodeURIComponent(getSafeRedirectPath(raw))}`;
+            return "/auth/signup";
+          })()}
+        >
+          Sign up
+        </Link>
       </p>
     </div>
   );

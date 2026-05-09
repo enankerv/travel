@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/lib/AuthContext'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { GoogleIcon } from '@/components/icons'
+import { getSafeRedirectPath, POST_AUTH_REDIRECT_KEY } from '@/lib/safeRedirect'
 
 const TERMS_CONSENT_KEY = 'terms_consent_at'
 const TERMS_CONSENT_AGE_KEY = 'terms_consent_age'
@@ -36,6 +37,26 @@ export default function SignupForm() {
   const [error, setError] = useState('')
   const { signUp, signInWithGoogle } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  const afterSignupLoginHref = useMemo(() => {
+    const qs = new URLSearchParams({ message: 'Check your email to confirm' })
+    const safe = getSafeRedirectPath(searchParams.get('redirect'))
+    if (safe !== '/') qs.set('redirect', safe)
+    return `/auth/login?${qs.toString()}`
+  }, [searchParams])
+
+  const plainLoginHref = useMemo(() => {
+    const safe = getSafeRedirectPath(searchParams.get('redirect'))
+    if (safe !== '/') return `/auth/login?redirect=${encodeURIComponent(safe)}`
+    return '/auth/login'
+  }, [searchParams])
+
+  useEffect(() => {
+    const raw = searchParams.get('redirect')
+    if (typeof window === 'undefined' || !raw) return
+    sessionStorage.setItem(POST_AUTH_REDIRECT_KEY, getSafeRedirectPath(raw))
+  }, [searchParams])
 
   const ageFromDob = dob.trim() ? getAgeFromDOB(dob) : undefined
   const ageValid = ageFromDob !== undefined && ageFromDob >= 16
@@ -61,7 +82,7 @@ export default function SignupForm() {
     try {
       const { error } = await signUp(email, password)
       if (error) throw error
-      router.push('/auth/login?message=Check+your+email+to+confirm')
+      router.push(afterSignupLoginHref)
     } catch (err: any) {
       setError(err.message || 'Failed to sign up')
     } finally {
@@ -173,7 +194,7 @@ export default function SignupForm() {
       </button>
 
       <p className="auth-footer">
-        Already have an account? <Link href="/auth/login">Log in</Link>
+        Already have an account? <Link href={plainLoginHref}>Log in</Link>
       </p>
     </div>
   )
