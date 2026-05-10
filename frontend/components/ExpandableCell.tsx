@@ -84,8 +84,10 @@ export default function ExpandableCell({
         }
       >
         <span className="expandable-cell-inner expandable-cell-inner--wrap">
-          <span ref={textRef} className={wrapTextClass}>
-            {fullText}
+          <span className="expandable-cell-primary expandable-cell-primary--wrap">
+            <span ref={textRef} className={wrapTextClass}>
+              {fullText}
+            </span>
           </span>
           {suffix}
         </span>
@@ -116,8 +118,10 @@ export default function ExpandableCell({
   }
 
   const renderContent = () => {
-    if (fullText === '—') return '—'
-    if (!isLong) return fullText
+    if (fullText === '—')
+      return <span className="expandable-plain">—</span>
+    if (!isLong)
+      return <span className="expandable-plain">{fullText}</span>
     if (expanded) {
       return (
         <span className="expandable-content">
@@ -166,7 +170,7 @@ export default function ExpandableCell({
   return (
     <td className={className} onClick={handleCellClick} title={fullText}>
       <span className="expandable-cell-inner">
-        {renderContent()}
+        <span className="expandable-cell-primary">{renderContent()}</span>
         {suffix}
       </span>
       {subline != null && subline !== "" && (
