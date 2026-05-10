@@ -7,7 +7,7 @@
   --surface-hover: #2a2f38;
   --border: rgba(255, 255, 255, 0.06);
   --border-strong: rgba(255, 255, 255, 0.12);
-  --accent: #64d37c;
+  --accent: #f6fcc2;
   --accent-soft: rgba(164, 190, 243, 0.15);
   --accent-glow: rgba(164, 190, 243, 0.35);
   /* Text/icons on accent-filled controls (matches Scout / dropzone submit) */
@@ -3234,3 +3234,4 @@ button:focus-visible {
   color: var(--on-accent);
   border-radius: 7px;
 }
+
