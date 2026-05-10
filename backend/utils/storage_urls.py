@@ -1,61 +1,77 @@
-"""Generate signed URLs for Supabase Storage (private bucket).
-Uses user auth_token for RLS - never service role."""
-import re
+"""Generate signed URLs for getaway images stored in Supabase Storage.
 
-DEFAULT_BUCKET = "getaway-images"
-LEGACY_BUCKET = "villa-images"
+Single-bucket world: every getaway image lives in ``getaway-images`` as a
+relative storage path like ``<getaway_id>/00.jpg`` (see
+``utils.images.upload_images_to_supabase``). No full URLs, no legacy buckets,
+no per-row bucket detection — pass the paths straight to
+``create_signed_urls`` and we're done.
+
+Uses the user's auth token; RLS still applies (never service role).
+"""
+
+BUCKET = "getaway-images"
 EXPIRE_SEC = 3600  # 1 hour
 
-# Match Supabase storage URL: .../object/public|sign/BUCKET/path (path = no query string)
-_STORAGE_URL_RE = re.compile(r"/storage/v1/object/(?:public|sign)/([^/]+)/(.+?)(?:\?|$)")
 
-
-def _parse_storage_url(url_or_path: str) -> tuple[str, str] | None:
-    """If url_or_path is a Supabase storage URL, return (bucket, path). Else return None or (DEFAULT_BUCKET, path) for raw paths."""
-    if not url_or_path:
-        return None
-    if url_or_path.startswith("/images/"):
-        return None
-    if url_or_path.startswith("http"):
-        m = _STORAGE_URL_RE.search(url_or_path)
-        if m:
-            bucket, path = m.group(1), m.group(2)
-            return (bucket, path) if path else None
-        return None
-    if "/" in url_or_path:
-        return (DEFAULT_BUCKET, url_or_path)
-    return None
-
-
-def sign_image_paths(paths: list[str] | None, auth_token: str) -> list[str]:
-    """Convert storage paths (or old Supabase URLs) to signed URLs. Uses auth_token for RLS.
-    Supports both getaway-images and legacy villa-images bucket."""
+def _sign(paths: list[str], auth_token: str) -> list[str | None]:
+    """Sign ``paths`` in one Storage round trip. Returns a same-length list
+    with the signed URL at each position, or ``None`` if that path failed."""
     if not paths:
         return []
-    from db import get_supabase_client
+    # Lazy import: ``db/__init__.py`` imports ``db.getaways`` which imports
+    # this module, so importing ``db.client`` at top would deadlock.
+    from db.client import get_supabase_client
+
     client = get_supabase_client(auth_token)
-    if not client:
-        return paths
-    signed: list[str] = []
-    for p in paths:
-        parsed = _parse_storage_url(p)
-        if not parsed:
+    try:
+        results = client.storage.from_(BUCKET).create_signed_urls(paths, EXPIRE_SEC)
+    except Exception:
+        return [None] * len(paths)
+
+    out: list[str | None] = []
+    for res in results:
+        url = (
+            res.get("signedURL")
+            or res.get("signedUrl")
+            or res.get("signed_url")
+        )
+        out.append(url if url and not res.get("error") else None)
+    return out
+
+
+def sign_getaways_images(getaways: list[dict], auth_token: str) -> list[dict]:
+    """Replace each getaway's ``images`` paths with signed URLs.
+
+    Costs ONE ``POST /storage/v1/object/sign/getaway-images`` for the whole
+    batch, regardless of how many getaways or images are involved.
+    """
+    if not getaways:
+        return getaways
+
+    # Flatten paths across getaways, remembering which getaway each came from.
+    flat_paths: list[str] = []
+    origin_getaway: list[int] = []
+    for getaway_idx, getaway in enumerate(getaways):
+        for path in getaway.get("images") or []:
+            if not path:
+                continue
+            flat_paths.append(path)
+            origin_getaway.append(getaway_idx)
+
+    if not flat_paths:
+        return [{**g, "images": []} for g in getaways]
+
+    signed = _sign(flat_paths, auth_token)
+
+    # Reassemble per-getaway. Order within each getaway is preserved because
+    # we iterated each getaway's images in order when flattening.
+    images_by_getaway: dict[int, list[str]] = {}
+    for getaway_idx, signed_url in zip(origin_getaway, signed):
+        if signed_url is None:
             continue
-        bucket_name, storage_path = parsed
-        try:
-            bucket = client.storage.from_(bucket_name)
-            r = bucket.create_signed_url(storage_path, EXPIRE_SEC)
-            url = r.get("signed_url") or r.get("signedUrl") or p
-            signed.append(url)
-        except Exception:
-            signed.append(p)
-    return signed
+        images_by_getaway.setdefault(getaway_idx, []).append(signed_url)
 
-
-def sign_getaway_images(getaway: dict, auth_token: str) -> dict:
-    """Return getaway with images array replaced by signed URLs. Uses auth_token for RLS."""
-    if not getaway or "images" not in getaway:
-        return getaway
-    images = getaway.get("images") or []
-    getaway = {**getaway, "images": sign_image_paths(images, auth_token)}
-    return getaway
+    return [
+        {**getaway, "images": images_by_getaway.get(idx, [])}
+        for idx, getaway in enumerate(getaways)
+    ]

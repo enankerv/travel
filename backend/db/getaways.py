@@ -1,6 +1,7 @@
 """Getaways and getaway_images table operations."""
 import secrets
 from db.client import get_supabase_client
+from utils.storage_urls import sign_getaways_images
 
 
 def _attach_images_to_getaways(rows: list[dict]) -> list[dict]:
@@ -30,7 +31,12 @@ def insert_getaway(list_id: str, user_id: str, getaway_data: dict, auth_token: s
 
 
 def get_list_getaways(list_id: str, auth_token: str) -> list[dict]:
-    """Get all getaways in a list, with images from getaway_images."""
+    """Get all getaways in a list, with ``images`` populated as signed URLs.
+
+    Storage paths from ``getaway_images`` are converted to time-limited signed
+    URLs in a single batched Storage call so callers receive client-ready
+    data without orchestrating the signing step.
+    """
     client = get_supabase_client(auth_token)
     response = (
         client.table("getaways")
@@ -39,12 +45,12 @@ def get_list_getaways(list_id: str, auth_token: str) -> list[dict]:
         .order("created_at", desc=True)
         .execute()
     )
-    rows = response.data or []
-    return _attach_images_to_getaways(rows)
+    rows = _attach_images_to_getaways(response.data or [])
+    return sign_getaways_images(rows, auth_token)
 
 
 def get_getaway_by_slug(list_id: str, slug: str, auth_token: str) -> dict:
-    """Get a specific getaway by slug in a list."""
+    """Get one getaway by slug, with ``images`` populated as signed URLs."""
     client = get_supabase_client(auth_token)
     response = (
         client.table("getaways")
@@ -56,7 +62,7 @@ def get_getaway_by_slug(list_id: str, slug: str, auth_token: str) -> dict:
     if not response.data:
         return None
     rows = _attach_images_to_getaways([response.data[0]])
-    return rows[0]
+    return sign_getaways_images(rows, auth_token)[0]
 
 
 def update_getaway(getaway_id: str, updates: dict, auth_token: str) -> dict:

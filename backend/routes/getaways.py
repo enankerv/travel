@@ -37,12 +37,10 @@ def _apply_geocode_if_location_changed(current: dict, updates: dict) -> None:
 
 @router.get("/{list_id}/getaways", response_model=list[GetawayResponse])
 async def get_getaways_endpoint(list_id: str, authorization: Optional[str] = Header(None)):
-    """Get all getaways in a list. Image paths are signed for private bucket access."""
+    """Get all getaways in a list (images returned as signed URLs)."""
     try:
-        from utils.storage_urls import sign_getaway_images
         token = extract_auth_token(authorization)
-        getaways = get_list_getaways(list_id, token)
-        return [sign_getaway_images(g, token) for g in getaways]
+        return get_list_getaways(list_id, token)
     except HTTPException:
         raise
     except Exception as e:
@@ -58,7 +56,6 @@ async def update_getaway_endpoint(
 ):
     """Update getaway fields allowed by the listing editor (extra body keys ignored)."""
     try:
-        from utils.storage_urls import sign_getaway_images
         token = extract_auth_token(authorization)
         current = get_getaway_by_slug(list_id, getaway_slug, token)
         if not current:
@@ -72,7 +69,7 @@ async def update_getaway_endpoint(
         if not result:
             raise HTTPException(status_code=404, detail="Getaway not found")
         full = get_getaway_by_slug(list_id, result.get("slug") or getaway_slug, token)
-        return {"ok": True, "getaway": sign_getaway_images(full or result, token)}
+        return {"ok": True, "getaway": full or result}
     except HTTPException:
         raise
     except Exception as e:
