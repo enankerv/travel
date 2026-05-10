@@ -12,7 +12,7 @@ export default function LoginForm() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const { signIn } = useAuth();
+  const { signIn, user, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const message = searchParams.get("message");
@@ -22,6 +22,15 @@ export default function LoginForm() {
     () => getSafeRedirectPath(searchParams.get("redirect")),
     [searchParams]
   );
+
+  // Already signed in? Skip the form and send them straight to ?redirect=...
+  // (or the default landing page). ``replace`` so the back button doesn't
+  // bounce the user back to a login screen they can't use.
+  useEffect(() => {
+    if (authLoading || !user) return;
+    if (typeof window !== "undefined") sessionStorage.removeItem(POST_AUTH_REDIRECT_KEY);
+    router.replace(afterAuthPath);
+  }, [authLoading, user, afterAuthPath, router]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -49,6 +58,12 @@ export default function LoginForm() {
     } finally {
       setLoading(false);
     }
+  }
+
+  // Don't flash the login form while we're checking the session or while the
+  // already-signed-in redirect above is in flight.
+  if (authLoading || user) {
+    return <div className="auth-card">Loading...</div>;
   }
 
   return (
