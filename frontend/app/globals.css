@@ -274,6 +274,12 @@ button:focus-visible {
   flex-shrink: 0;
 }
 
+.getaway-mobile-card__vote-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
 .getaway-mobile-card__like-btn {
   background: none;
   border: none;
@@ -281,6 +287,17 @@ button:focus-visible {
   cursor: pointer;
   color: var(--muted);
   border-radius: 6px;
+}
+
+.getaway-mobile-card__like-btn--comment {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.getaway-mobile-card__comment-count {
+  font-size: 0.75rem;
+  line-height: 1;
 }
 
 .getaway-mobile-card__like-btn.voted {

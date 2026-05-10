@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useListDetailContext } from "@/lib/ListDetailContext";
 import { formatPerPersonLine } from "@/lib/pricePerPerson";
 import { useSignedImageUrls } from "@/hooks/useSignedImageUrls";
@@ -26,16 +26,19 @@ export default function GetawayDetailSheet({
   onClose,
   onDelete,
   onUpdate,
+  scrollToCommentsOnOpen = false,
 }: {
   getaway: any;
   onClose: () => void;
   onDelete?: (getawayId: string) => void;
   onUpdate?: (getawayId: string, updates: any) => void;
+  scrollToCommentsOnOpen?: boolean;
 }) {
   const { partySize } = useListDetailContext();
   const signedUrls = useSignedImageUrls(getaway?.images || []);
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<any>(() => ({ ...getaway }));
+  const commentsSectionRef = useRef<HTMLDivElement | null>(null);
 
   if (!getaway) return null;
 
@@ -77,6 +80,17 @@ export default function GetawayDetailSheet({
       onClose();
     }
   };
+
+  useEffect(() => {
+    if (!scrollToCommentsOnOpen || isEditing) return;
+    const id = window.setTimeout(() => {
+      commentsSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 50);
+    return () => window.clearTimeout(id);
+  }, [getaway?.id, isEditing, scrollToCommentsOnOpen]);
 
   return (
     <div className="getaway-detail-sheet" role="dialog" aria-modal="true">
@@ -231,7 +245,9 @@ export default function GetawayDetailSheet({
                 )}
               </div>
 
-              <InlineComments getawayId={getaway.id} />
+              <div ref={commentsSectionRef}>
+                <InlineComments getawayId={getaway.id} />
+              </div>
             </>
           )}
         </div>

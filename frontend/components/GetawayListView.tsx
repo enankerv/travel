@@ -26,9 +26,18 @@ export default function GetawayListView({
   onCommentClick: (getawayId: string) => void;
 }) {
   const isMobile = useIsMobile();
-  const { getaways, votesByGetaway, isListMember, currentUserId, onVote, onUnvote } =
+  const {
+    getaways,
+    votesByGetaway,
+    commentsByGetaway,
+    isListMember,
+    currentUserId,
+    onVote,
+    onUnvote,
+  } =
     useListDetailContext();
   const [detailGetaway, setDetailGetaway] = useState<any>(null);
+  const [detailScrollToComments, setDetailScrollToComments] = useState(false);
 
   if (isMobile) {
     return (
@@ -51,12 +60,18 @@ export default function GetawayListView({
               canVote={isListMember}
               onVote={onVote}
               onUnvote={onUnvote}
+              commentsByGetaway={commentsByGetaway}
               onCardClick={(g) => {
+                setDetailScrollToComments(false);
                 if (g.import_status === "thin" || g.import_status === "error") {
                   onPasteClick(g);
                 } else {
                   setDetailGetaway(g);
                 }
+              }}
+              onCommentClick={(g) => {
+                setDetailGetaway(g);
+                setDetailScrollToComments(true);
               }}
             />
             </>
@@ -65,9 +80,13 @@ export default function GetawayListView({
         {detailGetaway && (
           <GetawayDetailSheet
             getaway={detailGetaway}
-            onClose={() => setDetailGetaway(null)}
+            onClose={() => {
+              setDetailGetaway(null);
+              setDetailScrollToComments(false);
+            }}
             onDelete={onDelete}
             onUpdate={onUpdate}
+            scrollToCommentsOnOpen={detailScrollToComments}
           />
         )}
       </>

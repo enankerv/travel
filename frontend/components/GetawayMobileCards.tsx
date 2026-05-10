@@ -3,7 +3,7 @@
 import { useSignedImageUrls } from "@/hooks/useSignedImageUrls";
 import { useListDetailContext } from "@/lib/ListDetailContext";
 import { formatPerPersonLine } from "@/lib/pricePerPerson";
-import { ThumbsUpIcon } from "./icons";
+import { CommentIcon, ThumbsUpIcon } from "./icons";
 
 function formatListingPrice(price: number | null | undefined, currency?: string | null) {
   if (price == null) return "—";
@@ -19,14 +19,18 @@ export default function GetawayMobileCards({
   onVote,
   onUnvote,
   onCardClick,
+  onCommentClick,
+  commentsByGetaway,
 }: {
   getaways: any[];
   votesByGetaway?: Record<string, { user_id: string; first_name?: string; avatar_url?: string }[]>;
+  commentsByGetaway?: Record<string, any[]>;
   currentUserId?: string;
   canVote?: boolean;
   onVote?: (getawayId: string) => void;
   onUnvote?: (getawayId: string) => void;
   onCardClick: (getaway: any) => void;
+  onCommentClick?: (getaway: any) => void;
 }) {
   const { partySize } = useListDetailContext();
 
@@ -54,6 +58,8 @@ export default function GetawayMobileCards({
           onVote={() => onVote?.(getaway.id)}
           onUnvote={() => onUnvote?.(getaway.id)}
           onClick={() => onCardClick(getaway)}
+          onCommentClick={() => onCommentClick?.(getaway)}
+          commentCount={commentsByGetaway?.[getaway.id]?.length ?? 0}
         />
       ))}
     </div>
@@ -69,6 +75,8 @@ function GetawayMobileCard({
   onVote,
   onUnvote,
   onClick,
+  onCommentClick,
+  commentCount,
 }: {
   getaway: any;
   partySize: number;
@@ -78,6 +86,8 @@ function GetawayMobileCard({
   onVote: () => void;
   onUnvote: () => void;
   onClick: () => void;
+  onCommentClick?: () => void;
+  commentCount: number;
 }) {
   const signedUrls = useSignedImageUrls(getaway?.images || []);
   const thumbUrl = signedUrls[0];
@@ -152,18 +162,35 @@ function GetawayMobileCard({
           )}
         </div>
         <div className="getaway-mobile-card__likes" onClick={(e) => e.stopPropagation()}>
-          {canVote && (
+          {onCommentClick && (
             <button
               type="button"
-              className={`getaway-mobile-card__like-btn ${myVote ? "voted" : ""}`}
-              onClick={() => (myVote ? onUnvote() : onVote())}
-              aria-label={myVote ? "Remove vote" : "Vote"}
+              className="getaway-mobile-card__like-btn getaway-mobile-card__like-btn--comment"
+              onClick={() => onCommentClick()}
+              aria-label="Comments"
             >
-              <ThumbsUpIcon size={18} filled={!!myVote} />
+              <CommentIcon size={18} />
+              {commentCount > 0 && (
+                <span className="getaway-mobile-card__comment-count">{commentCount}</span>
+              )}
             </button>
           )}
-          {voters.length > 0 && (
-            <span className="getaway-mobile-card__like-count">{voters.length}</span>
+          {(canVote || voters.length > 0) && (
+            <div className="getaway-mobile-card__vote-group">
+              {canVote && (
+                <button
+                  type="button"
+                  className={`getaway-mobile-card__like-btn ${myVote ? "voted" : ""}`}
+                  onClick={() => (myVote ? onUnvote() : onVote())}
+                  aria-label={myVote ? "Remove vote" : "Vote"}
+                >
+                  <ThumbsUpIcon size={18} filled={!!myVote} />
+                </button>
+              )}
+              {voters.length > 0 && (
+                <span className="getaway-mobile-card__like-count">{voters.length}</span>
+              )}
+            </div>
           )}
         </div>
       </div>
