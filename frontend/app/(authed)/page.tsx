@@ -1,21 +1,18 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '@/lib/AuthContext'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { getLists, createList } from '@/lib/api'
 import ListsView, { type ListItem } from '@/components/ListsView'
 import ListDetailView from '@/components/ListDetailView'
 import { setLastListId } from '@/lib/lastListStorage'
-import TermsConsentModal from '@/components/TermsConsentModal'
 import CreateListModal from '@/components/CreateListModal'
 import BookmarkletPasteModal from '@/components/BookmarkletPasteModal'
-import AuthDeniedView from '@/components/AuthDeniedView'
 import LoadingView from '@/components/LoadingView'
-import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
 
-function HomeContent() {
-  const { user, loading: authLoading, signOut } = useAuth()
+export default function HomePage() {
+  const { user, signOut } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const listParam = searchParams.get('list')
@@ -25,11 +22,6 @@ function HomeContent() {
   const [selectedListId, setSelectedListId] = useState<string | null>(null)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [error, setError] = useState('')
-  const [allowlistDenied, setAllowlistDenied] = useState(false)
-  const [showTermsModal, setShowTermsModal] = useState(false)
-  const [termsIsReAccept, setTermsIsReAccept] = useState(false)
-  const [termsRequiresAge, setTermsRequiresAge] = useState(false)
-  const [underAgeDenied, setUnderAgeDenied] = useState(false)
   const [showBookmarkletModal, setShowBookmarkletModal] = useState(false)
 
   useEffect(() => {
@@ -61,34 +53,9 @@ function HomeContent() {
     [listParam, router]
   )
 
-  const onTermsNeeded = useCallback(
-    ({ isReAccept, requiresAge }: { isReAccept: boolean; requiresAge: boolean }) => {
-      setTermsIsReAccept(isReAccept)
-      setTermsRequiresAge(requiresAge)
-      setShowTermsModal(true)
-    },
-    []
-  )
-
-  useAuthBootstrap({
-    user,
-    authLoading,
-    signOut,
-    allowlistDenied,
-    underAgeDenied,
-    onReady: loadLists,
-    onTermsNeeded,
-    onAllowlistDenied: () => setAllowlistDenied(true),
-    onUnderAgeDenied: () => setUnderAgeDenied(true),
-    onError: setError,
-    onLoadingChange: setIsLoading,
-  })
-
   useEffect(() => {
-    if (!authLoading && !user && !allowlistDenied && !underAgeDenied) {
-      router.push('/auth/login')
-    }
-  }, [authLoading, user, allowlistDenied, underAgeDenied, router])
+    void loadLists()
+  }, [loadLists])
 
   useEffect(() => {
     if (listParam && lists.some((l) => l.id === listParam)) {
@@ -122,58 +89,11 @@ function HomeContent() {
     setLists((prev) => [...prev, list])
   }
 
-  if (authLoading || isLoading) {
-    return (
-      <LoadingView message={authLoading ? 'Checking session…' : 'Loading your lists…'} />
-    )
+  if (isLoading) {
+    return <LoadingView message="Loading your lists…" />
   }
 
-  if (allowlistDenied) {
-    return (
-      <AuthDeniedView
-        title="You're not on the invite list yet"
-        message="This app is currently invite-only. Ask the owner to add your email."
-        onAction={() => router.push('/auth/login')}
-      />
-    )
-  }
-
-  if (underAgeDenied) {
-    return (
-      <AuthDeniedView
-        title="You must be 16+ to use GetawayGather"
-        message="GetawayGather requires users to be at least 16 years old."
-        onAction={() => {
-          signOut()
-          setUnderAgeDenied(false)
-          router.push('/auth/login')
-        }}
-      />
-    )
-  }
-
-  if (!user) return null
-
-  if (showTermsModal) {
-    return (
-      <TermsConsentModal
-        isReAccept={termsIsReAccept}
-        requiresAge={termsRequiresAge}
-        onAccepted={() => {
-          setShowTermsModal(false)
-          setIsLoading(true)
-          loadLists()
-        }}
-        onUnderAge={() => {
-          setShowTermsModal(false)
-          setUnderAgeDenied(true)
-          signOut()
-        }}
-      />
-    )
-  }
-
-  const selectedList = lists.find(l => l.id === selectedListId)
+  const selectedList = lists.find((l) => l.id === selectedListId)
 
   return (
     <div className="app">
@@ -228,13 +148,5 @@ function HomeContent() {
         />
       )}
     </div>
-  )
-}
-
-export default function Home() {
-  return (
-    <Suspense fallback={<LoadingView />}>
-      <HomeContent />
-    </Suspense>
   )
 }

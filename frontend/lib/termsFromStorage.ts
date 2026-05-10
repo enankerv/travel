@@ -7,7 +7,12 @@ export type TermsCheckResult =
   | { needsModal: true; isReAccept: boolean; requiresAge: boolean }
 
 /**
- * Check if user needs to accept terms, and whether we can use recent localStorage consent.
+ * Decide whether the gate must show the Terms / age modal, taking a recent
+ * localStorage consent into account so we don't re-prompt within 10 minutes.
+ *
+ * The user must have BOTH: a fresh terms acceptance (>= TERMS_UPDATED_AT) AND
+ * an `age_verified_at`. Either being missing means we need a modal (or a silent
+ * accept if localStorage has a usable consent).
  */
 export function checkTermsFromProfile(profile: {
   terms_accepted_at?: string | null
@@ -20,33 +25,44 @@ export function checkTermsFromProfile(profile: {
   const needsAcceptance = !profile?.terms_accepted_at || acceptedAt < termsUpdatedAt
   const needsAge = !profile?.age_verified_at
 
-  if (!needsAcceptance) {
+  if (!needsAcceptance && !needsAge) {
     return { needsModal: false }
   }
 
+  const modalResult: TermsCheckResult = {
+    needsModal: true,
+    /* "Terms Updated" copy only when the user previously accepted but the
+       version is now stale. Missing-age-only goes through the normal copy. */
+    isReAccept: !!profile?.terms_accepted_at && needsAcceptance,
+    requiresAge: needsAge,
+  }
+
   if (typeof window === 'undefined') {
-    return { needsModal: true, isReAccept: !!profile?.terms_accepted_at, requiresAge: needsAge }
+    return modalResult
   }
 
   const consentAt = localStorage.getItem('terms_consent_at')
   const consentAge = localStorage.getItem('terms_consent_age')
   if (!consentAt) {
-    return { needsModal: true, isReAccept: !!profile?.terms_accepted_at, requiresAge: needsAge }
+    return modalResult
   }
 
   const consentTime = new Date(consentAt).getTime()
   const age = Date.now() - consentTime
-  if (age >= CONSENT_MAX_AGE_MS || consentTime < termsUpdatedAt) {
-    return { needsModal: true, isReAccept: !!profile?.terms_accepted_at, requiresAge: needsAge }
+  const consentFresh = age < CONSENT_MAX_AGE_MS && consentTime >= termsUpdatedAt
+  if (!consentFresh) {
+    return modalResult
   }
 
   const ageNum = consentAge ? parseInt(consentAge, 10) : undefined
-  if (needsAge && ageNum !== undefined && !isNaN(ageNum) && ageNum >= 16) {
-    return { needsModal: false, acceptWithAge: ageNum }
-  }
-  if (!needsAge) {
-    return { needsModal: false, acceptTermsOnly: true }
+  const ageOk = ageNum !== undefined && !isNaN(ageNum) && ageNum >= 16
+
+  if (needsAge) {
+    if (ageOk) {
+      return { needsModal: false, acceptWithAge: ageNum }
+    }
+    return modalResult
   }
 
-  return { needsModal: true, isReAccept: !!profile?.terms_accepted_at, requiresAge: needsAge }
+  return { needsModal: false, acceptTermsOnly: true }
 }
