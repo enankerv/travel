@@ -1,11 +1,13 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { useListDetailContext } from '@/lib/ListDetailContext'
 import { useResizableColumns } from '@/hooks/useResizableColumns'
 import GetawayRow from './GetawayRow'
 import ColumnPopover from './ColumnPopover'
 import PartySizeControls from './PartySizeControls'
+import GetawaySortSelect from './GetawaySortSelect'
+import { sortGetaways, type GetawaySortOption } from '@/lib/sortGetaways'
 import {
   COLUMN_BY_KEY,
   COLUMN_KEYS,
@@ -33,8 +35,14 @@ export default function GetawayTable({
   const [editingId, setEditingId] = useState(null)
   const [visibleColumns, setVisibleColumns] = useState<VisibleColumns>(DEFAULT_VISIBLE)
   const [showColumnMenu, setShowColumnMenu] = useState(false)
+  const [sortOption, setSortOption] = useState<GetawaySortOption>('votes-desc')
   const triggerRef = useRef<HTMLButtonElement>(null)
   const { getColStyle, startResize } = useResizableColumns<ColumnKey>()
+
+  const sortedGetaways = useMemo(
+    () => sortGetaways(getaways || [], votesByGetaway ?? {}, sortOption),
+    [getaways, votesByGetaway, sortOption],
+  )
 
   const handleEditStart = (getawayId: any) => {
     setEditingId(getawayId)
@@ -76,6 +84,11 @@ export default function GetawayTable({
     <div className="sheet-wrap" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
       <div className="sheet-toolbar">
         <PartySizeControls />
+        <GetawaySortSelect
+          id="getaway-sort-table"
+          value={sortOption}
+          onChange={setSortOption}
+        />
         <button
           ref={triggerRef}
           type="button"
@@ -118,7 +131,7 @@ export default function GetawayTable({
             </tr>
           </thead>
           <tbody>
-            {getaways.map((getaway: any) => (
+            {sortedGetaways.map((getaway: any) => (
               <GetawayRow
                 key={getaway.id}
                 getaway={getaway}

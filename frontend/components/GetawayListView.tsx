@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useListDetailContext } from "@/lib/ListDetailContext";
+import { sortGetaways, type GetawaySortOption } from "@/lib/sortGetaways";
 import GetawayTable from "./GetawayTable";
 import GetawayMobileCards from "./GetawayMobileCards";
 import PartySizeControls from "./PartySizeControls";
+import GetawaySortSelect from "./GetawaySortSelect";
 import GetawayDetailSheet from "./GetawayDetailSheet";
 
 export default function GetawayListView({
@@ -38,6 +40,14 @@ export default function GetawayListView({
     useListDetailContext();
   const [detailGetaway, setDetailGetaway] = useState<any>(null);
   const [detailScrollToComments, setDetailScrollToComments] = useState(false);
+  const [mobileSortOption, setMobileSortOption] =
+    useState<GetawaySortOption>("votes-desc");
+
+  const sortedMobileGetaways = useMemo(
+    () =>
+      sortGetaways(getaways || [], votesByGetaway ?? {}, mobileSortOption),
+    [getaways, votesByGetaway, mobileSortOption],
+  );
 
   if (isMobile) {
     return (
@@ -52,9 +62,15 @@ export default function GetawayListView({
             <>
               <div className="getaway-list-mobile__party-wrap">
                 <PartySizeControls />
+                <GetawaySortSelect
+                  id="getaway-sort-mobile"
+                  className="getaway-list-mobile__sort"
+                  value={mobileSortOption}
+                  onChange={setMobileSortOption}
+                />
               </div>
               <GetawayMobileCards
-              getaways={getaways}
+              getaways={sortedMobileGetaways}
               votesByGetaway={votesByGetaway}
               currentUserId={currentUserId}
               canVote={isListMember}
