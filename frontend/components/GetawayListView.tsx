@@ -60,16 +60,14 @@ export default function GetawayListView({
             </div>
           ) : (
             <>
-              <div className="getaway-list-mobile__party-outer">
-                <div className="getaway-list-mobile__party-wrap">
-                  <PartySizeControls />
-                  <GetawaySortSelect
-                    id="getaway-sort-mobile"
-                    className="getaway-list-mobile__sort"
-                    value={mobileSortOption}
-                    onChange={setMobileSortOption}
-                  />
-                </div>
+              <div className="getaway-list-mobile__party-wrap">
+                <PartySizeControls />
+                <GetawaySortSelect
+                  id="getaway-sort-mobile"
+                  className="getaway-list-mobile__sort"
+                  value={mobileSortOption}
+                  onChange={setMobileSortOption}
+                />
               </div>
               <GetawayMobileCards
               getaways={sortedMobileGetaways}

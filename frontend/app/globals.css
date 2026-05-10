@@ -131,16 +131,8 @@ button:focus-visible {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   padding: 0 1rem 1rem;
-}
-
-.getaway-list-mobile__party-outer {
-  container-type: inline-size;
-  container-name: getaway-party;
-  width: calc(100% + 2rem);
-  margin-left: -1rem;
-  margin-right: -1rem;
-  margin-bottom: 0.35rem;
 }
 
 .getaway-list-mobile__party-wrap {
@@ -151,7 +143,10 @@ button:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 0.65rem 0.75rem;
-  width: 100%;
+  width: calc(100% + 2rem);
+  margin-left: -1rem;
+  margin-right: -1rem;
+  margin-bottom: 0.35rem;
   padding: 0.5rem 1rem 0.65rem;
   border-bottom: 1px solid var(--border);
 }
@@ -174,7 +169,8 @@ button:focus-visible {
   min-width: 0;
 }
 
-@container getaway-party (max-width: 24rem) {
+/* Viewport-based stack: avoids container-query + scrollbar width toggling (looked like constant “spinning”). */
+@media (max-width: 480px) {
   .getaway-list-mobile__party-wrap {
     flex-direction: column;
     align-items: stretch;
@@ -197,34 +193,6 @@ button:focus-visible {
   .getaway-list-mobile__sort .sheet-toolbar-sort__select {
     flex: 1 1 auto;
     max-width: none;
-  }
-}
-
-@supports not (container-type: inline-size) {
-  @media (max-width: 380px) {
-    .getaway-list-mobile__party-wrap {
-      flex-direction: column;
-      align-items: stretch;
-      flex-wrap: nowrap;
-      gap: 0.65rem;
-    }
-
-    .getaway-list-mobile__party-wrap .sheet-toolbar-party {
-      flex: 0 0 auto;
-      width: 100%;
-    }
-
-    .getaway-list-mobile__sort {
-      flex: 0 0 auto;
-      width: 100%;
-      min-width: 0;
-      justify-content: space-between;
-    }
-
-    .getaway-list-mobile__sort .sheet-toolbar-sort__select {
-      flex: 1 1 auto;
-      max-width: none;
-    }
   }
 }
 
