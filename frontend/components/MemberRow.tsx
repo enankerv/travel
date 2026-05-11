@@ -5,9 +5,20 @@ export type MemberRowProps = {
   profile?: { first_name?: string; avatar_url?: string };
   role: string;
   subtitle: string;
+  onRemove?: () => void;
+  removeLabel?: string;
+  isRemoving?: boolean;
 };
 
-export default function MemberRow({ user_id, profile, role, subtitle }: MemberRowProps) {
+export default function MemberRow({
+  user_id,
+  profile,
+  role,
+  subtitle,
+  onRemove,
+  removeLabel = "Remove",
+  isRemoving,
+}: MemberRowProps) {
   const displayName = profile?.first_name || user_id.slice(0, 8) + "…";
   return (
     <div className="member-row">
@@ -26,7 +37,19 @@ export default function MemberRow({ user_id, profile, role, subtitle }: MemberRo
           <p className="member-row__subtitle">{subtitle}</p>
         </div>
       </div>
-      <span className="member-row__role">{role}</span>
+      <div className="member-row__meta">
+        <span className="member-row__role">{role}</span>
+        {onRemove && (
+          <button
+            type="button"
+            className="member-row__remove"
+            disabled={isRemoving}
+            onClick={onRemove}
+          >
+            {isRemoving ? "Removing…" : removeLabel}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

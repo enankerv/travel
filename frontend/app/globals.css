@@ -2422,6 +2422,13 @@ button:focus-visible {
   font-size: 0.8rem;
 }
 
+.member-row__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
 .member-row__role {
   background: var(--accent-soft);
   color: var(--accent);
@@ -2430,6 +2437,29 @@ button:focus-visible {
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: capitalize;
+}
+
+.member-row__remove {
+  background: transparent;
+  border: 1px solid var(--muted);
+  color: var(--muted);
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-family: inherit;
+  font-weight: 500;
+}
+
+.member-row__remove:hover:not(:disabled) {
+  color: var(--red);
+  border-color: var(--red);
+  background: var(--red-soft);
+}
+
+.member-row__remove:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 /* List detail view (header + tabs + content) */

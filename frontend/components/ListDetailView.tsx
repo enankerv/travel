@@ -269,6 +269,7 @@ export default function ListDetailView({
             currentUserId={user?.id}
             onBack={onBack}
             onError={setError}
+            onMembersChanged={() => loadData(true)}
           />
         )}
       </div>

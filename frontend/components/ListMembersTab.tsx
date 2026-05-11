@@ -11,6 +11,7 @@ type ListMembersTabProps = {
   currentUserId: string | undefined;
   onBack: () => void;
   onError: (message: string) => void;
+  onMembersChanged?: () => void | Promise<void>;
 };
 
 export default function ListMembersTab({
@@ -19,9 +20,11 @@ export default function ListMembersTab({
   currentUserId,
   onBack,
   onError,
+  onMembersChanged,
 }: ListMembersTabProps) {
   const [isLeaving, setIsLeaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [removingUserId, setRemovingUserId] = useState<string | null>(null);
 
   async function handleLeaveList() {
     if (!currentUserId) return;
@@ -57,6 +60,20 @@ export default function ListMembersTab({
     (a, b) => (b.is_creator ? 1 : 0) - (a.is_creator ? 1 : 0)
   );
 
+  async function handleRemoveMember(userId: string, displayLabel: string) {
+    if (!confirm(`Remove ${displayLabel} from this list? They can be added again with an invite link.`))
+      return;
+    setRemovingUserId(userId);
+    try {
+      await removeListMember(listId, userId);
+      await onMembersChanged?.();
+    } catch (err: any) {
+      onError(err.message || "Failed to remove member");
+    } finally {
+      setRemovingUserId(null);
+    }
+  }
+
   return (
     <div className="list-members-tab">
       {isOwner && <InviteLinkSection listId={listId} onError={onError} />}
@@ -64,21 +81,35 @@ export default function ListMembersTab({
       <div>
         <h3 className="list-members-tab__title">Members ({members.length})</h3>
         <div className="list-members-tab__list">
-          {sortedMembers.map((member: any) => (
-            <MemberRow
-              key={member.user_id}
-              user_id={member.user_id}
-              profile={member.profile}
-              role={member.is_creator ? "Owner" : member.role}
-              subtitle={
-                member.is_creator
-                  ? "Owner"
-                  : member.joined_at
-                    ? `Joined ${new Date(member.joined_at).toLocaleDateString()}`
-                    : "—"
-              }
-            />
-          ))}
+          {sortedMembers.map((member: any) => {
+            const displayLabel =
+              member.profile?.first_name?.trim() || `${member.user_id.slice(0, 8)}…`;
+            const canOwnerRemove =
+              isOwner &&
+              !member.is_creator &&
+              member.user_id !== currentUserId;
+            return (
+              <MemberRow
+                key={member.user_id}
+                user_id={member.user_id}
+                profile={member.profile}
+                role={member.is_creator ? "Owner" : member.role}
+                subtitle={
+                  member.is_creator
+                    ? "Owner"
+                    : member.joined_at
+                      ? `Joined ${new Date(member.joined_at).toLocaleDateString()}`
+                      : "—"
+                }
+                onRemove={
+                  canOwnerRemove
+                    ? () => handleRemoveMember(member.user_id, displayLabel)
+                    : undefined
+                }
+                isRemoving={removingUserId === member.user_id}
+              />
+            );
+          })}
         </div>
         {canLeave && (
           <div className="list-members-tab__leave">
