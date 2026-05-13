@@ -91,7 +91,7 @@ export default function ExpandableCell({
           </span>
           {suffix}
         </span>
-        {overflowing && (
+        {(overflowing || expanded) && (
           <button
             type="button"
             className="expandable-wrap-toggle"
