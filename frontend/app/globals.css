@@ -1292,9 +1292,13 @@ button:focus-visible {
 }
 
 .col-votes {
-  width: 110px;
-  min-width: 96px;
+  width: 9.5rem;
+  min-width: 8.25rem;
   vertical-align: middle;
+}
+
+.sheet td.col-votes {
+  overflow: visible;
 }
 
 .vote-cell {
@@ -1312,10 +1316,64 @@ button:focus-visible {
   flex-shrink: 0;
 }
 
-.vote-cell__like-count {
-  font-size: 0.85rem;
+/* Overlapping voter avatars — modest overlap, no hover UI */
+.vote-cell__face-pile {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.vote-cell__face-pile-inner {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.vote-cell__face-wrap {
+  --vote-face-size: 1.375rem;
+  --vote-face-back: var(--surface);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  /* ~38% underlap — clearly more face visible than the deep ~90% stack */
+  margin-left: calc(-0.38 * var(--vote-face-size));
+}
+
+.vote-cell__face-wrap:first-child {
+  margin-left: 0;
+}
+
+.vote-cell__face {
+  position: relative;
+  isolation: isolate;
+  box-sizing: border-box;
+  width: var(--vote-face-size);
+  height: var(--vote-face-size);
+  border-radius: 50%;
+  border: 2px solid var(--dark);
+  background: var(--vote-face-back);
+  overflow: hidden;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vote-cell__face-img {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  background-color: var(--vote-face-back);
+}
+
+.vote-cell__face-fallback {
+  font-size: 0.55rem;
+  font-weight: 600;
   color: var(--muted);
-  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
 .vote-cell__comment-count {
