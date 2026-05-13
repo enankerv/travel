@@ -260,6 +260,14 @@ button:focus-visible {
   transform: scale(0.98);
 }
 
+.getaway-mobile-card--loading {
+  cursor: default;
+}
+
+.getaway-mobile-card__delete-btn:hover {
+  color: var(--red);
+}
+
 .getaway-mobile-card__hero {
   aspect-ratio: 16/10;
   background: var(--dark-2);

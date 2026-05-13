@@ -1,14 +1,73 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useSignedImageUrls } from "@/hooks/useSignedImageUrls";
 import { useListDetailContext } from "@/lib/ListDetailContext";
 import { formatPerPersonLine } from "@/lib/pricePerPerson";
-import { CommentIcon, ThumbsUpIcon } from "./icons";
+import { CommentIcon, ThumbsUpIcon, TrashIcon } from "./icons";
 
 function formatListingPrice(price: number | null | undefined, currency?: string | null) {
   if (price == null) return "—";
   const sym = currency === "EUR" ? "€" : "$";
   return `${sym}${Number(price).toLocaleString()}`;
+}
+
+type PendingVariant = "loading" | "thin" | "error";
+
+const PENDING_CARD_MOD: Record<PendingVariant, string> = {
+  loading: "getaway-mobile-card--loading",
+  thin: "getaway-mobile-card--thin",
+  error: "getaway-mobile-card--error",
+};
+
+function PendingCardActions({
+  getawayId,
+  onDelete,
+}: {
+  getawayId: string;
+  onDelete?: (getawayId: string) => void;
+}) {
+  if (!onDelete) return null;
+  return (
+    <div className="getaway-mobile-card__likes" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        className="getaway-mobile-card__like-btn getaway-mobile-card__delete-btn"
+        onClick={() => onDelete(getawayId)}
+        aria-label="Delete listing"
+        title="Delete"
+      >
+        <TrashIcon size={18} />
+      </button>
+    </div>
+  );
+}
+
+/** Shared layout for loading / thin-scrape / error mobile cards (hero + body + optional delete). */
+function GetawayMobilePendingCard({
+  variant,
+  getawayId,
+  onDelete,
+  onCardClick,
+  hero,
+  children,
+}: {
+  variant: PendingVariant;
+  getawayId: string;
+  onDelete?: (getawayId: string) => void;
+  onCardClick?: () => void;
+  hero: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className={`getaway-mobile-card ${PENDING_CARD_MOD[variant]}`} onClick={onCardClick}>
+      <div className="getaway-mobile-card__hero">{hero}</div>
+      <div className="getaway-mobile-card__body">
+        <div className="getaway-mobile-card__body-main">{children}</div>
+        <PendingCardActions getawayId={getawayId} onDelete={onDelete} />
+      </div>
+    </div>
+  );
 }
 
 export default function GetawayMobileCards({
@@ -20,6 +79,7 @@ export default function GetawayMobileCards({
   onUnvote,
   onCardClick,
   onCommentClick,
+  onDelete,
   commentsByGetaway,
 }: {
   getaways: any[];
@@ -31,6 +91,7 @@ export default function GetawayMobileCards({
   onUnvote?: (getawayId: string) => void;
   onCardClick: (getaway: any) => void;
   onCommentClick?: (getaway: any) => void;
+  onDelete?: (getawayId: string) => void;
 }) {
   const { partySize } = useListDetailContext();
 
@@ -59,6 +120,7 @@ export default function GetawayMobileCards({
           onUnvote={() => onUnvote?.(getaway.id)}
           onClick={() => onCardClick(getaway)}
           onCommentClick={() => onCommentClick?.(getaway)}
+          onDelete={onDelete}
           commentCount={commentsByGetaway?.[getaway.id]?.length ?? 0}
         />
       ))}
@@ -76,6 +138,7 @@ function GetawayMobileCard({
   onUnvote,
   onClick,
   onCommentClick,
+  onDelete,
   commentCount,
 }: {
   getaway: any;
@@ -87,6 +150,7 @@ function GetawayMobileCard({
   onUnvote: () => void;
   onClick: () => void;
   onCommentClick?: () => void;
+  onDelete?: (getawayId: string) => void;
   commentCount: number;
 }) {
   const signedUrls = useSignedImageUrls(getaway?.images || []);
@@ -100,43 +164,47 @@ function GetawayMobileCard({
 
   if (getaway.import_status === "loading") {
     return (
-      <div className="getaway-mobile-card getaway-mobile-card--loading">
-        <div className="getaway-mobile-card__hero">
-          <div className="spinner" />
-        </div>
-        <div className="getaway-mobile-card__body">
-          <span className="getaway-mobile-card__name">Processing…</span>
-        </div>
-      </div>
+      <GetawayMobilePendingCard
+        variant="loading"
+        getawayId={getaway.id}
+        onDelete={onDelete}
+        hero={<div className="spinner" />}
+      >
+        <span className="getaway-mobile-card__name">Processing…</span>
+      </GetawayMobilePendingCard>
     );
   }
 
   if (getaway.import_status === "thin") {
     return (
-      <div className="getaway-mobile-card getaway-mobile-card--thin" onClick={onClick}>
-        <div className="getaway-mobile-card__hero">
-          <div className="getaway-mobile-card__hero-placeholder">⚠️</div>
-        </div>
-        <div className="getaway-mobile-card__body">
-          <span className="getaway-mobile-card__name">Tap to paste details</span>
-          <span style={{ fontSize: "0.8rem", color: "var(--muted)", display: "block", marginTop: "0.2rem" }}>
-            No credit used
-          </span>
-        </div>
-      </div>
+      <GetawayMobilePendingCard
+        variant="thin"
+        getawayId={getaway.id}
+        onDelete={onDelete}
+        onCardClick={onClick}
+        hero={<div className="getaway-mobile-card__hero-placeholder">⚠️</div>}
+      >
+        <span className="getaway-mobile-card__name">Tap to paste details</span>
+        <span
+          style={{ fontSize: "0.8rem", color: "var(--muted)", display: "block", marginTop: "0.2rem" }}
+        >
+          No credit used
+        </span>
+      </GetawayMobilePendingCard>
     );
   }
 
   if (getaway.import_status === "error") {
     return (
-      <div className="getaway-mobile-card getaway-mobile-card--error" onClick={onClick}>
-        <div className="getaway-mobile-card__hero">
-          <div className="getaway-mobile-card__hero-placeholder">❌</div>
-        </div>
-        <div className="getaway-mobile-card__body">
-          <span className="getaway-mobile-card__name">Error — tap to retry</span>
-        </div>
-      </div>
+      <GetawayMobilePendingCard
+        variant="error"
+        getawayId={getaway.id}
+        onDelete={onDelete}
+        onCardClick={onClick}
+        hero={<div className="getaway-mobile-card__hero-placeholder">❌</div>}
+      >
+        <span className="getaway-mobile-card__name">Error — tap to retry</span>
+      </GetawayMobilePendingCard>
     );
   }
 

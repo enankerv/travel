@@ -89,6 +89,7 @@ export default function GetawayListView({
                 setDetailGetaway(g);
                 setDetailScrollToComments(true);
               }}
+              onDelete={onDelete}
             />
             </>
           )}
