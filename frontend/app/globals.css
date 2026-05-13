@@ -1347,14 +1347,17 @@ button:focus-visible {
   color: var(--accent);
 }
 
+/* Image column: % width scales with table; drag-resize sets <col> px and thumb fills cell */
+.sheet col.col-thumb,
 .col-thumb {
-  width: 58px;
-  min-width: 58px;
+  width: 10%;
+  min-width: 4.5rem;
 }
 .sheet thead th.col-thumb,
 .sheet td.col-thumb {
-  padding-left: 0.4rem;
-  padding-right: 0.4rem;
+  padding-left: 0.45rem;
+  padding-right: 0.45rem;
+  box-sizing: border-box;
 }
 
 .col-name {
@@ -1741,31 +1744,37 @@ button:focus-visible {
   }
 }
 
-/* Thumbnail */
+/* Thumbnail — fills .col-thumb; 16:10; grows/shrinks with column (incl. resize handle) */
+.thumb-link {
+  cursor: pointer;
+  position: relative;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+
 .thumb {
-  width: 44px;
-  height: 44px;
-  border-radius: 6px;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 10;
+  border-radius: 8px;
   object-fit: cover;
   display: block;
   background: var(--surface);
 }
 
 .thumb-placeholder {
-  width: 44px;
-  height: 44px;
-  border-radius: 6px;
+  box-sizing: border-box;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 10;
+  border-radius: 8px;
   background: var(--surface);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--muted);
   font-size: 1rem;
-}
-
-.thumb-link {
-  cursor: pointer;
-  position: relative;
 }
 
 .thumb-link::after {
