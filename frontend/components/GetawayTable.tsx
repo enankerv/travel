@@ -8,6 +8,7 @@ import ColumnPopover from './ColumnPopover'
 import PartySizeControls from './PartySizeControls'
 import GetawaySortSelect from './GetawaySortSelect'
 import { sortGetaways, type GetawaySortOption } from '@/lib/sortGetaways'
+import { votesColumnMinWidthRem } from '@/lib/votesColumnLayout'
 import {
   COLUMN_BY_KEY,
   COLUMN_KEYS,
@@ -42,6 +43,25 @@ export default function GetawayTable({
   const sortedGetaways = useMemo(
     () => sortGetaways(getaways || [], votesByGetaway ?? {}, sortOption),
     [getaways, votesByGetaway, sortOption],
+  )
+
+  const maxVoteCount = useMemo(
+    () =>
+      sortedGetaways.reduce(
+        (m, g) => Math.max(m, votesByGetaway?.[g.id]?.length ?? 0),
+        0,
+      ),
+    [sortedGetaways, votesByGetaway],
+  )
+
+  const votesColMinWidth = useMemo(
+    () =>
+      votesColumnMinWidthRem({
+        voteCount: maxVoteCount,
+        canVote: !!isListMember,
+        hasCommentButton: !!onCommentClick,
+      }),
+    [maxVoteCount, isListMember, onCommentClick],
   )
 
   const handleEditStart = (getawayId: any) => {
@@ -83,7 +103,7 @@ export default function GetawayTable({
   return (
     <div
       className="sheet-wrap"
-      style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}
+      style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0 }}
     >
       <div className="sheet-toolbar">
         <PartySizeControls />
@@ -112,9 +132,20 @@ export default function GetawayTable({
       <div className="sheet-scroll sheet-scroll--fill">
         <table className="sheet">
           <colgroup>
-            {getVisibleColumnKeys(visibleColumns).map((key) => (
-              <col key={key} className={COLUMN_BY_KEY[key].className} style={getColStyle(key)} />
-            ))}
+            {getVisibleColumnKeys(visibleColumns).map((key) => {
+              const base = getColStyle(key)
+              const voteMin =
+                key === 'votes' && votesColMinWidth
+                  ? { minWidth: votesColMinWidth }
+                  : undefined
+              return (
+                <col
+                  key={key}
+                  className={COLUMN_BY_KEY[key].className}
+                  style={{ ...base, ...voteMin }}
+                />
+              )
+            })}
           </colgroup>
           <thead>
             <tr>
