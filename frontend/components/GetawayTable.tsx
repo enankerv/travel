@@ -81,7 +81,10 @@ export default function GetawayTable({
   }
 
   return (
-    <div className="sheet-wrap" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+    <div
+      className="sheet-wrap"
+      style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}
+    >
       <div className="sheet-toolbar">
         <PartySizeControls />
         <GetawaySortSelect
@@ -106,7 +109,7 @@ export default function GetawayTable({
         visibleColumns={visibleColumns}
         onToggleColumn={toggleColumn}
       />
-      <div className="sheet-scroll" style={{ flex: 1 }}>
+      <div className="sheet-scroll sheet-scroll--fill">
         <table className="sheet">
           <colgroup>
             {getVisibleColumnKeys(visibleColumns).map((key) => (

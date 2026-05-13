@@ -227,6 +227,50 @@ button:focus-visible {
   }
 }
 
+/* Desktop list detail: fill viewport below header so the getaway table can scroll inside .sheet-scroll */
+@media (min-width: 640px) {
+  .app-detail-view {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+  }
+
+  .app-detail-view > .list-detail-sticky {
+    flex-shrink: 0;
+  }
+
+  .app-detail-view > .list-detail-content {
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+  }
+
+  .list-villas-tab:not(.list-villas-tab--map) {
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+  }
+
+  .list-villas-tab:not(.list-villas-tab--map) .list-villas-tab__table-wrap {
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+  }
+
+  .list-villas-tab:not(.list-villas-tab--map) .list-villas-tab__table-wrap .sheet-wrap {
+    min-height: 0;
+  }
+
+  /* Fill <main> so list detail flex chain gets a bounded height for internal table scroll */
+  main > .app {
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+  }
+}
+
 .getaway-list-mobile__loading {
   display: flex;
   flex-direction: column;
@@ -1031,6 +1075,7 @@ button:focus-visible {
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
+  flex-shrink: 0;
   padding: 0.35rem 0.75rem;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
@@ -1139,10 +1184,11 @@ button:focus-visible {
   white-space: nowrap;
 }
 
-/* Table */
+/* Table — separate + zero spacing so thead position:sticky works (collapse breaks sticky in browsers) */
 .sheet {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   table-layout: fixed;
   font-size: 0.85rem;
 }
@@ -1193,16 +1239,19 @@ button:focus-visible {
 }
 
 .sheet tbody tr {
-  border-bottom: 1px solid var(--border);
   transition: background 0.15s;
+}
+
+.sheet tbody tr td {
+  border-bottom: 1px solid var(--border);
+}
+
+.sheet tbody tr:last-child td {
+  border-bottom: none;
 }
 
 .sheet tbody tr:hover {
   background: var(--surface-hover);
-}
-
-.sheet tbody tr:last-child {
-  border-bottom: none;
 }
 
 .sheet td {
@@ -2596,13 +2645,22 @@ button:focus-visible {
   margin-top: 0.5rem;
 }
 
-/* Scrollable table body */
-/* Default: no internal scroll \u2014 the page scrolls naturally and the footer flows below. */
+/* Default: page scrolls; no internal overflow. */
 .sheet-scroll {
-  /* No max-height / overflow so the page is the scroll container. */
 }
 
-/* Internal scroll only when needed (e.g. forced via parent) */
+/* Getaway table (web): toolbar stays fixed; thead sticks at top of this scrollport.
+   flex-basis must be 0 (not auto) or the block grows to full table height and the window scrolls instead. */
+@media (min-width: 640px) {
+  .sheet-scroll--fill {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-x: auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
 .sheet-scroll::-webkit-scrollbar {
   width: 6px;
 }
