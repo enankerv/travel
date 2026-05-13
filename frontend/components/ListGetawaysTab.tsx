@@ -59,6 +59,7 @@ export default function ListGetawaysTab({
     isLoading,
     onRefresh,
     commentsByGetaway,
+    otherViewers,
   } = useListDetailContext();
   const isMobile = useIsMobile();
   const listId = list.id;
@@ -366,7 +367,11 @@ export default function ListGetawaysTab({
       >
         <div className="list-villas-tab__table-wrap">
           {viewMode === "table" ? (
-            <ListCursorSurface listId={listId} enabled={!isMobile}>
+            <ListCursorSurface
+              listId={listId}
+              enabled={!isMobile}
+              otherViewers={otherViewers}
+            >
               <GetawayListView
                 isLoading={isLoading}
                 onDelete={handleDeleteGetaway}

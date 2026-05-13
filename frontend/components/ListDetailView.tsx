@@ -106,6 +106,8 @@ export default function ListDetailView({
     onUsersChange: setViewingUsers,
   });
 
+  const otherViewers = viewingUsers.filter((u) => u.user_id !== user?.id);
+
   const contextValue = {
     list,
     members,
@@ -130,6 +132,7 @@ export default function ListDetailView({
       else if (v > 999) setPartySizeInternal(999);
       else setPartySizeInternal(v);
     },
+    otherViewers,
   };
 
   async function loadData(silent = false) {
@@ -180,8 +183,6 @@ export default function ListDetailView({
     }
   }
 
-  const presenceOthers = viewingUsers.filter((u) => u.user_id !== user?.id);
-
   return (
     <ListDetailProvider value={contextValue}>
       <div className="list-detail-scroll">
@@ -197,16 +198,16 @@ export default function ListDetailView({
                 ←
               </button>
               <h1 className="list-detail-header__title">{list.name}</h1>
-              {presenceOthers.length > 0 && (
+              {otherViewers.length > 0 && (
                 <div
                   className="list-detail-presence"
-                  title={presenceOthers
+                  title={otherViewers
                     .map((u) => u.first_name || u.user_id.slice(0, 8))
                     .join(", ")}
                 >
                   <span>Viewing with</span>
                   <div className="list-detail-presence__avatars">
-                    {presenceOthers.slice(0, 5).map((u) => (
+                    {otherViewers.slice(0, 5).map((u) => (
                       <div
                         key={u.user_id}
                         className="list-detail-presence__avatar"

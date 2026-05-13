@@ -4,6 +4,7 @@ import { PerfectCursor } from 'perfect-cursors'
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -15,6 +16,7 @@ import { presenceColorForUserId } from '@/lib/presenceColors'
 import {
   subscribeListCursorBroadcast,
   type ListCursorBroadcastPayload,
+  type PresenceUser,
 } from '@/lib/realtime'
 
 const CURSOR_SURFACE = 'table' as const
@@ -134,10 +136,14 @@ function PeerRemoteCursor({
 export default function ListCursorSurface({
   listId,
   enabled,
+  otherViewers,
   children,
 }: {
   listId: string
   enabled: boolean
+  /** Presence peers (excluding self). Empty array gates outbound broadcasts and
+   *  provides each peer's cursor_color so we don't re-hash the user id. */
+  otherViewers: PresenceUser[]
   children: ReactNode
 }) {
   const { user } = useAuth()
@@ -147,6 +153,13 @@ export default function ListCursorSurface({
   const lastSendRef = useRef(0)
   const lastClientRef = useRef<{ clientX: number; clientY: number } | null>(null)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+
+  const hasOtherViewers = otherViewers.length > 0
+  const viewerColorById = useMemo(() => {
+    const m = new Map<string, string | undefined>()
+    for (const v of otherViewers) m.set(v.user_id, v.cursor_color)
+    return m
+  }, [otherViewers])
 
   useEffect(() => {
     if (!enabled || !userId) {
@@ -224,6 +237,7 @@ export default function ListCursorSurface({
   const sendLeave = useCallback(() => {
     const ch = channelRef.current
     if (!ch || !userId) return
+    if (!hasOtherViewers) return
     const payload: ListCursorBroadcastPayload = {
       user_id: userId,
       surface: CURSOR_SURFACE,
@@ -239,12 +253,13 @@ export default function ListCursorSurface({
       .catch((e: unknown) => {
         logCursor('send leave error', e)
       })
-  }, [userId])
+  }, [userId, hasOtherViewers])
 
   const send = useCallback(
     (nx: number, ny: number) => {
       const ch = channelRef.current
       if (!ch || !userId) return
+      if (!hasOtherViewers) return
       const now = Date.now()
       if (now - lastSendRef.current < 120) return
       lastSendRef.current = now
@@ -263,8 +278,15 @@ export default function ListCursorSurface({
           logCursor('send error', e)
         })
     },
-    [userId],
+    [userId, hasOtherViewers],
   )
+
+  /* When the last other viewer leaves presence, drop any peer dots we still hold so
+     we don't show stale pointers waiting for the 4.5s TTL sweep. */
+  useEffect(() => {
+    if (hasOtherViewers) return
+    setPeers((prev) => (Object.keys(prev).length === 0 ? prev : {}))
+  }, [hasOtherViewers])
 
   useEffect(() => {
     if (!enabled || !userId) return
@@ -324,7 +346,7 @@ export default function ListCursorSurface({
         {Object.entries(peers).map(([id, pos]) => (
           <PeerRemoteCursor
             key={id}
-            color={presenceColorForUserId(id)}
+            color={viewerColorById.get(id) ?? presenceColorForUserId(id)}
             nx={pos.nx}
             ny={pos.ny}
             surfaceRef={wrapRef}

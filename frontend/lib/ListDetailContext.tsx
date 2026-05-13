@@ -3,6 +3,7 @@
 import { createContext, useContext, type ReactNode } from "react";
 import type { VotesByGetaway } from "./votes";
 import type { CommentRecord } from "./api";
+import type { PresenceUser } from "./realtime";
 
 export type CommentsByGetaway = Record<string, CommentRecord[]>;
 
@@ -26,6 +27,9 @@ export type ListDetailContextValue = {
   /** Local party size for price-per-person (min 1); default from list member count. */
   partySize: number;
   setPartySize: (n: number) => void;
+  /** Other users currently viewing this list via Supabase presence (excludes self).
+   *  Single source of truth for the "Viewing with" pile + shared-cursor gating/colors. */
+  otherViewers: PresenceUser[];
 };
 
 const ListDetailContext = createContext<ListDetailContextValue | null>(null);
