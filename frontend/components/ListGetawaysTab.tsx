@@ -72,6 +72,17 @@ export default function ListGetawaysTab({
   const [viewMode, setViewMode] = useState<"table" | "map">("table");
   const [mapGetawayId, setMapGetawayId] = useState<string | null>(null);
 
+  const mapGetaway = useMemo(
+    () => (mapGetawayId ? getaways.find((g: any) => g.id === mapGetawayId) : undefined),
+    [mapGetawayId, getaways],
+  );
+
+  useEffect(() => {
+    if (mapGetawayId && !getaways.some((g: any) => g.id === mapGetawayId)) {
+      setMapGetawayId(null);
+    }
+  }, [mapGetawayId, getaways]);
+
   useEffect(() => {
     try {
       if ("Notification" in window && Notification.permission === "default") {
@@ -340,17 +351,17 @@ export default function ListGetawaysTab({
       </div>
 
       {viewMode === "map" &&
-        mapGetawayId &&
+        mapGetaway &&
         (isMobile ? (
           <GetawayDetailSheet
-            getaway={getaways.find((g: any) => g.id === mapGetawayId) ?? null}
+            getaway={mapGetaway}
             onClose={() => setMapGetawayId(null)}
             onDelete={handleDeleteGetaway}
             onUpdate={handleUpdateGetaway}
           />
         ) : (
           <MapGetawaySidebar
-            getaway={getaways.find((g: any) => g.id === mapGetawayId) ?? null}
+            getaway={mapGetaway}
             onClose={() => setMapGetawayId(null)}
             onImageClick={handleImageClick}
             onCommentClick={

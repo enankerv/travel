@@ -35,12 +35,10 @@ export default function GetawayDetailSheet({
   scrollToCommentsOnOpen?: boolean;
 }) {
   const { partySize } = useListDetailContext();
-  const signedUrls = useSignedImageUrls(getaway?.images || []);
+  const signedUrls = useSignedImageUrls(getaway.images || []);
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<any>(() => ({ ...getaway }));
   const commentsSectionRef = useRef<HTMLDivElement | null>(null);
-
-  if (!getaway) return null;
 
   const pricePerPersonLine = formatPerPersonLine(
     getaway.price,
@@ -75,11 +73,16 @@ export default function GetawayDetailSheet({
   };
 
   const handleDelete = () => {
-    if (onDelete) {
-      onDelete(getaway.id);
-      onClose();
-    }
+    if (!onDelete) return;
+    onDelete(getaway.id);
+    onClose();
   };
+
+  useEffect(() => {
+    setEditData({ ...getaway });
+    setIsEditing(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when switching listing (id), not refetches
+  }, [getaway.id]);
 
   useEffect(() => {
     if (!scrollToCommentsOnOpen || isEditing) return;
@@ -90,7 +93,15 @@ export default function GetawayDetailSheet({
       });
     }, 50);
     return () => window.clearTimeout(id);
-  }, [getaway?.id, isEditing, scrollToCommentsOnOpen]);
+  }, [getaway.id, isEditing, scrollToCommentsOnOpen]);
+
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, []);
 
   return (
     <div className="getaway-detail-sheet" role="dialog" aria-modal="true">
@@ -100,7 +111,6 @@ export default function GetawayDetailSheet({
         aria-hidden="true"
       />
       <div className="getaway-detail-sheet__panel">
-        <div className="getaway-detail-sheet__handle" aria-hidden="true" />
         <div className="getaway-detail-sheet__header">
           <h2>{isEditing ? "Edit listing" : (getaway.name || "Getaway")}</h2>
           <div className="getaway-detail-sheet__header-actions">
@@ -153,7 +163,7 @@ export default function GetawayDetailSheet({
           </div>
         </div>
 
-        <div className="getaway-detail-sheet__content">
+        <div key={getaway.id} className="getaway-detail-sheet__content">
           {isEditing ? (
             <GetawayEditForm editData={editData} setEditData={setEditData} />
           ) : (
@@ -245,7 +255,7 @@ export default function GetawayDetailSheet({
                 )}
               </div>
 
-              <div ref={commentsSectionRef}>
+              <div ref={commentsSectionRef} className="getaway-detail-sheet__comments-anchor">
                 <InlineComments getawayId={getaway.id} />
               </div>
             </>
