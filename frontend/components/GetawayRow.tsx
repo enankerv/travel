@@ -15,6 +15,7 @@ export default function GetawayRow({
   getaway,
   isEditing,
   visibleColumns,
+  sortIndex,
   onEditStart,
   onEditEnd,
   onDelete,
@@ -35,7 +36,7 @@ export default function GetawayRow({
   const thumbUrl = signedUrls[0]
   const visibleKeys = getVisibleColumnKeys(visibleColumns)
   const contentKeys = visibleKeys.filter(
-    (k) => k !== 'votes' && k !== 'image' && k !== 'actions'
+    (k) => k !== 'votes' && k !== 'image' && k !== 'actions' && k !== 'rank'
   )
   const colspanMessage = Math.max(1, contentKeys.length)
 
@@ -92,6 +93,7 @@ export default function GetawayRow({
     onVote,
     onUnvote,
     partySize,
+    sortIndex,
   }
 
   function renderSpecialRow(
@@ -104,6 +106,13 @@ export default function GetawayRow({
     return (
       <tr style={rowStyle} onClick={rowProps?.onClick} title={rowProps?.title}>
         {visibleKeys.map((key) => {
+          if (key === 'rank') {
+            return (
+              <td key={key} className="col-rank" aria-label={`Row ${sortIndex}`}>
+                <span className="sheet-row-rank">{sortIndex}</span>
+              </td>
+            )
+          }
           if (key === 'votes') {
             return <td key={key} className="col-votes" />
           }

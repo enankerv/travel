@@ -8,6 +8,7 @@ import VoteCell from "@/components/VoteCell";
 import { TrashIcon, ExternalLinkIcon } from "@/components/icons";
 
 export const COLUMN_KEYS = [
+  "rank",
   "votes",
   "image",
   "name",
@@ -25,8 +26,12 @@ export const COLUMN_KEYS = [
 
 export type ColumnKey = (typeof COLUMN_KEYS)[number];
 
-/** Columns the user cannot hide (votes/comments + row actions). */
-export const ALWAYS_VISIBLE_COLUMNS: ReadonlySet<ColumnKey> = new Set(["votes", "actions"]);
+/** Columns the user cannot hide (sort #, votes/comments + row actions). */
+export const ALWAYS_VISIBLE_COLUMNS: ReadonlySet<ColumnKey> = new Set([
+  "rank",
+  "votes",
+  "actions",
+]);
 
 export function isAlwaysVisibleColumn(key: ColumnKey): boolean {
   return ALWAYS_VISIBLE_COLUMNS.has(key);
@@ -35,6 +40,7 @@ export function isAlwaysVisibleColumn(key: ColumnKey): boolean {
 export type VisibleColumns = Record<ColumnKey, boolean>;
 
 export const DEFAULT_VISIBLE: VisibleColumns = {
+  rank: true,
   votes: true,
   image: true,
   name: true,
@@ -80,6 +86,8 @@ export type CellRenderContext = {
   onVote?: (getawayId: string) => void;
   onUnvote?: (getawayId: string) => void;
   partySize?: number;
+  /** 1-based index in the current sorted table order */
+  sortIndex: number;
 };
 
 type ColumnDef = {
@@ -90,6 +98,16 @@ type ColumnDef = {
 };
 
 const COLUMN_CONFIG: Record<ColumnKey, ColumnDef> = {
+  rank: {
+    key: "rank",
+    className: "col-rank",
+    label: "#",
+    render: ({ className, sortIndex }) => (
+      <td className={className} aria-label={`Row ${sortIndex}`}>
+        <span className="sheet-row-rank">{sortIndex}</span>
+      </td>
+    ),
+  },
   votes: {
     key: "votes",
     className: "col-votes",
@@ -381,7 +399,7 @@ const COLUMN_CONFIG: Record<ColumnKey, ColumnDef> = {
   actions: {
     key: "actions",
     className: "col-catch",
-    label: "Actions",
+    label: "",
     render: ({
       isEditing,
       onEditStart,
@@ -392,7 +410,7 @@ const COLUMN_CONFIG: Record<ColumnKey, ColumnDef> = {
     }) =>
       isEditing ? (
         <td className={className}>
-          <div style={{ display: "flex", gap: "0.5rem" }}>
+          <div className="col-catch__edit-actions">
             <button
               type="button"
               className="sheet-edit-btn sheet-edit-btn-save"
@@ -462,6 +480,7 @@ export type CellRenderContextInput = Pick<
   | "onVote"
   | "onUnvote"
   | "partySize"
+  | "sortIndex"
 >;
 
 /** Render a cell for the given column key. */

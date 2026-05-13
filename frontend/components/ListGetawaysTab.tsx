@@ -71,6 +71,7 @@ export default function ListGetawaysTab({
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [viewMode, setViewMode] = useState<"table" | "map">("table");
   const [mapGetawayId, setMapGetawayId] = useState<string | null>(null);
+  const [scoutPanelExpanded, setScoutPanelExpanded] = useState(true);
 
   const mapGetaway = useMemo(
     () => (mapGetawayId ? getaways.find((g: any) => g.id === mapGetawayId) : undefined),
@@ -257,13 +258,48 @@ export default function ListGetawaysTab({
   const stickyContent = useMemo(
     () => (
       <div className="list-villas-tab__sticky">
-        <div className="list-villas-tab__drop">
-          <DropZone
-            onUrlSubmit={handleScoutUrl}
-            onError={(msg) => setError(msg)}
-            isLoading={scoutLoading}
-          />
-          <ScoutBookmarklet />
+        <div
+          className={`list-villas-tab__scout-panel${
+            scoutPanelExpanded ? " list-villas-tab__scout-panel--open" : ""
+          }`}
+        >
+          <div className="list-villas-tab__scout-drop-clip">
+            <div
+              className="list-villas-tab__scout-drop-inner"
+              inert={scoutPanelExpanded ? undefined : true}
+            >
+              <div className="list-villas-tab__drop">
+                <DropZone
+                  onUrlSubmit={handleScoutUrl}
+                  onError={(msg) => setError(msg)}
+                  isLoading={scoutLoading}
+                />
+                <ScoutBookmarklet />
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="list-villas-tab__scout-toggle"
+            onClick={() => setScoutPanelExpanded((open) => !open)}
+            title={scoutPanelExpanded ? "Hide scout bar" : "Show scout bar"}
+            aria-label={scoutPanelExpanded ? "Hide scout bar" : "Show scout bar"}
+            aria-expanded={scoutPanelExpanded}
+          >
+            <svg
+              className="list-villas-tab__scout-toggle-chevron"
+              viewBox="0 0 12 12"
+              width="12"
+              height="12"
+              aria-hidden
+            >
+              {scoutPanelExpanded ? (
+                <path fill="currentColor" d="M6 3l4 5H2z" />
+              ) : (
+                <path fill="currentColor" d="M6 9l4-5H2z" />
+              )}
+            </svg>
+          </button>
         </div>
 
         {error && (
@@ -314,7 +350,7 @@ export default function ListGetawaysTab({
         </div>
       </div>
     ),
-    [scoutLoading, error, showRetry, viewMode],
+    [scoutLoading, error, showRetry, viewMode, scoutPanelExpanded],
   );
 
   useEffect(() => {

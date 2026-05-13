@@ -1262,7 +1262,35 @@ button:focus-visible {
   white-space: nowrap;
 }
 
-/* Column widths - compact so many columns can fit; expandable cells grow when expanded */
+/* Rank # — minimal width; col + cell padding override .sheet defaults */
+.sheet col.col-rank {
+  width: 1.5rem;
+}
+
+.sheet thead th.col-rank,
+.sheet td.col-rank {
+  width: 1.5rem;
+  min-width: 1.5rem;
+  max-width: 1.75rem;
+  padding-left: 0.1rem;
+  padding-right: 0.1rem;
+  box-sizing: border-box;
+}
+
+.col-rank {
+  text-align: center;
+  vertical-align: middle;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.sheet-row-rank {
+  display: inline-block;
+}
+
 .col-votes {
   width: 110px;
   min-width: 96px;
@@ -1272,58 +1300,43 @@ button:focus-visible {
 .vote-cell {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.35rem;
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 
-.vote-cell__avatars {
-  display: flex;
+.vote-cell__vote-group {
+  display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 2px;
-}
-
-.vote-cell__avatar {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  overflow: hidden;
-  border: 2px solid var(--dark);
+  gap: 0.2rem;
   flex-shrink: 0;
-  background: var(--border);
-  cursor: default;
 }
 
-.vote-cell__avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.vote-cell__avatar-fallback {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.vote-cell__like-count {
+  font-size: 0.85rem;
   color: var(--muted);
-  font-size: 0.6rem;
-  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
-.vote-cell__more {
-  font-size: 0.65rem;
+.vote-cell__comment-count {
+  font-size: 0.75rem;
+  line-height: 1;
   color: var(--muted);
-  margin-left: 2px;
+  font-variant-numeric: tabular-nums;
 }
 
 .vote-cell__btn {
-  padding: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.35rem;
   border: none;
   background: none;
   color: var(--muted);
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 6px;
   transition: color 0.15s;
+  flex-shrink: 0;
 }
 
 .vote-cell__btn:hover {
@@ -1334,32 +1347,16 @@ button:focus-visible {
   color: var(--accent);
 }
 
-.vote-cell__btn--comment {
-  position: relative;
-}
-
-.vote-cell__btn-count {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  font-size: 0.6rem;
-  min-width: 14px;
-  height: 14px;
-  padding: 0 3px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 7px;
-  background: var(--accent);
-  color: var(--on-accent);
-  font-weight: 600;
-  line-height: 1;
-}
-
 .col-thumb {
-  width: 48px;
-  min-width: 48px;
+  width: 58px;
+  min-width: 58px;
 }
+.sheet thead th.col-thumb,
+.sheet td.col-thumb {
+  padding-left: 0.4rem;
+  padding-right: 0.4rem;
+}
+
 .col-name {
   width: 12%;
   min-width: 80px;
@@ -1628,9 +1625,34 @@ button:focus-visible {
 .amenities-expanded:hover .amenities-collapse-btn {
   color: var(--accent);
 }
+
+.list-villas-tab__scout-toggle:focus,
+.list-villas-tab__scout-toggle:focus-visible,
+.amenities-expand-btn:focus,
+.amenities-expand-btn:focus-visible,
+.amenities-collapse-btn:focus,
+.amenities-collapse-btn:focus-visible,
+.expandable-expand-btn:focus,
+.expandable-expand-btn:focus-visible,
+.expandable-collapse-btn:focus,
+.expandable-collapse-btn:focus-visible,
+.expandable-wrap-toggle:focus,
+.expandable-wrap-toggle:focus-visible {
+  outline: none;
+}
+
 .col-catch {
   width: auto;
 }
+
+.col-catch__edit-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.25rem;
+  justify-content: center;
+}
+
 .col-actions-header {
   display: flex;
   align-items: center;
@@ -1721,8 +1743,8 @@ button:focus-visible {
 
 /* Thumbnail */
 .thumb {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 6px;
   object-fit: cover;
   display: block;
@@ -1730,8 +1752,8 @@ button:focus-visible {
 }
 
 .thumb-placeholder {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 6px;
   background: var(--surface);
   display: flex;
@@ -1837,7 +1859,8 @@ button:focus-visible {
 /* Row actions (pencil + trash) */
 .row-actions {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.2rem;
+  justify-content: center;
   opacity: 0;
   transition: opacity 0.15s;
 }
@@ -1851,13 +1874,20 @@ button:focus-visible {
   border: none;
   cursor: pointer;
   padding: 0;
-  font-size: 1.2rem;
+  font-size: 0.9rem;
   color: var(--light);
   transition: color 0.15s;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
+  min-width: 1.25rem;
+  min-height: 1.25rem;
+}
+
+.row-action-btn.trash svg {
+  width: 15px;
+  height: 15px;
 }
 
 .row-action-btn:hover {
@@ -2138,6 +2168,89 @@ button:focus-visible {
   height: calc(100vh - 220px);
   min-height: 400px;
   overflow: hidden;
+}
+
+.list-villas-tab__sticky {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.list-villas-tab__scout-panel {
+  position: relative;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  min-height: 2.75rem;
+  transition: background-color 0.25s ease;
+}
+
+.list-villas-tab__scout-panel:not(.list-villas-tab__scout-panel--open) {
+  /* Same as .list-detail-sticky — avoids a grey band behind the arrow */
+  background: var(--dark);
+}
+
+.list-villas-tab__scout-panel:not(.list-villas-tab__scout-panel--open) .list-villas-tab__scout-toggle {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Height animation: 0fr collapsed → 1fr open (no arrow motion — motion is here) */
+.list-villas-tab__scout-drop-clip {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.32s ease;
+}
+
+.list-villas-tab__scout-panel--open .list-villas-tab__scout-drop-clip {
+  grid-template-rows: 1fr;
+}
+
+.list-villas-tab__scout-drop-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.list-villas-tab__scout-panel--open .list-villas-tab__drop {
+  padding-bottom: 2.85rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .list-villas-tab__scout-drop-clip {
+    transition: grid-template-rows 0.01s linear;
+  }
+
+  .list-villas-tab__scout-panel {
+    transition: none;
+  }
+}
+
+.list-villas-tab__scout-toggle {
+  position: absolute;
+  bottom: 0.65rem;
+  right: 2rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.list-villas-tab__scout-toggle:hover {
+  color: var(--accent);
+}
+
+.list-villas-tab__scout-toggle-chevron {
+  display: block;
+  flex-shrink: 0;
 }
 
 .list-villas-tab__drop {

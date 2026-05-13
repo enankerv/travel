@@ -121,6 +121,7 @@ export default function GetawayTable({
               {getVisibleColumnKeys(visibleColumns).map((key) => (
                 <th key={key} className={COLUMN_BY_KEY[key].className}>
                   <span className="th-label">{COLUMN_BY_KEY[key].label}</span>
+                  {key !== 'rank' && (
                   <span
                     role="separator"
                     aria-orientation="vertical"
@@ -129,14 +130,16 @@ export default function GetawayTable({
                     onClick={(e) => e.stopPropagation()}
                     title="Drag to resize column"
                   />
+                  )}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {sortedGetaways.map((getaway: any) => (
+            {sortedGetaways.map((getaway: any, rowIdx: number) => (
               <GetawayRow
                 key={getaway.id}
+                sortIndex={rowIdx + 1}
                 getaway={getaway}
                 isEditing={editingId === getaway.id}
                 visibleColumns={visibleColumns}
