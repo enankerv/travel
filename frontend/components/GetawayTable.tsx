@@ -80,9 +80,22 @@ export default function GetawayTable({
     setVisibleColumns((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
+  const visibleKeys = getVisibleColumnKeys(visibleColumns)
+
   if (isLoading) {
     return (
-      <div className="sheet-wrap" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+      <div
+        className="sheet-wrap"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minWidth: 0,
+          width: '100%',
+          minHeight: 'min(50vh, 24rem)',
+        }}
+      >
         <div className="spinner"></div>
         <p style={{ marginTop: '1rem', color: 'var(--muted)' }}>Loading getaways...</p>
       </div>
@@ -103,25 +116,13 @@ export default function GetawayTable({
   return (
     <div
       className="sheet-wrap"
-      style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0 }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        minWidth: 0,
+        width: '100%',
+      }}
     >
-      <div className="sheet-toolbar">
-        <PartySizeControls />
-        <GetawaySortSelect
-          id="getaway-sort-table"
-          value={sortOption}
-          onChange={setSortOption}
-        />
-        <button
-          ref={triggerRef}
-          type="button"
-          className="column-toggle-btn"
-          onClick={() => setShowColumnMenu(!showColumnMenu)}
-          title="Toggle columns"
-        >
-          ⋮ Columns
-        </button>
-      </div>
       <ColumnPopover
         open={showColumnMenu}
         onClose={() => setShowColumnMenu(false)}
@@ -132,7 +133,7 @@ export default function GetawayTable({
       <div className="sheet-scroll sheet-scroll--fill">
         <table className="sheet">
           <colgroup>
-            {getVisibleColumnKeys(visibleColumns).map((key) => {
+            {visibleKeys.map((key) => {
               const base = getColStyle(key)
               const voteMin =
                 key === 'votes' && votesColMinWidth
@@ -147,9 +148,33 @@ export default function GetawayTable({
               )
             })}
           </colgroup>
+          {/* Sticky <thead> is the single sticky element on the desktop list table:
+              row 1 hosts the toolbar (in a colspan cell), row 2 hosts the column names.
+              Both stack inside the same sticky box — no JS height measurement needed. */}
           <thead>
+            <tr className="sheet-toolbar-row">
+              <th colSpan={visibleKeys.length} className="sheet-toolbar-cell">
+                <div className="sheet-toolbar">
+                  <PartySizeControls />
+                  <GetawaySortSelect
+                    id="getaway-sort-table"
+                    value={sortOption}
+                    onChange={setSortOption}
+                  />
+                  <button
+                    ref={triggerRef}
+                    type="button"
+                    className="column-toggle-btn"
+                    onClick={() => setShowColumnMenu(!showColumnMenu)}
+                    title="Toggle columns"
+                  >
+                    ⋮ Columns
+                  </button>
+                </div>
+              </th>
+            </tr>
             <tr>
-              {getVisibleColumnKeys(visibleColumns).map((key) => (
+              {visibleKeys.map((key) => (
                 <th key={key} className={COLUMN_BY_KEY[key].className}>
                   <span className="th-label">{COLUMN_BY_KEY[key].label}</span>
                   {key !== 'rank' && (

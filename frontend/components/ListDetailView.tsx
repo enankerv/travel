@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useEffect, type ReactNode } from "react";
-import { getGetaways, getListMembers, getListVotes, getListComments } from "@/lib/api";
+import {
+  getGetaways,
+  getListMembers,
+  getListVotes,
+  getListComments,
+} from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
 import { useListRealtime, useListPresence, PresenceUser } from "@/lib/realtime";
 import { presenceColorForUserId } from "@/lib/presenceColors";
@@ -32,14 +37,17 @@ export default function ListDetailView({
   const [activeTab, setActiveTab] = useState<"places" | "members">("places");
   const [getaways, setGetaways] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
-  const [commentsByGetaway, setCommentsByGetaway] = useState<Record<string, any[]>>({});
+  const [commentsByGetaway, setCommentsByGetaway] = useState<
+    Record<string, any[]>
+  >({});
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [focusedGetawayId, setFocusedGetawayId] = useState<string | null>(null);
   const [viewingUsers, setViewingUsers] = useState<PresenceUser[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [dataLoaded, setDataLoaded] = useState(false);
-  const [placesStickyContent, setPlacesStickyContent] = useState<ReactNode>(null);
+  const [placesStickyContent, setPlacesStickyContent] =
+    useState<ReactNode>(null);
   const [partySize, setPartySizeInternal] = useState(() =>
     defaultPartySizeFromList(list),
   );
@@ -77,7 +85,9 @@ export default function ListDetailView({
       setCommentsByGetaway((prev) => {
         const next = { ...prev };
         for (const gid of Object.keys(next)) {
-          next[gid] = next[gid].map((x) => (x.id === c.id ? { ...x, ...c } : x));
+          next[gid] = next[gid].map((x) =>
+            x.id === c.id ? { ...x, ...c } : x,
+          );
         }
         return next;
       }),
@@ -125,12 +135,13 @@ export default function ListDetailView({
   async function loadData(silent = false) {
     if (!silent) setIsLoading(true);
     try {
-      const [getawaysData, membersData, votesData, commentsData] = await Promise.all([
-        getGetaways(list.id),
-        getListMembers(list.id),
-        getListVotes(list.id),
-        getListComments(list.id),
-      ]);
+      const [getawaysData, membersData, votesData, commentsData] =
+        await Promise.all([
+          getGetaways(list.id),
+          getListMembers(list.id),
+          getListVotes(list.id),
+          getListComments(list.id),
+        ]);
       setGetaways(getawaysData || []);
       const memberRows = membersData?.members || [];
       setMembers(memberRows);
@@ -146,11 +157,18 @@ export default function ListDetailView({
         commentsByGid[gid].push(c);
       }
       setCommentsByGetaway(commentsByGid);
-      const votesByGid: Record<string, { user_id: string; first_name?: string; avatar_url?: string }[]> = {};
+      const votesByGid: Record<
+        string,
+        { user_id: string; first_name?: string; avatar_url?: string }[]
+      > = {};
       for (const v of votesList) {
         const gid = v.getaway_id;
         if (!votesByGid[gid]) votesByGid[gid] = [];
-        votesByGid[gid].push({ user_id: v.user_id, first_name: v.first_name, avatar_url: v.avatar_url });
+        votesByGid[gid].push({
+          user_id: v.user_id,
+          first_name: v.first_name,
+          avatar_url: v.avatar_url,
+        });
       }
       votes.setVotesByGetaway(votesByGid);
       setDataLoaded(true);
@@ -166,78 +184,81 @@ export default function ListDetailView({
 
   return (
     <ListDetailProvider value={contextValue}>
-      <div className="list-detail-sticky">
-      <header className="list-detail-header">
-        <div className="list-detail-header__left">
-          <button
-            type="button"
-            onClick={onBack}
-            className="list-detail-header__back"
-            aria-label="Back"
-          >
-            ←
-          </button>
-          <h1 className="list-detail-header__title">{list.name}</h1>
-          {presenceOthers.length > 0 && (
-            <div
-              className="list-detail-presence"
-              title={presenceOthers
-                .map((u) => u.first_name || u.user_id.slice(0, 8))
-                .join(", ")}
-            >
-              <span>Viewing with</span>
-              <div className="list-detail-presence__avatars">
-                {presenceOthers.slice(0, 5).map((u) => (
-                  <div
-                    key={u.user_id}
-                    className="list-detail-presence__avatar"
-                    title={u.first_name || u.user_id.slice(0, 8)}
-                    style={{
-                      borderColor: u.cursor_color || presenceColorForUserId(u.user_id),
-                    }}
-                  >
-                    {u.avatar_url ? (
-                      <img
-                        src={u.avatar_url}
-                        alt=""
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <div className="list-detail-presence__avatar-fallback">
-                        {(u.first_name || u.user_id).charAt(0).toUpperCase()}
+      <div className="list-detail-scroll">
+        <div className="list-detail-chrome">
+          <header className="list-detail-header">
+            <div className="list-detail-header__left">
+              <button
+                type="button"
+                onClick={onBack}
+                className="list-detail-header__back"
+                aria-label="Back"
+              >
+                ←
+              </button>
+              <h1 className="list-detail-header__title">{list.name}</h1>
+              {presenceOthers.length > 0 && (
+                <div
+                  className="list-detail-presence"
+                  title={presenceOthers
+                    .map((u) => u.first_name || u.user_id.slice(0, 8))
+                    .join(", ")}
+                >
+                  <span>Viewing with</span>
+                  <div className="list-detail-presence__avatars">
+                    {presenceOthers.slice(0, 5).map((u) => (
+                      <div
+                        key={u.user_id}
+                        className="list-detail-presence__avatar"
+                        title={u.first_name || u.user_id.slice(0, 8)}
+                        style={{
+                          borderColor:
+                            u.cursor_color || presenceColorForUserId(u.user_id),
+                        }}
+                      >
+                        {u.avatar_url ? (
+                          <img
+                            src={u.avatar_url}
+                            alt=""
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          <div className="list-detail-presence__avatar-fallback">
+                            {(u.first_name || u.user_id)
+                              .charAt(0)
+                              .toUpperCase()}
+                          </div>
+                        )}
                       </div>
-                    )}
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-        <div className="list-detail-header__right">
-          <ScoutCredits />
-        </div>
-      </header>
+            <div className="list-detail-header__right">
+              <ScoutCredits />
+            </div>
+          </header>
 
-      <div className="list-detail-tabs">
-        <button
-          type="button"
-          onClick={() => setActiveTab("places")}
-          className={`list-detail-tabs__tab ${activeTab === "places" ? "list-detail-tabs__tab--active" : ""}`}
-        >
-          Places
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("members")}
-          className={`list-detail-tabs__tab ${activeTab === "members" ? "list-detail-tabs__tab--active" : ""}`}
-        >
-          Members ({members.length})
-        </button>
-      </div>
-      {activeTab === "places" && placesStickyContent}
-      </div>
+          <div className="list-detail-tabs">
+            <button
+              type="button"
+              onClick={() => setActiveTab("places")}
+              className={`list-detail-tabs__tab ${activeTab === "places" ? "list-detail-tabs__tab--active" : ""}`}
+            >
+              Places
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("members")}
+              className={`list-detail-tabs__tab ${activeTab === "members" ? "list-detail-tabs__tab--active" : ""}`}
+            >
+              Members ({members.length})
+            </button>
+          </div>
+          {activeTab === "places" && placesStickyContent}
+        </div>
 
-      <div className="list-detail-content">
         {error && (
           <div
             className="list-villas-tab__error"

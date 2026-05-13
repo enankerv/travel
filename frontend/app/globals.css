@@ -203,7 +203,7 @@ button:focus-visible {
     -webkit-overflow-scrolling: touch;
   }
 
-  .app-detail-view .list-detail-content {
+  .app-detail-view .list-detail-scroll {
     flex: none;
     min-height: auto;
     overflow: visible;
@@ -227,45 +227,80 @@ button:focus-visible {
   }
 }
 
-/* Desktop list detail: fill viewport below header so the getaway table can scroll inside .sheet-scroll */
+/* Desktop list detail: one vertical scroll on .list-detail-scroll (list chrome + table);
+   sheet grows with rows; shared cursors use full sheet rect, not a nested scrollport.
+   Sticky: only .sheet-toolbar + thead (not list title/tabs/scout). */
 @media (min-width: 640px) {
   .app-detail-view {
-    flex: 1;
+    flex: 1 1 0;
     display: flex;
     flex-direction: column;
     min-height: 0;
     min-width: 0;
+    overflow: hidden;
   }
 
-  .app-detail-view > .list-detail-sticky {
-    flex-shrink: 0;
-  }
-
-  .app-detail-view > .list-detail-content {
-    flex: 1;
+  .app-detail-view > .list-detail-scroll {
+    flex: 1 1 0;
     min-height: 0;
     min-width: 0;
+    /* visible: overflow-x:hidden + overflow-y:auto breaks position:sticky in Chromium */
+    overflow-x: visible;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .list-villas-tab:not(.list-villas-tab--map) {
-    flex: 1;
-    min-height: 0;
+    flex: 0 1 auto;
     min-width: 0;
+    overflow: visible;
   }
 
   .list-villas-tab:not(.list-villas-tab--map) .list-villas-tab__table-wrap {
-    flex: 1;
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: visible;
+  }
+
+  /* sticky bindings: every box between sticky elements and the .list-detail-scroll
+     scrollport must NOT create its own scroll-containing-block. Per CSS spec,
+     overflow-x:auto + overflow-y:visible promotes the visible side to auto, so
+     declare both visible explicitly. */
+  .list-villas-tab:not(.list-villas-tab--map) .list-villas-tab__table-wrap .sheet-wrap {
     min-height: 0;
+    overflow: visible;
+  }
+
+  .list-villas-tab:not(.list-villas-tab--map) .sheet-scroll--fill {
+    overflow-x: visible;
+    overflow-y: visible;
+  }
+
+  /* No horizontal table scroll on desktop — table fits .sheet-wrap width; default
+     .sheet { min-width: max-content } pushes the sheet (and sticky header) off-page. */
+  .list-villas-tab:not(.list-villas-tab--map) .sheet {
     min-width: 0;
   }
 
-  .list-villas-tab:not(.list-villas-tab--map) .list-villas-tab__table-wrap .sheet-wrap {
-    min-height: 0;
+  /* Single sticky element: the entire <thead>. Row 1 is the toolbar (in a colspan
+     cell), row 2 is the column names. Stacking + reflow is automatic because both
+     rows are inside the same sticky box — no JS height measurement needed. */
+  .list-villas-tab:not(.list-villas-tab--map) .sheet thead {
+    position: sticky;
+    top: 0;
+    z-index: 5;
   }
 
-  /* Fill <main> so list detail flex chain gets a bounded height for internal table scroll */
+  /* Cancel the base cell-level sticky on each <th>; we stick the whole thead instead. */
+  .list-villas-tab:not(.list-villas-tab--map) .sheet thead th {
+    position: relative;
+    top: auto;
+    z-index: 1;
+  }
+
+  /* Fill <main> so list detail flex chain gets a bounded height for .list-detail-scroll */
   main > .app {
-    flex: 1;
+    flex: 1 1 0;
     min-height: 0;
     min-width: 0;
   }
@@ -1080,6 +1115,19 @@ button:focus-visible {
   padding: 0.35rem 0.75rem;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
+}
+
+/* Toolbar lives inside the first <thead> row in a <th colspan>; strip the inherited
+   uppercase/letter-spacing/padding header styling so the inner .sheet-toolbar div
+   controls its own layout and border. */
+.sheet thead .sheet-toolbar-cell {
+  padding: 0;
+  text-transform: none;
+  font-weight: normal;
+  font-size: 1rem;
+  letter-spacing: normal;
+  border-bottom: none;
+  text-align: left;
 }
 
 .sheet-toolbar-party {
@@ -2256,7 +2304,7 @@ button:focus-visible {
 }
 
 .list-villas-tab__scout-panel:not(.list-villas-tab__scout-panel--open) {
-  /* Same as .list-detail-sticky — avoids a grey band behind the arrow */
+  /* Same as .list-detail-chrome — avoids a grey band behind the arrow */
   background: var(--dark);
 }
 
@@ -2519,18 +2567,20 @@ button:focus-visible {
 }
 
 .list-villas-tab__table-wrap > .list-cursor-surface {
-  flex: 1;
-  min-height: 0;
+  flex: 0 1 auto;
   min-width: 0;
   display: flex;
   flex-direction: column;
   position: relative;
+  overflow: visible;
 }
 
 .list-cursor-surface > .sheet-wrap {
-  flex: 1;
-  min-height: 0;
+  flex: 0 1 auto;
   min-width: 0;
+  width: 100%;
+  /* .sheet-wrap defaults to overflow:hidden which traps sticky to a non-scrolling box */
+  overflow: visible;
 }
 
 .list-cursor-surface__peers {
@@ -2607,7 +2657,8 @@ button:focus-visible {
   padding: 1.5rem 2rem;
   display: flex;
   flex-direction: column;
-  flex: 1;
+  flex: 0 1 auto;
+  min-height: 0;
   overflow: auto;
 }
 
@@ -2851,17 +2902,16 @@ button:focus-visible {
   border-bottom-color: var(--accent);
 }
 
-.list-detail-content {
+.list-detail-scroll {
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
-.list-detail-sticky {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: var(--dark);
+/* List title, tabs, scout — scrolls with the page; not sticky (table toolbar/thead stick instead). */
+.list-detail-chrome {
   flex-shrink: 0;
+  background: var(--dark);
 }
 
 .img-badge-modal {
@@ -2874,22 +2924,19 @@ button:focus-visible {
   margin-top: 0.5rem;
 }
 
-/* Scrollport for sheet tables: horizontal + vertical when content exceeds bounds */
+/* Scrollport for sheet tables: horizontal when columns overflow.
+   List detail (Places table): vertical scroll is .list-detail-scroll — sheet grows in height. */
 .sheet-scroll {
   min-width: 0;
   overflow-x: auto;
 }
 
-/* Getaway table (web): toolbar stays fixed; thead sticks at top of this scrollport.
-   flex-basis must be 0 (not auto) or the block grows to full table height and the window scrolls instead. */
 @media (min-width: 640px) {
   .sheet-scroll--fill {
-    flex: 1 1 0;
-    min-height: 0;
+    flex: 0 1 auto;
     min-width: 0;
     overflow-x: auto;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+    overflow-y: visible;
   }
 }
 
