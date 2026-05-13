@@ -276,8 +276,11 @@ button:focus-visible {
     overflow-y: visible;
   }
 
-  /* No horizontal table scroll on desktop — table fits .sheet-wrap width; default
-     .sheet { min-width: max-content } pushes the sheet (and sticky header) off-page. */
+  /* Auto-fit columns: with `table-layout: fixed` + `width: 100%`, the browser
+     distributes available width across visible columns. Cancel the base
+     `min-width: max-content` so adding more columns shrinks each one to fit
+     instead of pushing the sheet off-page. Per-column min-widths still apply,
+     so a column won't crush below its declared minimum. */
   .list-villas-tab:not(.list-villas-tab--map) .sheet {
     min-width: 0;
   }
@@ -1494,7 +1497,7 @@ button:focus-visible {
 .col-caveats,
 .col-included {
   width: 11%;
-  min-width: 90px;
+  min-width: 64px;
   max-width: 200px;
 }
 .sheet td.col-amenities.amenities-expanded,
@@ -1754,8 +1757,13 @@ button:focus-visible {
   outline: none;
 }
 
+/* Reserved width for row actions (pencil + trash, ~20px each + gap + padding).
+   Without min-width, table-layout:fixed gives this `auto` column 0 (or negative)
+   space whenever the sum of other columns' min-widths exceeds the table width,
+   pushing the buttons off the right edge. */
 .col-catch {
-  width: auto;
+  width: 4.5rem;
+  min-width: 4rem;
 }
 
 .col-catch__edit-actions {
