@@ -16,6 +16,7 @@ export default function GetawayRow({
   isEditing,
   visibleColumns,
   sortIndex,
+  isPinnedNew,
   onEditStart,
   onEditEnd,
   onDelete,
@@ -94,6 +95,7 @@ export default function GetawayRow({
     onUnvote,
     partySize,
     sortIndex,
+    isPinnedNew,
   }
 
   function renderSpecialRow(
@@ -107,6 +109,13 @@ export default function GetawayRow({
       <tr style={rowStyle} onClick={rowProps?.onClick} title={rowProps?.title}>
         {visibleKeys.map((key) => {
           if (key === 'rank') {
+            if (isPinnedNew) {
+              return (
+                <td key={key} className="col-rank" aria-label="Recently added row">
+                  <span className="sheet-row-rank sheet-row-rank--new">NEW</span>
+                </td>
+              )
+            }
             return (
               <td key={key} className="col-rank" aria-label={`Row ${sortIndex}`}>
                 <span className="sheet-row-rank">{sortIndex}</span>

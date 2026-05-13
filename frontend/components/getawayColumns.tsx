@@ -88,6 +88,10 @@ export type CellRenderContext = {
   partySize?: number;
   /** 1-based index in the current sorted table order */
   sortIndex: number;
+  /** True for rows pinned to the top because they appeared after the table mounted.
+   *  These rows render a "NEW" badge in the rank cell instead of a number; the rank
+   *  numbering for the rest of the table starts at #1 below the pinned block. */
+  isPinnedNew?: boolean;
 };
 
 type ColumnDef = {
@@ -102,11 +106,16 @@ const COLUMN_CONFIG: Record<ColumnKey, ColumnDef> = {
     key: "rank",
     className: "col-rank",
     label: "#",
-    render: ({ className, sortIndex }) => (
-      <td className={className} aria-label={`Row ${sortIndex}`}>
-        <span className="sheet-row-rank">{sortIndex}</span>
-      </td>
-    ),
+    render: ({ className, sortIndex, isPinnedNew }) =>
+      isPinnedNew ? (
+        <td className={className} aria-label="Recently added row">
+          <span className="sheet-row-rank sheet-row-rank--new">NEW</span>
+        </td>
+      ) : (
+        <td className={className} aria-label={`Row ${sortIndex}`}>
+          <span className="sheet-row-rank">{sortIndex}</span>
+        </td>
+      ),
   },
   votes: {
     key: "votes",
@@ -481,6 +490,7 @@ export type CellRenderContextInput = Pick<
   | "onUnvote"
   | "partySize"
   | "sortIndex"
+  | "isPinnedNew"
 >;
 
 /** Render a cell for the given column key. */

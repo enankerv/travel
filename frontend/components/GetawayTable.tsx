@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useMemo } from 'react'
+import { useState, useRef, useMemo, useEffect, useCallback } from 'react'
 import { useListDetailContext } from '@/lib/ListDetailContext'
 import { useResizableColumns } from '@/hooks/useResizableColumns'
 import GetawayRow from './GetawayRow'
@@ -40,18 +40,72 @@ export default function GetawayTable({
   const triggerRef = useRef<HTMLButtonElement>(null)
   const { getColStyle, startResize } = useResizableColumns<ColumnKey>()
 
-  const sortedGetaways = useMemo(
-    () => sortGetaways(getaways || [], votesByGetaway ?? {}, sortOption),
-    [getaways, votesByGetaway, sortOption],
+  // "Seen" set: every row ID the user has acknowledged via either the initial
+  // load or a subsequent sort. Any row currently in `getaways` that is NOT in
+  // `seenIds` is treated as new — it pins to the top with a NEW badge.
+  //
+  // The model:
+  //  - seenIds starts as `null` (uninitialized). While null, nothing renders
+  //    as new and nothing pins to the top — we don't know what the baseline
+  //    is yet, so we can't flag anything against it.
+  //  - We snapshot the baseline as soon as load completes. Two trigger paths
+  //    so we behave correctly across the real data-load lifecycles:
+  //      (a) isLoading transitions true → false (the standard fetch flow,
+  //          even when it lands an empty result).
+  //      (b) We observe non-empty `getaways` (handles prefetched/cached
+  //          cases where isLoading is never set true).
+  //  - When the user changes sort, snapshot the current row set into seenIds.
+  //    Whatever was new becomes seen and slots into the new sort order on the
+  //    next render, automatically.
+  //  - Any row that arrives later (own scout, teammate scout) is not in
+  //    seenIds → renders as new at the top until the user re-sorts.
+  const [seenIds, setSeenIds] = useState<Set<string> | null>(null)
+  const prevLoadingRef = useRef<boolean | null>(null)
+
+  useEffect(() => {
+    const wasLoading = prevLoadingRef.current
+    prevLoadingRef.current = isLoading
+    if (seenIds !== null) return
+    const loadJustFinished = wasLoading === true && !isLoading
+    const hasContent = Array.isArray(getaways) && getaways.length > 0
+    if (loadJustFinished || hasContent) {
+      setSeenIds(new Set((getaways || []).map((g: any) => g.id)))
+    }
+  }, [seenIds, isLoading, getaways])
+
+  // Source order has newest at index 0 (realtime inserts via [row, ...prev]),
+  // so the natural array order already puts the newest new-row at the top of
+  // the pinned block. Before init, treat nothing as new.
+  const newIds = useMemo(() => {
+    if (seenIds === null) return [] as string[]
+    return (getaways || [])
+      .filter((g: any) => !seenIds.has(g.id))
+      .map((g: any) => g.id as string)
+  }, [getaways, seenIds])
+
+  const handleSortChange = useCallback(
+    (next: GetawaySortOption) => {
+      setSortOption(next)
+      setSeenIds(new Set((getaways || []).map((g: any) => g.id)))
+    },
+    [getaways],
+  )
+
+  const orderedGetaways = useMemo(
+    () =>
+      sortGetaways(getaways || [], votesByGetaway ?? {}, sortOption, {
+        pinFirstIds: newIds,
+      }),
+    [getaways, votesByGetaway, sortOption, newIds],
   )
 
   const maxVoteCount = useMemo(
     () =>
-      sortedGetaways.reduce(
-        (m, g) => Math.max(m, votesByGetaway?.[g.id]?.length ?? 0),
+      orderedGetaways.reduce(
+        (m: number, g: any) => Math.max(m, votesByGetaway?.[g.id]?.length ?? 0),
         0,
       ),
-    [sortedGetaways, votesByGetaway],
+    [orderedGetaways, votesByGetaway],
   )
 
   const votesColMinWidth = useMemo(
@@ -159,7 +213,7 @@ export default function GetawayTable({
                   <GetawaySortSelect
                     id="getaway-sort-table"
                     value={sortOption}
-                    onChange={setSortOption}
+                    onChange={handleSortChange}
                   />
                   <button
                     ref={triggerRef}
@@ -192,28 +246,39 @@ export default function GetawayTable({
             </tr>
           </thead>
           <tbody>
-            {sortedGetaways.map((getaway: any, rowIdx: number) => (
-              <GetawayRow
-                key={getaway.id}
-                sortIndex={rowIdx + 1}
-                getaway={getaway}
-                isEditing={editingId === getaway.id}
-                visibleColumns={visibleColumns}
-                onEditStart={() => handleEditStart(getaway.id)}
-                onEditEnd={(updatedData: any) => handleEditEnd(getaway.id, updatedData)}
-                onDelete={() => onDelete && onDelete(getaway.id)}
-                onImageClick={onImageClick}
-                onRetry={getaway.source_url ? () => onRetry && onRetry(getaway) : undefined}
-                onPasteClick={onPasteClick}
-                onCommentClick={onCommentClick ? () => onCommentClick(getaway.id) : undefined}
-                votesByGetaway={votesByGetaway}
-                commentsByGetaway={commentsByGetaway}
-                currentUserId={currentUserId}
-                canVote={isListMember}
-                onVote={onVote}
-                onUnvote={onUnvote}
-              />
-            ))}
+            {(() => {
+              // Rank numbers count only non-pinned rows so the sorted region
+              // below the NEW block always reads #1, #2, #3...
+              let sortedRank = 0
+              return orderedGetaways.map((getaway: any) => {
+                const isPinnedNew =
+                  seenIds !== null && !seenIds.has(getaway.id)
+                const sortIndex = isPinnedNew ? 0 : ++sortedRank
+                return (
+                  <GetawayRow
+                    key={getaway.id}
+                    sortIndex={sortIndex}
+                    isPinnedNew={isPinnedNew}
+                    getaway={getaway}
+                    isEditing={editingId === getaway.id}
+                    visibleColumns={visibleColumns}
+                    onEditStart={() => handleEditStart(getaway.id)}
+                    onEditEnd={(updatedData: any) => handleEditEnd(getaway.id, updatedData)}
+                    onDelete={() => onDelete && onDelete(getaway.id)}
+                    onImageClick={onImageClick}
+                    onRetry={getaway.source_url ? () => onRetry && onRetry(getaway) : undefined}
+                    onPasteClick={onPasteClick}
+                    onCommentClick={onCommentClick ? () => onCommentClick(getaway.id) : undefined}
+                    votesByGetaway={votesByGetaway}
+                    commentsByGetaway={commentsByGetaway}
+                    currentUserId={currentUserId}
+                    canVote={isListMember}
+                    onVote={onVote}
+                    onUnvote={onUnvote}
+                  />
+                )
+              })
+            })()}
           </tbody>
         </table>
       </div>
