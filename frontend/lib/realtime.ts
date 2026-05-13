@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { presenceColorForUserId } from "@/lib/presenceColors";
 
 /** Event to trigger optimistic credit decrement (before realtime confirms). */
 export const SCOUT_OPTIMISTIC_DECREMENT = "scout-credits-optimistic-decrement";
@@ -16,7 +17,53 @@ export type PresenceUser = {
   user_id: string;
   first_name?: string;
   avatar_url?: string;
+  /** Deterministic per-user; set from presence track for viewers. */
+  cursor_color?: string;
 };
+
+/** Client broadcast payload for shared-pointer cursors (same channel as list updates). */
+export type ListCursorBroadcastPayload = {
+  user_id?: string;
+  surface?: "table" | "map";
+  nx?: number;
+  ny?: number;
+  /** When true, receivers should drop this user's cursor for this surface. */
+  leave?: boolean;
+};
+
+const listCursorSubscribers = new Map<
+  string,
+  Set<(p: ListCursorBroadcastPayload) => void>
+>();
+
+function dispatchListCursor(listId: string, payload: ListCursorBroadcastPayload) {
+  const set = listCursorSubscribers.get(listId);
+  if (!set?.size) return;
+  for (const cb of set) {
+    try {
+      cb(payload);
+    } catch {
+      /* ignore subscriber errors */
+    }
+  }
+}
+
+/** Register for `cursor` broadcasts on `list:<listId>` (dispatched from useListRealtime). */
+export function subscribeListCursorBroadcast(
+  listId: string,
+  cb: (p: ListCursorBroadcastPayload) => void,
+): () => void {
+  let set = listCursorSubscribers.get(listId);
+  if (!set) {
+    set = new Set();
+    listCursorSubscribers.set(listId, set);
+  }
+  set.add(cb);
+  return () => {
+    set!.delete(cb);
+    if (set!.size === 0) listCursorSubscribers.delete(listId);
+  };
+}
 
 type GetawayRow = { id: string; updated_at?: string; [key: string]: any };
 
@@ -66,7 +113,15 @@ export function useListGetawaysRealtime({
     };
 
     const channel = supabase
-      .channel(`list:${listId}`, { config: { private: true } })
+      .channel(`list:${listId}`, {
+        config: {
+          private: true,
+          broadcast: {
+            self: process.env.NODE_ENV === 'development',
+            ack: false,
+          },
+        },
+      })
       .on("broadcast", { event: "INSERT" }, (p: any) =>
         applyChange("INSERT", p.payload?.record, null),
       )
@@ -166,7 +221,15 @@ export function useListRealtime({
     };
 
     const channel = supabase
-      .channel(`list:${listId}`, { config: { private: true } })
+      .channel(`list:${listId}`, {
+        config: {
+          private: true,
+          broadcast: {
+            self: process.env.NODE_ENV === 'development',
+            ack: false,
+          },
+        },
+      })
       .on("broadcast", { event: "INSERT" }, (p: any) =>
         applyGetawayChange("INSERT", p.payload?.record, null),
       )
@@ -205,6 +268,9 @@ export function useListRealtime({
       .on("broadcast", { event: "COMMENT_DELETE" }, (p: any) => {
         const r = p.payload?.old_record;
         if (r?.id && r?.getaway_id && onCommentDelete) onCommentDelete(r.id, r.getaway_id);
+      })
+      .on("broadcast", { event: "cursor" }, (p: any) => {
+        dispatchListCursor(listId, (p.payload ?? {}) as ListCursorBroadcastPayload);
       })
       .on(
         "postgres_changes",
@@ -264,7 +330,15 @@ export function useListVotesRealtime({
     if (!enabled) return;
 
     const channel = supabase
-      .channel(`list:${listId}`, { config: { private: true } })
+      .channel(`list:${listId}`, {
+        config: {
+          private: true,
+          broadcast: {
+            self: process.env.NODE_ENV === 'development',
+            ack: false,
+          },
+        },
+      })
       .on("broadcast", { event: "VOTE_INSERT" }, (p: any) => {
         const r = p.payload?.record;
         if (r?.getaway_id && r?.user_id) {
@@ -343,6 +417,9 @@ export function useListPresence({
                 user_id: p.user_id,
                 first_name: p.first_name,
                 avatar_url: p.avatar_url,
+                cursor_color:
+                  (p as { cursor_color?: string }).cursor_color ||
+                  presenceColorForUserId(p.user_id),
               });
           }
         }
@@ -350,7 +427,12 @@ export function useListPresence({
       })
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
-          channel.track({ user_id: user.id, first_name, avatar_url });
+          channel.track({
+            user_id: user.id,
+            first_name,
+            avatar_url,
+            cursor_color: presenceColorForUserId(user.id),
+          });
         }
       });
 

@@ -2518,6 +2518,51 @@ button:focus-visible {
   margin-right: 0;
 }
 
+.list-villas-tab__table-wrap > .list-cursor-surface {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.list-cursor-surface > .sheet-wrap {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+.list-cursor-surface__peers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.list-cursor-peer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  overflow: visible;
+  color: inherit;
+  pointer-events: none;
+}
+
+.list-cursor-peer__svg {
+  display: block;
+  position: absolute;
+  left: -15px;
+  top: -15px;
+  width: 35px;
+  height: 35px;
+  overflow: visible;
+  will-change: transform;
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.55));
+}
+
 /* Getaway map */
 .getaway-map {
   flex: 1;

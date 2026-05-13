@@ -13,6 +13,7 @@ import CommentsSidebar from "./CommentsSidebar";
 import MapGetawaySidebar from "./MapGetawaySidebar";
 import GetawayDetailSheet from "./GetawayDetailSheet";
 import GetawayListView from "./GetawayListView";
+import ListCursorSurface from "./ListCursorSurface";
 import ScoutBookmarklet from "./ScoutBookmarklet";
 import { dispatchScoutOptimisticDecrement, dispatchScoutOptimisticRefund } from "@/components/ScoutCredits";
 
@@ -365,18 +366,20 @@ export default function ListGetawaysTab({
       >
         <div className="list-villas-tab__table-wrap">
           {viewMode === "table" ? (
-            <GetawayListView
-              isLoading={isLoading}
-              onDelete={handleDeleteGetaway}
-              onUpdate={handleUpdateGetaway}
-              onImageClick={handleImageClick}
-              onRetry={handleRetryGetaway}
-              onPasteClick={handlePasteClick}
-              onCommentClick={(getawayId: string) => {
-                onCommentsOpenChange?.(true);
-                onFocusedGetawayChange?.(getawayId);
-              }}
-            />
+            <ListCursorSurface listId={listId} enabled={!isMobile}>
+              <GetawayListView
+                isLoading={isLoading}
+                onDelete={handleDeleteGetaway}
+                onUpdate={handleUpdateGetaway}
+                onImageClick={handleImageClick}
+                onRetry={handleRetryGetaway}
+                onPasteClick={handlePasteClick}
+                onCommentClick={(getawayId: string) => {
+                  onCommentsOpenChange?.(true);
+                  onFocusedGetawayChange?.(getawayId);
+                }}
+              />
+            </ListCursorSurface>
           ) : (
             <GetawayMap
               getaways={getaways}

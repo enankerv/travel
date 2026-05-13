@@ -4,6 +4,7 @@ import { useState, useEffect, type ReactNode } from "react";
 import { getGetaways, getListMembers, getListVotes, getListComments } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
 import { useListRealtime, useListPresence, PresenceUser } from "@/lib/realtime";
+import { presenceColorForUserId } from "@/lib/presenceColors";
 import { useListVotes } from "@/hooks/useListVotes";
 import { ListDetailProvider } from "@/lib/ListDetailContext";
 import ListGetawaysTab from "./ListGetawaysTab";
@@ -191,6 +192,9 @@ export default function ListDetailView({
                     key={u.user_id}
                     className="list-detail-presence__avatar"
                     title={u.first_name || u.user_id.slice(0, 8)}
+                    style={{
+                      borderColor: u.cursor_color || presenceColorForUserId(u.user_id),
+                    }}
                   >
                     {u.avatar_url ? (
                       <img
