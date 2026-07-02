@@ -8,6 +8,7 @@ no per-row bucket detection — pass the paths straight to
 
 Uses the user's auth token; RLS still applies (never service role).
 """
+from __future__ import annotations
 
 BUCKET = "getaway-images"
 EXPIRE_SEC = 3600  # 1 hour

@@ -1,4 +1,6 @@
 """Scout quota: credits only (5 free on first use, no monthly reset). Uses service role."""
+from __future__ import annotations
+
 from datetime import datetime
 from db.client import get_service_client
 

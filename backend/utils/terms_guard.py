@@ -1,4 +1,6 @@
 """Terms and age verification: block API access for users who haven't accepted terms or verified age."""
+from __future__ import annotations
+
 import base64
 import json
 import os

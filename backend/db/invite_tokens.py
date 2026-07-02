@@ -1,4 +1,6 @@
 """Invite tokens table operations."""
+from __future__ import annotations
+
 import secrets
 from datetime import datetime, timedelta
 from db.client import get_supabase_client

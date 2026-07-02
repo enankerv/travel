@@ -1,4 +1,6 @@
 """Comments table operations. Per getaway per list; list members read, owner can edit."""
+from __future__ import annotations
+
 from db.client import get_supabase_client
 
 

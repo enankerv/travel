@@ -1,4 +1,6 @@
 """Getaway scouting and data extraction engine."""
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass
 

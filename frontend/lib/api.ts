@@ -1,6 +1,11 @@
 import { supabase } from './supabase'
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+function normalizeHttpUrl(url: string): string {
+  if (url.startsWith('http://') || url.startsWith('https://')) return url
+  return `http://${url}`
+}
+
+export const API_URL = normalizeHttpUrl(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
 
 /** Resolve image URL - only full URLs (e.g. signed Supabase) work; storage paths need signing via API */
 export function resolveImageUrl(url: string): string {

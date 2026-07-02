@@ -1,4 +1,6 @@
 """OpenCage geocoding for getaway locations. Rate limited to 1 req/sec (free tier)."""
+from __future__ import annotations
+
 import json
 import logging
 import os

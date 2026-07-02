@@ -1,4 +1,6 @@
 """Votes table operations. One vote per user per getaway per list."""
+from __future__ import annotations
+
 from db.client import get_supabase_client
 
 

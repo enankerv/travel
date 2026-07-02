@@ -1,4 +1,6 @@
 """URL manipulation and parameter handling utilities."""
+from __future__ import annotations
+
 import re
 from urllib.parse import urlencode, urlparse, parse_qs, urlunparse, urljoin
 

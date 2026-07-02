@@ -1,4 +1,6 @@
 """Scout endpoints (URL and paste)."""
+from __future__ import annotations
+
 import asyncio
 from typing import Optional
 

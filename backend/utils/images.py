@@ -1,4 +1,6 @@
 """Image handling, filtering, and upload utilities."""
+from __future__ import annotations
+
 import io
 import re
 import logging
