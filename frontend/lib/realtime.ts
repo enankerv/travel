@@ -180,16 +180,9 @@ type UseListCommentsRealtimeOptions = {
   onCommentDelete?: (commentId: string, getawayId: string) => void;
 };
 
-type UseListPoisRealtimeOptions = {
-  onPoiInsert?: (row: any) => void;
-  onPoiUpdate?: (row: any) => void;
-  onPoiDelete?: (id: string) => void;
-};
-
 type UseListRealtimeOptions = UseListGetawaysRealtimeOptions &
   UseListVotesRealtimeOptions &
-  UseListCommentsRealtimeOptions &
-  UseListPoisRealtimeOptions;
+  UseListCommentsRealtimeOptions;
 
 /**
  * Single subscription to list channel for both getaways and votes.
@@ -207,9 +200,6 @@ export function useListRealtime({
   onCommentInsert,
   onCommentUpdate,
   onCommentDelete,
-  onPoiInsert,
-  onPoiUpdate,
-  onPoiDelete,
 }: UseListRealtimeOptions) {
   useEffect(() => {
     if (!enabled) return;
@@ -228,16 +218,6 @@ export function useListRealtime({
       if (event === "INSERT" && newRow) onInsert(newRow);
       else if (event === "UPDATE" && newRow) onUpdate(newRow);
       else if (event === "DELETE" && oldRow?.id) onDelete(oldRow.id);
-    };
-
-    const applyPoiChange = (event: string, newRow: any, oldRow: any) => {
-      const dedupeKey = `poi:${event}:${newRow?.id ?? oldRow?.id ?? "?"}:${newRow?.updated_at ?? oldRow?.updated_at ?? Date.now()}`;
-      if (recentIds.has(dedupeKey)) return;
-      markSeen(dedupeKey);
-
-      if (event === "INSERT" && newRow) onPoiInsert?.(newRow);
-      else if (event === "UPDATE" && newRow) onPoiUpdate?.(newRow);
-      else if (event === "DELETE" && oldRow?.id) onPoiDelete?.(oldRow.id);
     };
 
     const channel = supabase
@@ -289,16 +269,6 @@ export function useListRealtime({
         const r = p.payload?.old_record;
         if (r?.id && r?.getaway_id && onCommentDelete) onCommentDelete(r.id, r.getaway_id);
       })
-      .on("broadcast", { event: "POI_INSERT" }, (p: any) =>
-        applyPoiChange("INSERT", p.payload?.record, null),
-      )
-      .on("broadcast", { event: "POI_UPDATE" }, (p: any) =>
-        applyPoiChange("UPDATE", p.payload?.record, p.payload?.old_record ?? null),
-      )
-      .on("broadcast", { event: "POI_DELETE" }, (p: any) => {
-        const oldRecord = p.payload?.old_record ?? p.payload?.record;
-        applyPoiChange("DELETE", null, oldRecord);
-      })
       .on("broadcast", { event: "cursor" }, (p: any) => {
         dispatchListCursor(listId, (p.payload ?? {}) as ListCursorBroadcastPayload);
       })
@@ -329,22 +299,6 @@ export function useListRealtime({
           onImagesChange?.();
         },
       )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "pois",
-          filter: `list_id=eq.${listId}`,
-        },
-        (payload: { eventType?: string; new?: any; old?: any }) => {
-          applyPoiChange(
-            payload.eventType ?? "",
-            payload.new,
-            payload.old ?? null,
-          );
-        },
-      )
       .subscribe();
 
     return () => {
@@ -362,9 +316,6 @@ export function useListRealtime({
     onCommentInsert,
     onCommentUpdate,
     onCommentDelete,
-    onPoiInsert,
-    onPoiUpdate,
-    onPoiDelete,
   ]);
 }
 

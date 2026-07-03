@@ -1,7 +1,8 @@
 """Point of interest domain model (entity + persistence)."""
 from __future__ import annotations
 
-from typing import Literal, Optional, Self
+from collections.abc import Mapping
+from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -9,34 +10,69 @@ from utils.geocode import geocode_from_location_region
 
 PoiType = Literal["restaurant", "activity", "business", "place", "other"]
 
-READONLY_FIELDS = frozenset({"id", "list_id", "user_id", "created_at", "updated_at"})
+# Extensible type-specific payload; graduates to dedicated columns/tables later.
+PoiMetadata = dict[str, Any]
+
+
+class PoiInput(BaseModel):
+    """Fields accepted when creating a POI."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    poi_type: PoiType = "other"
+    name: str = Field(min_length=1)
+    description: str | None = None
+    location: str | None = None
+    region: str | None = None
+    lat: float | None = None
+    lng: float | None = None
+    source_url: str | None = None
+    notes: str | None = None
+    metadata: PoiMetadata | None = None
+
+
+class PoiPatch(BaseModel):
+    """Fields accepted when partially updating a POI."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    poi_type: PoiType | None = None
+    name: str | None = Field(default=None, min_length=1)
+    description: str | None = None
+    location: str | None = None
+    region: str | None = None
+    lat: float | None = None
+    lng: float | None = None
+    source_url: str | None = None
+    notes: str | None = None
+    metadata: PoiMetadata | None = None
 
 
 class Poi(BaseModel):
     """
-    A point of interest on a list — restaurants, activities, places, etc.
+    A persisted point of interest on a list.
 
-    Single domain class for validation, geocoding, and DB access. Routes act as
-    thin controllers that parse auth and delegate here.
+    Returned by all read and write operations. Input shapes are ``PoiInput``
+    (create) and ``PoiPatch`` (update).
     """
 
     model_config = ConfigDict(extra="ignore")
 
-    id: Optional[str] = None
-    list_id: Optional[str] = None
-    user_id: Optional[str] = None
-    poi_type: PoiType = "other"
-    name: Optional[str] = None
-    description: Optional[str] = None
-    location: Optional[str] = None
-    region: Optional[str] = None
-    lat: Optional[float] = None
-    lng: Optional[float] = None
-    source_url: Optional[str] = None
-    notes: Optional[str] = None
-    metadata: dict = Field(default_factory=dict)
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    id: str
+    list_id: str
+    user_id: str | None
+    poi_type: PoiType
+    name: str
+    description: str | None = None
+    location: str | None = None
+    region: str | None = None
+    lat: float | None = None
+    lng: float | None = None
+    source_url: str | None = None
+    notes: str | None = None
+    metadata: PoiMetadata = Field(default_factory=dict)
+    created_at: str
+    updated_at: str
 
     @classmethod
     def _table(cls, auth_token: str):
@@ -45,18 +81,25 @@ class Poi(BaseModel):
         return get_supabase_client(auth_token).table("pois")
 
     @classmethod
-    def from_row(cls, row: dict) -> Self:
+    def from_row(cls, row: Mapping[str, Any]) -> Self:
+        """Parse a DB row into a fully typed persisted POI."""
         return cls.model_validate(row)
 
     @classmethod
-    def list_for(cls, list_id: str, auth_token: str, poi_type: str | None = None) -> list[Self]:
+    def list_for(
+        cls,
+        list_id: str,
+        auth_token: str,
+        *,
+        poi_type: PoiType | None = None,
+    ) -> list[Self]:
         query = (
             cls._table(auth_token)
             .select("*")
             .eq("list_id", list_id)
             .order("created_at", desc=True)
         )
-        if poi_type:
+        if poi_type is not None:
             query = query.eq("poi_type", poi_type)
         response = query.execute()
         return [cls.from_row(row) for row in (response.data or [])]
@@ -75,12 +118,9 @@ class Poi(BaseModel):
         return cls.from_row(response.data[0])
 
     @classmethod
-    def create(cls, list_id: str, user_id: str, auth_token: str, fields: dict) -> Self:
-        data = {k: v for k, v in fields.items() if k not in READONLY_FIELDS}
-        name = (data.get("name") or "").strip()
-        if not name:
-            raise ValueError("name is required")
-        data["name"] = name
+    def create(cls, list_id: str, user_id: str, auth_token: str, input: PoiInput) -> Self:
+        data = input.model_dump(exclude_unset=True)
+        data["name"] = input.name.strip()
         if data.get("metadata") is None:
             data["metadata"] = {}
         cls._geocode_fields(data)
@@ -92,20 +132,16 @@ class Poi(BaseModel):
             raise RuntimeError("Failed to create POI")
         return cls.from_row(response.data[0])
 
-    def update(self, auth_token: str, fields: dict) -> Self:
-        if not self.id or not self.list_id:
-            raise ValueError("Cannot update an unpersisted POI")
-
-        updates = {k: v for k, v in fields.items() if k not in READONLY_FIELDS}
+    def update(self, auth_token: str, patch: PoiPatch) -> Self:
+        updates = patch.model_dump(exclude_unset=True)
         if not updates:
             raise ValueError("No fields to update")
 
-        current = self.model_dump()
-        cls = type(self)
-        cls._geocode_on_location_change(current, updates)
+        type(self)._geocode_on_location_change(self.model_dump(), updates)
 
         response = (
-            cls._table(auth_token)
+            type(self)
+            ._table(auth_token)
             .update(updates)
             .eq("list_id", self.list_id)
             .eq("id", self.id)
@@ -113,12 +149,9 @@ class Poi(BaseModel):
         )
         if not response.data:
             raise LookupError("POI not found")
-        return cls.from_row(response.data[0])
+        return type(self).from_row(response.data[0])
 
-    def delete(self, auth_token: str) -> bool:
-        if not self.id or not self.list_id:
-            raise ValueError("Cannot delete an unpersisted POI")
-
+    def delete(self, auth_token: str) -> None:
         response = (
             type(self)
             ._table(auth_token)
@@ -127,10 +160,11 @@ class Poi(BaseModel):
             .eq("id", self.id)
             .execute()
         )
-        return bool(response.data)
+        if not response.data:
+            raise LookupError("POI not found")
 
     @staticmethod
-    def _geocode_fields(data: dict) -> None:
+    def _geocode_fields(data: dict[str, Any]) -> None:
         if data.get("lat") is not None and data.get("lng") is not None:
             return
         lat, lng = geocode_from_location_region(data.get("location"), data.get("region"))
@@ -139,9 +173,9 @@ class Poi(BaseModel):
             data["lng"] = lng
 
     @staticmethod
-    def _geocode_on_location_change(current: dict, updates: dict) -> None:
-        def _strip(s: Optional[str]) -> str:
-            return (s or "").strip()
+    def _geocode_on_location_change(current: Mapping[str, Any], updates: dict[str, Any]) -> None:
+        def _strip(value: Any) -> str:
+            return (value or "").strip() if isinstance(value, str) else ""
 
         touched_loc = "location" in updates
         touched_reg = "region" in updates
@@ -157,3 +191,7 @@ class Poi(BaseModel):
             lat, lng = geocode_from_location_region(new_loc, new_reg)
             updates["lat"] = lat
             updates["lng"] = lng
+
+
+class PoiDeleteResult(BaseModel):
+    ok: Literal[True] = True
