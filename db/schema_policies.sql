@@ -208,6 +208,28 @@ CREATE POLICY "Editors can delete getaways from lists"
   ON getaways FOR DELETE
   USING (user_has_verified_terms_and_age() AND is_list_owner_or_editor(getaways.list_id, auth.uid()));
 
+-- Points of interest ---------------------------------------------------------
+
+DROP POLICY IF EXISTS "Users can view pois in their lists" ON pois;
+CREATE POLICY "Users can view pois in their lists"
+  ON pois FOR SELECT
+  USING (user_has_verified_terms_and_age() AND is_list_owner_or_member(pois.list_id, auth.uid()));
+
+DROP POLICY IF EXISTS "Users can add pois to lists they have access to" ON pois;
+CREATE POLICY "Users can add pois to lists they have access to"
+  ON pois FOR INSERT
+  WITH CHECK (user_has_verified_terms_and_age() AND is_list_owner_or_editor(pois.list_id, auth.uid()));
+
+DROP POLICY IF EXISTS "Users can update pois in lists they have access to" ON pois;
+CREATE POLICY "Users can update pois in lists they have access to"
+  ON pois FOR UPDATE
+  USING (user_has_verified_terms_and_age() AND is_list_owner_or_editor(pois.list_id, auth.uid()));
+
+DROP POLICY IF EXISTS "Editors can delete pois from lists" ON pois;
+CREATE POLICY "Editors can delete pois from lists"
+  ON pois FOR DELETE
+  USING (user_has_verified_terms_and_age() AND is_list_owner_or_editor(pois.list_id, auth.uid()));
+
 -- Getaway images -------------------------------------------------------------
 
 DROP POLICY IF EXISTS "Users can view images in their getaways" ON getaway_images;
