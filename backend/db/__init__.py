@@ -21,6 +21,13 @@ from db.getaways import (
     delete_getaway_by_slug,
     insert_getaway_images,
 )
+from db.pois import (
+    insert_poi,
+    get_list_pois,
+    get_poi_by_slug,
+    update_poi_by_slug,
+    delete_poi_by_slug,
+)
 
 __all__ = [
     "get_supabase_client",
@@ -48,4 +55,9 @@ __all__ = [
     "delete_getaway",
     "delete_getaway_by_slug",
     "insert_getaway_images",
+    "insert_poi",
+    "get_list_pois",
+    "get_poi_by_slug",
+    "update_poi_by_slug",
+    "delete_poi_by_slug",
 ]

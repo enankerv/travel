@@ -3,6 +3,7 @@
 import { useState, useEffect, type ReactNode } from "react";
 import {
   getGetaways,
+  getPois,
   getListMembers,
   getListVotes,
   getListComments,
@@ -13,6 +14,7 @@ import { presenceColorForUserId } from "@/lib/presenceColors";
 import { useListVotes } from "@/hooks/useListVotes";
 import { ListDetailProvider } from "@/lib/ListDetailContext";
 import ListGetawaysTab from "./ListGetawaysTab";
+import ListIdeasTab from "./ListIdeasTab";
 import ListMembersTab from "./ListMembersTab";
 import ScoutCredits from "./ScoutCredits";
 
@@ -34,8 +36,9 @@ export default function ListDetailView({
 }) {
   const { user } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<"places" | "members">("places");
+  const [activeTab, setActiveTab] = useState<"places" | "ideas" | "members">("places");
   const [getaways, setGetaways] = useState<any[]>([]);
+  const [pois, setPois] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [commentsByGetaway, setCommentsByGetaway] = useState<
     Record<string, any[]>
@@ -71,6 +74,10 @@ export default function ListDetailView({
       setGetaways((prev) => prev.map((g) => (g.id === row.id ? row : g))),
     onDelete: (id) => setGetaways((prev) => prev.filter((g) => g.id !== id)),
     onImagesChange: () => loadData(true),
+    onPoiInsert: (row) => setPois((prev) => [row, ...prev.filter((p) => p.id !== row.id)]),
+    onPoiUpdate: (row) =>
+      setPois((prev) => prev.map((p) => (p.id === row.id ? row : p))),
+    onPoiDelete: (id) => setPois((prev) => prev.filter((p) => p.id !== id)),
     onVoteInsert: votes.onVoteInsert,
     onVoteDelete: votes.onVoteDelete,
     onCommentInsert: (c) =>
@@ -138,14 +145,16 @@ export default function ListDetailView({
   async function loadData(silent = false) {
     if (!silent) setIsLoading(true);
     try {
-      const [getawaysData, membersData, votesData, commentsData] =
+      const [getawaysData, poisData, membersData, votesData, commentsData] =
         await Promise.all([
           getGetaways(list.id),
+          getPois(list.id),
           getListMembers(list.id),
           getListVotes(list.id),
           getListComments(list.id),
         ]);
       setGetaways(getawaysData || []);
+      setPois(poisData || []);
       const memberRows = membersData?.members || [];
       setMembers(memberRows);
       if (!dataLoaded) {
@@ -251,6 +260,13 @@ export default function ListDetailView({
             </button>
             <button
               type="button"
+              onClick={() => setActiveTab("ideas")}
+              className={`list-detail-tabs__tab ${activeTab === "ideas" ? "list-detail-tabs__tab--active" : ""}`}
+            >
+              Ideas ({pois.length})
+            </button>
+            <button
+              type="button"
               onClick={() => setActiveTab("members")}
               className={`list-detail-tabs__tab ${activeTab === "members" ? "list-detail-tabs__tab--active" : ""}`}
             >
@@ -285,6 +301,15 @@ export default function ListDetailView({
             focusedGetawayId={focusedGetawayId}
             onFocusedGetawayChange={setFocusedGetawayId}
             onStickyContent={setPlacesStickyContent}
+          />
+        )}
+
+        {activeTab === "ideas" && (
+          <ListIdeasTab
+            listId={list.id}
+            pois={pois}
+            setPois={setPois}
+            isLoading={isLoading}
           />
         )}
 

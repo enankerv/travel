@@ -135,6 +135,71 @@ export async function deleteGetaway(listId: string, slug: string) {
   return res.json()
 }
 
+export type PoiType = 'restaurant' | 'activity' | 'business' | 'place' | 'other'
+
+export type PoiRecord = {
+  id: string
+  list_id: string
+  user_id?: string | null
+  slug: string
+  poi_type: PoiType
+  name: string
+  description?: string | null
+  location?: string | null
+  region?: string | null
+  lat?: number | null
+  lng?: number | null
+  source_url?: string | null
+  notes?: string | null
+  metadata?: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+// Points of interest (restaurants, activities, places, etc.)
+export async function getPois(listId: string, poiType?: PoiType): Promise<PoiRecord[]> {
+  const headers = await getAuthHeaders()
+  const qs = poiType ? `?poi_type=${encodeURIComponent(poiType)}` : ''
+  const res = await fetch(`${API_URL}/api/lists/${listId}/pois${qs}`, { headers })
+  if (!res.ok) throw new Error('Failed to fetch ideas')
+  return res.json()
+}
+
+export async function createPoi(listId: string, data: Record<string, unknown>): Promise<PoiRecord> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_URL}/api/lists/${listId}/pois`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.detail || 'Failed to create idea')
+  }
+  return res.json()
+}
+
+export async function updatePoi(listId: string, slug: string, updates: Record<string, unknown>) {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_URL}/api/lists/${listId}/pois/${slug}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(updates),
+  })
+  if (!res.ok) throw new Error('Failed to update idea')
+  return res.json()
+}
+
+export async function deletePoi(listId: string, slug: string) {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_URL}/api/lists/${listId}/pois/${slug}`, {
+    method: 'DELETE',
+    headers,
+  })
+  if (!res.ok) throw new Error('Failed to delete idea')
+  return res.json()
+}
+
 async function scoutErrorFromResponse(res: Response, fallback: string): Promise<string> {
   if (res.status === 429) {
     try {

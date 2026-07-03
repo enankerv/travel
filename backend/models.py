@@ -143,6 +143,60 @@ class GetawayEditorUpdate(BaseModel):
 
 
 # ============================================================================
+# POI MODELS
+# ============================================================================
+
+PoiType = Literal["restaurant", "activity", "business", "place", "other"]
+
+
+class PoiCreate(BaseModel):
+    name: str
+    poi_type: PoiType = "other"
+    description: Optional[str] = None
+    location: Optional[str] = None
+    region: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    source_url: Optional[str] = None
+    notes: Optional[str] = None
+    metadata: Optional[dict] = None
+
+
+class PoiUpdate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    name: Optional[str] = None
+    poi_type: Optional[PoiType] = None
+    description: Optional[str] = None
+    location: Optional[str] = None
+    region: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    source_url: Optional[str] = None
+    notes: Optional[str] = None
+    metadata: Optional[dict] = None
+
+
+class PoiResponse(BaseModel):
+    id: str
+    list_id: str
+    user_id: Optional[str] = None
+    slug: str
+    poi_type: PoiType
+    name: str
+    description: Optional[str] = None
+    location: Optional[str] = None
+    region: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    source_url: Optional[str] = None
+    notes: Optional[str] = None
+    metadata: dict = Field(default_factory=dict)
+    created_at: str
+    updated_at: str
+
+
+# ============================================================================
 # SCOUT MODELS
 # ============================================================================
 
