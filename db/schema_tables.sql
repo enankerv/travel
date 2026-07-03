@@ -142,7 +142,6 @@ CREATE TABLE IF NOT EXISTS public.pois (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   list_id UUID NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
   user_id UUID,
-  slug TEXT NOT NULL,
   poi_type TEXT NOT NULL DEFAULT 'other'
     CHECK (poi_type IN ('restaurant', 'activity', 'business', 'place', 'other')),
   name TEXT NOT NULL,
@@ -153,8 +152,7 @@ CREATE TABLE IF NOT EXISTS public.pois (
   notes TEXT,
   metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(list_id, slug)
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_pois_list_id ON pois(list_id);

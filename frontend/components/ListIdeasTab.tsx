@@ -7,7 +7,6 @@ import CreatePoiModal, { type PoiFormData } from "./CreatePoiModal";
 export type PoiRecord = {
   id: string;
   list_id: string;
-  slug: string;
   poi_type: string;
   name: string;
   description?: string | null;
@@ -48,7 +47,7 @@ export default function ListIdeasTab({
 }) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [error, setError] = useState("");
-  const [deletingSlug, setDeletingSlug] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   async function handleCreate(data: PoiFormData) {
     const payload: Record<string, string> = {
@@ -65,17 +64,17 @@ export default function ListIdeasTab({
     setPois((prev) => [created, ...prev]);
   }
 
-  async function handleDelete(slug: string) {
+  async function handleDelete(poiId: string) {
     if (!confirm("Remove this idea from the list?")) return;
-    setDeletingSlug(slug);
+    setDeletingId(poiId);
     setError("");
     try {
-      await deletePoi(listId, slug);
-      setPois((prev) => prev.filter((p) => p.slug !== slug));
+      await deletePoi(listId, poiId);
+      setPois((prev) => prev.filter((p) => p.id !== poiId));
     } catch (err: any) {
       setError(err.message || "Failed to delete idea");
     } finally {
-      setDeletingSlug(null);
+      setDeletingId(null);
     }
   }
 
@@ -240,14 +239,14 @@ export default function ListIdeasTab({
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleDelete(poi.slug)}
-                    disabled={deletingSlug === poi.slug}
+                    onClick={() => handleDelete(poi.id)}
+                    disabled={deletingId === poi.id}
                     title="Remove idea"
                     style={{
                       background: "transparent",
                       border: "none",
                       color: "var(--muted)",
-                      cursor: deletingSlug === poi.slug ? "wait" : "pointer",
+                      cursor: deletingId === poi.id ? "wait" : "pointer",
                       fontSize: "1.25rem",
                       lineHeight: 1,
                       padding: "0.25rem",

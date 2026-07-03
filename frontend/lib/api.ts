@@ -141,7 +141,6 @@ export type PoiRecord = {
   id: string
   list_id: string
   user_id?: string | null
-  slug: string
   poi_type: PoiType
   name: string
   description?: string | null
@@ -179,9 +178,9 @@ export async function createPoi(listId: string, data: Record<string, unknown>): 
   return res.json()
 }
 
-export async function updatePoi(listId: string, slug: string, updates: Record<string, unknown>) {
+export async function updatePoi(listId: string, poiId: string, updates: Record<string, unknown>) {
   const headers = await getAuthHeaders()
-  const res = await fetch(`${API_URL}/api/lists/${listId}/pois/${slug}`, {
+  const res = await fetch(`${API_URL}/api/lists/${listId}/pois/${poiId}`, {
     method: 'PUT',
     headers,
     body: JSON.stringify(updates),
@@ -190,9 +189,9 @@ export async function updatePoi(listId: string, slug: string, updates: Record<st
   return res.json()
 }
 
-export async function deletePoi(listId: string, slug: string) {
+export async function deletePoi(listId: string, poiId: string) {
   const headers = await getAuthHeaders()
-  const res = await fetch(`${API_URL}/api/lists/${listId}/pois/${slug}`, {
+  const res = await fetch(`${API_URL}/api/lists/${listId}/pois/${poiId}`, {
     method: 'DELETE',
     headers,
   })
