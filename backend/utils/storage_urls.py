@@ -1,7 +1,7 @@
-"""Generate signed URLs for getaway images stored in Supabase Storage.
+"""Generate signed URLs for POI images stored in Supabase Storage.
 
-Single-bucket world: every getaway image lives in ``getaway-images`` as a
-relative storage path like ``<getaway_id>/00.jpg`` (see
+Single-bucket world: every POI image lives in ``getaway-images`` as a
+relative storage path like ``<poi_id>/00.jpg`` (see
 ``utils.images.upload_images_to_supabase``). No full URLs, no legacy buckets,
 no per-row bucket detection — pass the paths straight to
 ``create_signed_urls`` and we're done.
@@ -40,39 +40,40 @@ def _sign(paths: list[str], auth_token: str) -> list[str | None]:
     return out
 
 
-def sign_getaways_images(getaways: list[dict], auth_token: str) -> list[dict]:
-    """Replace each getaway's ``images`` paths with signed URLs.
+def sign_images(rows: list[dict], auth_token: str) -> list[dict]:
+    """Replace each row's ``images`` paths with signed URLs.
 
-    Costs ONE ``POST /storage/v1/object/sign/getaway-images`` for the whole
-    batch, regardless of how many getaways or images are involved.
+    Works for any rows carrying an ``images`` list of storage paths (POIs,
+    getaways, etc.). Costs ONE ``POST /storage/v1/object/sign/getaway-images``
+    for the whole batch, regardless of how many rows or images are involved.
     """
-    if not getaways:
-        return getaways
+    if not rows:
+        return rows
 
-    # Flatten paths across getaways, remembering which getaway each came from.
+    # Flatten paths across rows, remembering which row each came from.
     flat_paths: list[str] = []
-    origin_getaway: list[int] = []
-    for getaway_idx, getaway in enumerate(getaways):
-        for path in getaway.get("images") or []:
+    origin_row: list[int] = []
+    for row_idx, row in enumerate(rows):
+        for path in row.get("images") or []:
             if not path:
                 continue
             flat_paths.append(path)
-            origin_getaway.append(getaway_idx)
+            origin_row.append(row_idx)
 
     if not flat_paths:
-        return [{**g, "images": []} for g in getaways]
+        return [{**r, "images": []} for r in rows]
 
     signed = _sign(flat_paths, auth_token)
 
-    # Reassemble per-getaway. Order within each getaway is preserved because
-    # we iterated each getaway's images in order when flattening.
-    images_by_getaway: dict[int, list[str]] = {}
-    for getaway_idx, signed_url in zip(origin_getaway, signed):
+    # Reassemble per-row. Order within each row is preserved because we
+    # iterated each row's images in order when flattening.
+    images_by_row: dict[int, list[str]] = {}
+    for row_idx, signed_url in zip(origin_row, signed):
         if signed_url is None:
             continue
-        images_by_getaway.setdefault(getaway_idx, []).append(signed_url)
+        images_by_row.setdefault(row_idx, []).append(signed_url)
 
     return [
-        {**getaway, "images": images_by_getaway.get(idx, [])}
-        for idx, getaway in enumerate(getaways)
+        {**row, "images": images_by_row.get(idx, [])}
+        for idx, row in enumerate(rows)
     ]

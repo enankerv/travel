@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from schema import VillaListing
 from utils.urls import (
     add_search_params, generate_js_params, is_js_heavy_site,
-    extract_url_slug, generate_slug
+    extract_url_slug,
 )
 from utils.text_cleaning import (
     strip_other_villas_block, extract_main_property_only, is_thin_scrape
@@ -27,7 +27,7 @@ from utils.scout_limits import (
 )
 from utils.geocode import geocode_from_location_region
 from db.scout_quota import check_and_use_quota
-from db import update_getaway, insert_getaway_images
+from models import Getaway
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("scout")
@@ -94,12 +94,12 @@ async def scout_bundle_from_paste_inputs(
 
 async def execute_scout_bundle_to_getaway(
     bundle: ScoutExtractionBundle,
-    getaway_id: str,
+    poi_id: str,
     auth_token: str,
     user_id: str | None,
 ) -> dict:
     """Sign-in + scout quota, then LLM extraction + DB update from a bundle."""
-    if early := _early_return_unless_user_and_quota(getaway_id, auth_token, user_id):
+    if early := _early_return_unless_user_and_quota(poi_id, auth_token, user_id):
         return early
     return await _llm_extract_and_persist_from_md(
         bundle.extraction_md,
@@ -108,16 +108,21 @@ async def execute_scout_bundle_to_getaway(
         image_candidate_urls=list(bundle.image_candidate_urls),
         url_for_path_title=bundle.url_for_path_title,
         name_if_no_villa=bundle.name_if_no_villa,
-        getaway_id=getaway_id,
+        poi_id=poi_id,
         auth_token=auth_token,
     )
 
 
 def _listing_to_getaway_row(
-    listing, slug: str, source_url: str, name: str, raw_text: str | None = None,
+    listing, source_url: str, name: str, raw_text: str | None = None,
     lat: float | None = None, lng: float | None = None,
 ) -> dict:
-    """Map extracted VillaListing to getaways table row (no images; those go to getaway_images)."""
+    """Map extracted VillaListing to a flat poi+getaway row.
+
+    Keys are split across the pois spine (title/description/location/lat/lng/
+    source_url) and the getaways subtype by ``db.update_getaway``; images are
+    handled separately via ``insert_getaway_images``.
+    """
     ld = listing.model_dump()
     parts = [
         ld.get("interiors_summary"),
@@ -140,11 +145,15 @@ def _listing_to_getaway_row(
         price = ld.get("price_weekly_usd") or ld.get("price_weekly_min_eur")
         price_currency = "USD" if ld.get("price_weekly_usd") is not None else ("EUR" if (ld.get("price_weekly_min_eur") or ld.get("price_weekly_max_eur")) else None)
     return {
-        "slug": slug,
+        # pois spine
         "source_url": source_url,
-        "import_status": "loaded",
-        "name": name or (ld.get("villa_name") or "").strip() or None,
+        "title": name or (ld.get("villa_name") or "").strip() or None,
         "location": ld.get("location"),
+        "description": description,
+        "lat": lat,
+        "lng": lng,
+        # getaways subtype
+        "import_status": "loaded",
         "region": ld.get("region"),
         "bedrooms": ld.get("bedrooms"),
         "bathrooms": ld.get("bathrooms"),
@@ -155,10 +164,7 @@ def _listing_to_getaway_row(
         "deposit": ld.get("security_deposit_eur"),
         "amenities": amenities if amenities else None,
         "included": ld.get("included_in_price"),
-        "description": description,
         "caveats": ld.get("the_catch"),
-        "lat": lat,
-        "lng": lng,
     }
 
 
@@ -195,37 +201,38 @@ async def persist_listing_to_getaway(
     listing: VillaListing,
     *,
     name: str,
-    slug: str,
     source_url: str,
     raw_text_for_price: str | None,
     image_candidate_urls: list[str],
-    getaway_id: str,
+    poi_id: str,
     auth_token: str,
 ) -> dict:
     """
-    Upload candidate images, geocode, map listing to row, update getaway + images.
+    Upload candidate images, geocode, map listing to row, update poi + getaway + images.
     Shared by URL scout and paste flows after LLM extraction.
     """
     image_urls: list[str] = []
     if image_candidate_urls:
-        image_urls = await upload_images_to_supabase(image_candidate_urls, getaway_id, auth_token) or []
+        image_urls = await upload_images_to_supabase(image_candidate_urls, poi_id, auth_token) or []
     if image_urls:
         print(f"[IMG] Uploaded {len(image_urls)} images to Supabase")
 
     lat, lng = _geocode_listing(listing)
     row = _listing_to_getaway_row(
-        listing, slug=slug, source_url=source_url, name=name,
+        listing, source_url=source_url, name=name,
         raw_text=raw_text_for_price, lat=lat, lng=lng,
     )
-    update_getaway(getaway_id, row, auth_token=auth_token)
     if image_urls:
-        insert_getaway_images(getaway_id, image_urls, auth_token)
+        row["thumbnail_url"] = image_urls[0]
+    Getaway.update_by_id(poi_id, auth_token, **row)
+    if image_urls:
+        Getaway.replace_images_by_id(poi_id, image_urls, auth_token)
     print("[OK] Success! Getaway updated in Supabase")
-    return {"path": f"/getaways/{slug}", "getaway_id": getaway_id}
+    return {"path": f"/getaways/{poi_id}", "poi_id": poi_id}
 
 
 def _early_return_unless_user_and_quota(
-    getaway_id: str | None,
+    poi_id: str | None,
     auth_token: str | None,
     user_id: str | None,
 ) -> dict | None:
@@ -233,24 +240,22 @@ def _early_return_unless_user_and_quota(
     If the user is missing or scout quota is exhausted, update the getaway (when possible)
     and return a response dict the caller should return. Otherwise return None.
     """
-    err: dict = {"path": None, "getaway_id": getaway_id, "quota_exceeded": True}
+    err: dict = {"path": None, "poi_id": poi_id, "quota_exceeded": True}
 
     if not user_id:
-        if getaway_id and auth_token:
-            update_getaway(
-                getaway_id,
-                {"import_status": "error", "import_error": "Sign in to scout listings."},
-                auth_token,
+        if poi_id and auth_token:
+            Getaway.update_by_id(
+                poi_id, auth_token,
+                import_status="error", import_error="Sign in to scout listings.",
             )
         return err
 
     allowed, quota_error = check_and_use_quota(user_id)
     if not allowed:
-        if getaway_id and auth_token:
-            update_getaway(
-                getaway_id,
-                {"import_status": "error", "import_error": quota_error},
-                auth_token,
+        if poi_id and auth_token:
+            Getaway.update_by_id(
+                poi_id, auth_token,
+                import_status="error", import_error=quota_error,
             )
         return err
     return None
@@ -264,23 +269,21 @@ async def _llm_extract_and_persist_from_md(
     image_candidate_urls: list[str],
     url_for_path_title: str | None,
     name_if_no_villa: str,
-    getaway_id: str,
+    poi_id: str,
     auth_token: str,
 ) -> dict:
-    """Run two-pass LLM extraction on markdown, derive title/slug, persist row + images."""
+    """Run two-pass LLM extraction on markdown, derive title, persist row + images."""
     listing = await extract_villa_two_pass(extraction_md)
     name = _display_title_for_listing(
         listing, url_for_path_title=url_for_path_title, name_if_no_villa=name_if_no_villa,
     )
-    slug = generate_slug(name)
     return await persist_listing_to_getaway(
         listing,
         name=name,
-        slug=slug,
         source_url=source_url,
         raw_text_for_price=raw_text_for_price,
         image_candidate_urls=image_candidate_urls or [],
-        getaway_id=getaway_id,
+        poi_id=poi_id,
         auth_token=auth_token,
     )
 
@@ -390,17 +393,17 @@ async def generate_getaway_page(
     guests: int | None = None,
     list_id: str | None = None,
     auth_token: str | None = None,
-    getaway_id: str | None = None,
+    poi_id: str | None = None,
     user_id: str | None = None,
 ):
     """Full flow: scrape, thin check, charge, LLM, update. Used when route awaits everything."""
     scraped = await scrape_and_thin_check(url, check_in, check_out, guests)
     if scraped["is_thin"]:
-        return {"path": None, "thin_scrape": True, "getaway_id": getaway_id}
+        return {"path": None, "thin_scrape": True, "poi_id": poi_id}
 
     bundle = scout_bundle_from_scrape_dict(scraped)
     result = await execute_scout_bundle_to_getaway(
-        bundle, getaway_id, auth_token, user_id,
+        bundle, poi_id, auth_token, user_id,
     )
     return {**result, "thin_scrape": False}
 
@@ -410,23 +413,23 @@ async def generate_getaway_page_from_paste(
     original_url: str |  None = None,
     list_id: str | None = None,
     auth_token: str | None = None,
-    getaway_id: str | None = None,
+    poi_id: str | None = None,
     user_id: str | None = None,
 ) -> dict:
     """
-    Build a getaway report from pasted listing text. Updates the given getaway row.
+    Build a getaway report from pasted listing text. Updates the given poi row.
 
     Mirrors generate_getaway_page: requires user_id and consumes scout quota here (not only in the route)
     so callers always hit the same billing rules.
     """
     if not (pasted_text or "").strip():
         raise ValueError("Pasted text is empty.")
-    if not getaway_id or not auth_token:
-        raise ValueError("getaway_id and auth_token required")
+    if not poi_id or not auth_token:
+        raise ValueError("poi_id and auth_token required")
 
     bundle = await scout_bundle_from_paste_inputs(pasted_text, original_url)
     return await execute_scout_bundle_to_getaway(
-        bundle, getaway_id, auth_token, user_id,
+        bundle, poi_id, auth_token, user_id,
     )
 
 

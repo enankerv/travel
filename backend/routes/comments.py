@@ -34,13 +34,13 @@ async def get_comments_endpoint(list_id: str, authorization: Optional[str] = Hea
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/{list_id}/getaways/{getaway_id}/comments")
+@router.post("/{list_id}/getaways/{poi_id}/comments")
 async def create_comment_endpoint(
-    list_id: str, getaway_id: str,
+    list_id: str, poi_id: str,
     body: dict,
     authorization: Optional[str] = Header(None),
 ):
-    """Create a comment on a getaway. Must be list member."""
+    """Create a comment on a POI. Must be list member."""
     try:
         token = extract_auth_token(authorization)
         user_id = extract_user_id_from_token(token)
@@ -48,9 +48,9 @@ async def create_comment_endpoint(
         comment_body = body.get("body", "").strip()
         if not comment_body:
             raise HTTPException(status_code=400, detail="Comment body is required")
-        result = create_comment(list_id, getaway_id, user_id, comment_body, token)
+        result = create_comment(poi_id, user_id, comment_body, token)
         if result is None:
-            raise HTTPException(status_code=400, detail="Getaway not found or invalid")
+            raise HTTPException(status_code=400, detail="POI not found or invalid")
         return {"comment": result}
     except HTTPException:
         raise

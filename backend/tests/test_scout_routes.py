@@ -2,9 +2,10 @@
 import pytest
 
 try:
-    from unittest.mock import patch, MagicMock
+    from unittest.mock import patch, AsyncMock
     from fastapi.testclient import TestClient
     from app import app
+    from models import Getaway
     client = TestClient(app)
     _HAS_DEPS = True
 except (ImportError, RuntimeError) as e:
@@ -27,12 +28,15 @@ def test_scout_returns_429_when_rate_limited():
     """Scout endpoint returns 429 when user exceeds rate limit."""
     auth_headers = {"Authorization": "Bearer fake.jwt.token"}
 
-    with patch("utils.terms_guard.check_terms_and_age", return_value=(True, None)):
+    loading = Getaway(id="g1", list_id="list-1", created_at="t", updated_at="t")
+    thin_scrape = AsyncMock(return_value={"is_thin": True, "url": "https://example.com/villa/1"})
+
+    with patch("app.check_terms_and_age", return_value=(True, None)):
         with patch("routes.scout.extract_auth_token", return_value="fake"):
             with patch("routes.scout.extract_user_id_from_token", return_value="rl-test-user"):
-                with patch("routes.scout.create_loading_getaway", return_value={"id": "g1"}):
-                    with patch("routes.scout.update_getaway"):
-                        with patch("routes.scout._process_scout", new=MagicMock()):
+                with patch.object(Getaway, "new", return_value=loading):
+                    with patch.object(Getaway, "update_by_id", return_value=loading):
+                        with patch("routes.scout.scrape_and_thin_check", new=thin_scrape):
                             # Exhaust rate limit (default 10)
                             for _ in range(10):
                                 r = client.post(

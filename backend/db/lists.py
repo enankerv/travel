@@ -48,9 +48,10 @@ def get_user_lists(auth_token: str) -> list[dict]:
         lst["member_count"] = len(members)
         try:
             count_resp = (
-                client.table("getaways")
+                client.table("pois")
                 .select("id", count="exact")
                 .eq("list_id", lst["id"])
+                .eq("poi_type", "getaway")
                 .limit(0)
                 .execute()
             )

@@ -1,6 +1,6 @@
 """Pydantic models for FastAPI endpoints."""
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
-from typing import Optional, Literal
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, PrivateAttr
+from typing import ClassVar, Optional, Literal
 
 
 # ============================================================================
@@ -82,15 +82,241 @@ class AcceptInvite(BaseModel):
 
 
 # ============================================================================
-# GETAWAY MODELS
+# POI RELATED DATA (shared across every POI subtype)
 # ============================================================================
 
-class GetawayData(BaseModel):
-    name: Optional[str] = None
+class Vote(BaseModel):
+    """A single vote on a POI, enriched with the voter's profile."""
+
+    poi_id: str
+    user_id: str
+    first_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+
+class Comment(BaseModel):
+    """A single comment on a POI, enriched with the author's profile."""
+
+    id: str
+    poi_id: str
+    user_id: str
+    body: str
+    created_at: str
+    updated_at: str
+    first_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+
+# ============================================================================
+# POI MODELS (spine shared by every board pin)
+# ============================================================================
+
+PoiType = Literal["getaway", "activity", "restaurant", "flight", "note", "poi"]
+
+
+class POIBase(BaseModel):
+    """Fields shared by every point of interest / board pin (the pois spine)."""
+
+    poi_type: PoiType = "poi"
+    title: Optional[str] = None
+    description: Optional[str] = None
     location: Optional[str] = None
-    region: Optional[str] = None
+    address: Optional[str] = None
     lat: Optional[float] = None
     lng: Optional[float] = None
+    source_url: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    board_x: float = 0.5
+    board_y: float = 0.5
+    board_z: int = 0
+
+
+class POI(POIBase):
+    """The single POI model: spine fields (composed on fetch) plus behavior.
+
+    When fetched or created via ``get`` / ``for_list`` / ``new``, the caller's
+    ``auth_token`` is stored on the instance (never serialized to clients) so
+    subsequent instance methods and classmethods that receive the instance do
+    not need the token passed again.
+
+    CRUD lives here as classmethods:
+
+    * ``get`` / ``for_list`` — query params + token (token stored on result),
+    * ``new`` — creation fields + token (token stored on result),
+    * ``update`` / ``delete`` / ``replace_images`` — take a fetched instance
+      (uses its bound token),
+    * ``update_by_id`` / ``delete_by_id`` / ``replace_images_by_id`` — take
+      an id + explicit token (for scout/background paths that only hold an id).
+
+    Subtypes (Getaway, ...) inherit these hooks and may override ``_subtype_columns``
+    etc. Names prefixed with ``_`` are protected — for use inside the POI hierarchy
+    only, not part of the public API routes and callers should use.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    # Persistence config (subtypes override). ClassVar so Pydantic ignores them.
+    _SUBTYPE_TABLE: ClassVar[Optional[str]] = None
+    _TYPE_FILTER: ClassVar[Optional[str]] = None
+    _IMMUTABLE: ClassVar[frozenset[str]] = frozenset(
+        {"id", "list_id", "user_id", "poi_type", "created_at", "updated_at", "images"}
+    )
+
+    id: str
+    list_id: str
+    user_id: Optional[str] = None
+    created_at: str
+    updated_at: str
+    images: list[str] = Field(default_factory=list)
+
+    # Session auth for RLS-scoped db calls. Set on every get/for_list/new; never serialized.
+    _auth_token: str = PrivateAttr()
+
+    # ---- protected hooks (POI hierarchy only; subtypes may override) --------
+    @classmethod
+    def _spine_columns(cls) -> set[str]:
+        return set(POIBase.model_fields)
+
+    @classmethod
+    def _subtype_columns(cls) -> set[str]:
+        return set()
+
+    @classmethod
+    def _split_writable(cls, data: dict) -> tuple[dict, dict]:
+        spine = {
+            k: v for k, v in data.items()
+            if k in cls._spine_columns() and k not in cls._IMMUTABLE
+        }
+        sub = {k: v for k, v in data.items() if k in cls._subtype_columns()}
+        return spine, sub
+
+    def _bind_auth_token(self, auth_token: str) -> None:
+        object.__setattr__(self, "_auth_token", auth_token)
+
+    def _session_token(self) -> str:
+        try:
+            return self._auth_token
+        except AttributeError as e:
+            raise RuntimeError(
+                "POI has no session token — fetch or create via get/for_list/new first"
+            ) from e
+
+    @classmethod
+    def _persist_update(
+        cls, poi_id: str, auth_token: str, model_cls: type["POI"], changes: dict,
+    ) -> Optional["POI"]:
+        from db.pois import update_poi_row, update_subtype_row
+        spine, sub = model_cls._split_writable(changes)
+        if spine:
+            update_poi_row(poi_id, spine, auth_token)
+        if sub and model_cls._SUBTYPE_TABLE:
+            update_subtype_row(model_cls._SUBTYPE_TABLE, poi_id, sub, auth_token)
+        return model_cls.get(poi_id, auth_token)
+
+    # ---- reads (query params) ---------------------------------------------
+    @classmethod
+    def get(cls, poi_id: str, auth_token: str) -> Optional["POI"]:
+        """Fetch one POI by id. Token is stored on the returned instance."""
+        from db.pois import fetch_poi_row
+        row = fetch_poi_row(poi_id, auth_token)
+        if not row:
+            return None
+        obj = poi_from_row(row, auth_token)
+        if cls is POI:
+            return obj
+        return obj if isinstance(obj, cls) else None
+
+    @classmethod
+    def for_list(cls, list_id: str, auth_token: str) -> list["POI"]:
+        """Fetch all POIs in a list. Token is stored on each instance."""
+        from db.pois import fetch_list_poi_rows
+        rows = fetch_list_poi_rows(list_id, auth_token, poi_type=cls._TYPE_FILTER)
+        return [poi_from_row(r, auth_token) for r in rows]
+
+    # ---- create -----------------------------------------------------------
+    @classmethod
+    def new(cls, list_id: str, auth_token: str, *, user_id: Optional[str] = None, **fields) -> Optional["POI"]:
+        """Create a POI (+ subtype row). Token is stored on the returned instance."""
+        from db.pois import insert_poi_row, insert_subtype_row
+        spine, sub = cls._split_writable(fields)
+        spine["poi_type"] = cls.model_fields["poi_type"].default
+        row = insert_poi_row(list_id, spine, auth_token, user_id=user_id)
+        if not row:
+            return None
+        if cls._SUBTYPE_TABLE:
+            insert_subtype_row(cls._SUBTYPE_TABLE, row["id"], sub, auth_token)
+        return cls.get(row["id"], auth_token)
+
+    # ---- update / delete (instance — uses bound token) --------------------
+    @classmethod
+    def update(cls, poi: "POI", **changes) -> Optional["POI"]:
+        """Apply ``changes`` to a fetched instance; uses its bound auth token."""
+        return cls._persist_update(poi.id, poi._session_token(), type(poi), changes)
+
+    @classmethod
+    def delete(cls, poi: "POI") -> bool:
+        """Delete a fetched instance; uses its bound auth token."""
+        from db.pois import delete_poi_row
+        return delete_poi_row(poi.id, poi._session_token())
+
+    @classmethod
+    def replace_images(cls, poi: "POI", image_paths: list[str]) -> None:
+        """Replace this instance's ordered image set; uses its bound auth token."""
+        from db.pois import insert_poi_images
+        insert_poi_images(poi.id, image_paths, poi._session_token())
+
+    # ---- update / delete (id + token — scout / background paths) ----------
+    @classmethod
+    def update_by_id(cls, poi_id: str, auth_token: str, **changes) -> Optional["POI"]:
+        """Apply ``changes`` by poi id with an explicit auth token."""
+        return cls._persist_update(poi_id, auth_token, cls, changes)
+
+    @classmethod
+    def delete_by_id(cls, poi_id: str, auth_token: str) -> bool:
+        """Delete by poi id with an explicit auth token."""
+        from db.pois import delete_poi_row
+        return delete_poi_row(poi_id, auth_token)
+
+    @classmethod
+    def replace_images_by_id(cls, poi_id: str, auth_token: str, image_paths: list[str]) -> None:
+        """Replace images by poi id with an explicit auth token."""
+        from db.pois import insert_poi_images
+        insert_poi_images(poi_id, image_paths, auth_token)
+
+    # ---- related data (uses bound token) ----------------------------------
+    def votes(self) -> list["Vote"]:
+        from db.votes import get_votes_for_poi
+        return [Vote(**v) for v in get_votes_for_poi(self.id, self._session_token())]
+
+    def comments(self) -> list["Comment"]:
+        from db.comments import get_comments_for_poi
+        return [Comment(**c) for c in get_comments_for_poi(self.id, self._session_token())]
+
+    def add_vote(self, user_id: str) -> Optional["Vote"]:
+        from db.votes import add_vote
+        row = add_vote(self.id, user_id, self._session_token())
+        return Vote(**row) if row else None
+
+    def remove_vote(self, user_id: str) -> bool:
+        from db.votes import remove_vote
+        return remove_vote(self.id, user_id, self._session_token())
+
+    def add_comment(self, user_id: str, body: str) -> Optional["Comment"]:
+        from db.comments import create_comment
+        row = create_comment(self.id, user_id, body, self._session_token())
+        return Comment(**row) if row else None
+
+
+# ============================================================================
+# GETAWAY MODELS (accommodation subtype of POI)
+# ============================================================================
+
+class GetawayFields(BaseModel):
+    """Accommodation-specific fields stored in the getaways subtype table."""
+
+    import_status: Literal["loading", "loaded", "thin", "error"] = "loading"
+    import_error: Optional[str] = None
+    region: Optional[str] = None
     bedrooms: Optional[int] = None
     bathrooms: Optional[int] = None
     max_guests: Optional[int] = None
@@ -101,45 +327,63 @@ class GetawayData(BaseModel):
     deposit: Optional[float] = None
     amenities: Optional[list[str]] = None
     included: Optional[list[str]] = None
-    description: Optional[str] = None
     caveats: Optional[str] = None
-    source_url: Optional[str] = None
-    images: Optional[list[str]] = None
-    slug: Optional[str] = None
 
 
-class GetawayResponse(GetawayData):
-    id: str
-    list_id: str
-    user_id: Optional[str] = None
-    import_status: Literal["loading", "loaded", "thin", "error"] = "loading"
-    import_error: Optional[str] = None
-    created_at: str
-    updated_at: str
+class Getaway(POI, GetawayFields):
+    """A getaway *is* a POI (spine + behavior) plus accommodation fields."""
+
+    poi_type: Literal["getaway"] = "getaway"
+
+    _SUBTYPE_TABLE: ClassVar[Optional[str]] = "getaways"
+    _TYPE_FILTER: ClassVar[Optional[str]] = "getaway"
+
+    @classmethod
+    def _subtype_columns(cls) -> set[str]:
+        return set(GetawayFields.model_fields)
+
+    class Update(BaseModel):
+        """HTTP input contract for the listing editor — *not* the full entity.
+
+        Whitelists the fields a client may PATCH/PUT and ignores everything else
+        (``import_status``, ``id``, ``images``, etc. are not editable here).
+        The domain model's ``update`` routes these fields to the correct table.
+        """
+
+        model_config = ConfigDict(extra="ignore")
+
+        title: Optional[str] = None
+        location: Optional[str] = None
+        region: Optional[str] = None
+        bedrooms: Optional[int] = None
+        bathrooms: Optional[int] = None
+        max_guests: Optional[int] = None
+        price: Optional[float] = None
+        price_currency: Optional[str] = None
+        price_period: Optional[str] = None
+        amenities: Optional[list[str]] = None
+        included: Optional[list[str]] = None
+        description: Optional[str] = None
+        caveats: Optional[str] = None
 
 
-class GetawayEditorUpdate(BaseModel):
-    """
-    Fields users may edit in the listing editor (GetawayEditForm / table inline edit).
+# Back-compat alias for imports that haven't moved to Getaway.Update yet.
+GetawayEditorUpdate = Getaway.Update
 
-    Extra JSON keys are ignored; only these fields are passed through to the DB update.
-    """
 
-    model_config = ConfigDict(extra="ignore")
+# Maps pois.poi_type -> concrete model. POI is the fallback for plain pins.
+_POI_MODELS: dict[str, type[POI]] = {
+    "getaway": Getaway,
+}
 
-    name: Optional[str] = None
-    location: Optional[str] = None
-    region: Optional[str] = None
-    bedrooms: Optional[int] = None
-    bathrooms: Optional[int] = None
-    max_guests: Optional[int] = None
-    price: Optional[float] = None
-    price_currency: Optional[str] = None
-    price_period: Optional[str] = None
-    amenities: Optional[list[str]] = None
-    included: Optional[list[str]] = None
-    description: Optional[str] = None
-    caveats: Optional[str] = None
+
+def poi_from_row(row: dict, auth_token: str) -> POI:
+    """Build the correct POI subtype from a composed pois row (spine + subtype
+    + images). Dispatches on ``poi_type`` and binds the session auth token."""
+    model = _POI_MODELS.get(row.get("poi_type") or "poi", POI)
+    obj = model.model_validate(row)
+    obj._bind_auth_token(auth_token)
+    return obj
 
 
 # ============================================================================
@@ -152,14 +396,14 @@ class ScoutRequest(BaseModel):
     check_in: Optional[str] = None
     check_out: Optional[str] = None
     guests: Optional[int] = None
-    getaway_id: Optional[str] = None  # When provided, update this getaway instead of creating new (retry)
+    poi_id: Optional[str] = None  # When provided, update this poi instead of creating new (retry)
 
 
 class ScoutPasteRequest(BaseModel):
     pasted_text: str = Field(...)  # Truncated in backend after cutting, before LLM
     list_id: str  # Required: which list to save to
     original_url: Optional[str] = None
-    getaway_id: Optional[str] = None  # When provided, update this getaway instead of creating new
+    poi_id: Optional[str] = None  # When provided, update this poi instead of creating new
 
 
 class ScoutResponse(BaseModel):
@@ -167,7 +411,7 @@ class ScoutResponse(BaseModel):
     path: Optional[str] = None
     error: Optional[str] = None
     thin_scrape: bool = False
-    getaway_id: Optional[str] = None
+    poi_id: Optional[str] = None
     truncated: bool = False  # True when pasted text was truncated for length limits
 
 

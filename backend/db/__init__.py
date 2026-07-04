@@ -1,4 +1,9 @@
-"""Database layer - split by table."""
+"""Database layer - split by table.
+
+POI persistence is orchestrated by the domain models (``models.POI`` /
+``models.Getaway``), which call the low-level helpers in ``db.pois`` directly.
+This package exposes the client factory and the non-POI table helpers.
+"""
 from db.client import get_supabase_client
 from db.lists import create_list, get_user_lists, get_list_by_id, update_list, delete_list
 from db.list_members import add_list_member, get_list_members, update_member_role, remove_list_member
@@ -9,17 +14,6 @@ from db.invite_tokens import (
     accept_invite,
     list_invite_tokens,
     revoke_invite_token,
-)
-from db.getaways import (
-    create_loading_getaway,
-    insert_getaway,
-    get_list_getaways,
-    get_getaway_by_slug,
-    update_getaway,
-    update_getaway_by_slug,
-    delete_getaway,
-    delete_getaway_by_slug,
-    insert_getaway_images,
 )
 
 __all__ = [
@@ -39,13 +33,4 @@ __all__ = [
     "accept_invite",
     "list_invite_tokens",
     "revoke_invite_token",
-    "create_loading_getaway",
-    "insert_getaway",
-    "get_list_getaways",
-    "get_getaway_by_slug",
-    "update_getaway",
-    "update_getaway_by_slug",
-    "delete_getaway",
-    "delete_getaway_by_slug",
-    "insert_getaway_images",
 ]

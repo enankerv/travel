@@ -34,16 +34,16 @@ async def get_votes_endpoint(list_id: str, authorization: Optional[str] = Header
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/{list_id}/getaways/{getaway_id}/vote")
-async def add_vote_endpoint(list_id: str, getaway_id: str, authorization: Optional[str] = Header(None)):
+@router.post("/{list_id}/getaways/{poi_id}/vote")
+async def add_vote_endpoint(list_id: str, poi_id: str, authorization: Optional[str] = Header(None)):
     """Add current user's vote. Must be list member."""
     try:
         token = extract_auth_token(authorization)
         user_id = extract_user_id_from_token(token)
         _ensure_list_member(list_id, user_id, token)
-        result = add_vote(list_id, getaway_id, user_id, token)
+        result = add_vote(poi_id, user_id, token)
         if result is None:
-            raise HTTPException(status_code=400, detail="Already voted or getaway not in list")
+            raise HTTPException(status_code=400, detail="Already voted or POI not accessible")
         return {"ok": True, "vote": result}
     except HTTPException:
         raise
@@ -51,13 +51,13 @@ async def add_vote_endpoint(list_id: str, getaway_id: str, authorization: Option
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/{list_id}/getaways/{getaway_id}/vote")
-async def remove_vote_endpoint(list_id: str, getaway_id: str, authorization: Optional[str] = Header(None)):
+@router.delete("/{list_id}/getaways/{poi_id}/vote")
+async def remove_vote_endpoint(list_id: str, poi_id: str, authorization: Optional[str] = Header(None)):
     """Remove current user's vote."""
     try:
         token = extract_auth_token(authorization)
         user_id = extract_user_id_from_token(token)
-        success = remove_vote(list_id, getaway_id, user_id, token)
+        success = remove_vote(poi_id, user_id, token)
         if not success:
             raise HTTPException(status_code=404, detail="Vote not found")
         return {"ok": True}
