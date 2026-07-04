@@ -14,7 +14,7 @@ import {
 } from 'react'
 import { createPoi, resolveImageUrl, updatePoi } from '@/lib/api'
 import { useListDetailContext } from '@/lib/ListDetailContext'
-import { useBoardPinDragSync } from '@/hooks/useBoardPinDragSync'
+import { useBoardPinFocusSync } from '@/hooks/useBoardPinFocusSync'
 import { presenceColorForUserId } from '@/lib/presenceColors'
 import {
   BOARD_WORLD_H,
@@ -261,14 +261,17 @@ const BoardView = forwardRef<
   const {
     lockedPoiIds,
     peerDragByPoiId,
+    peerSelectByPoiId,
+    hiddenCursorUserIds,
     broadcastDragStart,
     broadcastDragMove,
     broadcastDragEnd,
-  } = useBoardPinDragSync({
+  } = useBoardPinFocusSync({
     listId,
     enabled,
     userId: currentUserId,
     otherViewers,
+    selectedPoiId: selectedPoiId ?? null,
     onPeerDragEnd: handlePeerDragEnd,
   })
   const viewportRef = useRef<HTMLDivElement>(null)
@@ -338,14 +341,11 @@ const BoardView = forwardRef<
     return m
   }, [otherViewers])
 
-  const hiddenCursorUserIds = useMemo(() => {
-    const ids = new Set<string>()
+  const hiddenCursorUserIdsWithDrag = useMemo(() => {
+    const ids = new Set(hiddenCursorUserIds)
     if (drag && currentUserId) ids.add(currentUserId)
-    for (const peerDrag of peerDragByPoiId.values()) {
-      ids.add(peerDrag.userId)
-    }
     return ids
-  }, [drag, currentUserId, peerDragByPoiId])
+  }, [hiddenCursorUserIds, drag, currentUserId])
 
   const pinHighlightColor = useCallback(
     (poiId: string) => {
@@ -359,9 +359,16 @@ const BoardView = forwardRef<
           presenceColorForUserId(peerDrag.userId)
         )
       }
+      const peerSelect = peerSelectByPoiId.get(poiId)
+      if (peerSelect) {
+        return (
+          viewerColorById.get(peerSelect.userId) ??
+          presenceColorForUserId(peerSelect.userId)
+        )
+      }
       return undefined
     },
-    [drag, currentUserId, peerDragByPoiId, viewerColorById],
+    [drag, currentUserId, peerDragByPoiId, peerSelectByPoiId, viewerColorById],
   )
 
   useEffect(() => {
@@ -758,7 +765,9 @@ const BoardView = forwardRef<
     (poi: POIBase) => {
       if (drag?.poiId === poi.id && dragPos) return dragPos
       const peer = peerDragByPoiId.get(poi.id)
-      if (peer) return { wx: peer.wx, wy: peer.wy }
+      if (peer && peer.wx != null && peer.wy != null) {
+        return { wx: peer.wx, wy: peer.wy }
+      }
       const gospel = gospelByPoiId[poi.id]
       if (gospel) return gospel
       return { wx: poi.board_x ?? 0.5, wy: poi.board_y ?? 0.5 }
@@ -852,7 +861,7 @@ const BoardView = forwardRef<
             otherViewers={otherViewers}
             viewportRef={viewportRef}
             cameraRef={cameraRef}
-            hiddenCursorUserIds={hiddenCursorUserIds}
+            hiddenCursorUserIds={hiddenCursorUserIdsWithDrag}
           />
         </div>
       </div>

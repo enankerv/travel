@@ -91,8 +91,8 @@ function BoardPeerCursor({ color, wx, wy }: { color: string; wx: number; wy: num
 }
 
 /**
- * Board multiplayer cursors in world space. Hidden while a user is dragging a pin
- * (selection is shown on the pin border instead).
+ * Board multiplayer cursors in world space. Hidden while a user is dragging or
+ * has a POI selected (selection is shown on the pin border instead).
  */
 export default function BoardCursorLayer({
   listId,

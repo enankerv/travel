@@ -35,24 +35,29 @@ export type ListCursorBroadcastPayload = {
   leave?: boolean;
 };
 
-/** Ephemeral in-progress pin drag on the cork board (not persisted until PUT on release). */
-export type PinDragBroadcastPayload = {
+/** Ephemeral pin focus on the cork board — drag (live wx/wy) or static selection. */
+export type PinFocusBroadcastPayload = {
   user_id?: string;
-  poi_id?: string;
+  poi_id?: string | null;
   wx?: number;
   wy?: number;
-  /** false when the user releases the pin (position may still be included). */
+  /** true while focused; false when drag released or selection cleared. */
   active?: boolean;
+  /** true = dragging with wx/wy; false = static selection (cursor hidden). */
+  dragging?: boolean;
 };
+
+/** @deprecated use PinFocusBroadcastPayload */
+export type PinDragBroadcastPayload = PinFocusBroadcastPayload;
 
 const listCursorSubscribers = new Map<
   string,
   Set<(p: ListCursorBroadcastPayload) => void>
 >();
 
-const pinDragSubscribers = new Map<
+const pinFocusSubscribers = new Map<
   string,
-  Set<(p: PinDragBroadcastPayload) => void>
+  Set<(p: PinFocusBroadcastPayload) => void>
 >();
 
 function dispatchListCursor(listId: string, payload: ListCursorBroadcastPayload) {
@@ -84,8 +89,8 @@ export function subscribeListCursorBroadcast(
   };
 }
 
-function dispatchPinDrag(listId: string, payload: PinDragBroadcastPayload) {
-  const set = pinDragSubscribers.get(listId);
+function dispatchPinFocus(listId: string, payload: PinFocusBroadcastPayload) {
+  const set = pinFocusSubscribers.get(listId);
   if (!set?.size) return;
   for (const cb of set) {
     try {
@@ -96,21 +101,29 @@ function dispatchPinDrag(listId: string, payload: PinDragBroadcastPayload) {
   }
 }
 
-/** Register for ephemeral `pin_drag` broadcasts on `list:<listId>`. */
-export function subscribePinDragBroadcast(
+/** Register for ephemeral `pin_focus` broadcasts on `list:<listId>`. */
+export function subscribePinFocusBroadcast(
   listId: string,
-  cb: (p: PinDragBroadcastPayload) => void,
+  cb: (p: PinFocusBroadcastPayload) => void,
 ): () => void {
-  let set = pinDragSubscribers.get(listId);
+  let set = pinFocusSubscribers.get(listId);
   if (!set) {
     set = new Set();
-    pinDragSubscribers.set(listId, set);
+    pinFocusSubscribers.set(listId, set);
   }
   set.add(cb);
   return () => {
     set!.delete(cb);
-    if (set!.size === 0) pinDragSubscribers.delete(listId);
+    if (set!.size === 0) pinFocusSubscribers.delete(listId);
   };
+}
+
+/** @deprecated use subscribePinFocusBroadcast */
+export function subscribePinDragBroadcast(
+  listId: string,
+  cb: (p: PinFocusBroadcastPayload) => void,
+): () => void {
+  return subscribePinFocusBroadcast(listId, cb);
 }
 
 type GetawayRow = { id: string; updated_at?: string; title?: string; poi_type?: string; [key: string]: any };
@@ -320,8 +333,12 @@ export function useListRealtime({
       .on("broadcast", { event: "cursor" }, (p: any) => {
         dispatchListCursor(listId, (p.payload ?? {}) as ListCursorBroadcastPayload);
       })
+      .on("broadcast", { event: "pin_focus" }, (p: any) => {
+        dispatchPinFocus(listId, (p.payload ?? {}) as PinFocusBroadcastPayload);
+      })
       .on("broadcast", { event: "pin_drag" }, (p: any) => {
-        dispatchPinDrag(listId, (p.payload ?? {}) as PinDragBroadcastPayload);
+        const raw = (p.payload ?? {}) as PinFocusBroadcastPayload;
+        dispatchPinFocus(listId, { ...raw, dragging: raw.dragging ?? true });
       })
       .on(
         "postgres_changes",
