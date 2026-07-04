@@ -44,6 +44,36 @@ DROP FUNCTION IF EXISTS public._getaway_with_images(record);
 DROP FUNCTION IF EXISTS public.update_getaways_updated_at();
 
 -- ----------------------------------------------------------------------------
+-- 1b. Drop old RLS policies that depend on columns we're about to drop/rename
+--     (list_id on votes/comments/getaways, and the getaway-scoped storage +
+--     image policies). schema_policies.sql reinstalls the poi-delegated ones.
+-- ----------------------------------------------------------------------------
+
+DROP POLICY IF EXISTS "List members can read votes" ON votes;
+DROP POLICY IF EXISTS "List members can add own vote" ON votes;
+DROP POLICY IF EXISTS "Users can remove own vote" ON votes;
+
+DROP POLICY IF EXISTS "List members can read comments" ON comments;
+DROP POLICY IF EXISTS "List members can add own comment" ON comments;
+DROP POLICY IF EXISTS "Comment owner can update" ON comments;
+DROP POLICY IF EXISTS "Comment owner can delete" ON comments;
+
+DROP POLICY IF EXISTS "Users can view getaways in their lists" ON getaways;
+DROP POLICY IF EXISTS "Users can add getaways to lists they have access to" ON getaways;
+DROP POLICY IF EXISTS "Users can update getaways in lists they have access to" ON getaways;
+DROP POLICY IF EXISTS "Admins can delete getaways from lists" ON getaways;
+DROP POLICY IF EXISTS "Editors can delete getaways from lists" ON getaways;
+
+DROP POLICY IF EXISTS "Users can view images in their getaways" ON getaway_images;
+DROP POLICY IF EXISTS "Users can add images to their getaways" ON getaway_images;
+
+-- storage policies reference getaways.list_id via subquery
+DROP POLICY IF EXISTS "Allow getaway image uploads" ON storage.objects;
+DROP POLICY IF EXISTS "List members can view getaway images" ON storage.objects;
+DROP POLICY IF EXISTS "Allow getaway image reads" ON storage.objects;
+DROP POLICY IF EXISTS "List members can view legacy villa-images" ON storage.objects;
+
+-- ----------------------------------------------------------------------------
 -- 2. Create the pois spine
 -- ----------------------------------------------------------------------------
 
