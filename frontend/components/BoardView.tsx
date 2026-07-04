@@ -37,9 +37,9 @@ import BoardCursorLayer from './BoardCursorLayer'
 const MIN_SCALE = 0.08
 const MAX_SCALE = 2.5
 /** Visual padding around pin anchors when fitting (world px). */
-const PIN_PAD_X = 84
-const PIN_PAD_TOP = 128
-const PIN_PAD_BOTTOM = 12
+const PIN_PAD_X = 88
+const PIN_PAD_TOP = 142
+const PIN_PAD_BOTTOM = 14
 const MIN_FIT_SPAN = 180
 const FIT_MARGIN = 0.88
 /** Screen px before a pin pointer down becomes a drag (not a click). */
@@ -141,11 +141,23 @@ function pinLabel(poi: POIBase): string {
   return 'Pin'
 }
 
+/** Stable slight tilt per pin — scattered polaroids on a cork board. */
+function pinTilt(poiId: string): number {
+  let h = 0
+  for (let i = 0; i < poiId.length; i++) {
+    h = (h * 31 + poiId.charCodeAt(i)) | 0
+  }
+  return (h % 70) / 10 - 3.5
+}
+
+/** How this pin is being held — drives lift animation + movement smoothing. */
+type PinHoldState = 'none' | 'grab' | 'local' | 'remote'
+
 const BoardPin = memo(function BoardPin({
   poi,
   wx,
   wy,
-  isDragging,
+  holdState,
   isSelected,
   lockedByPeer,
   highlightColor,
@@ -154,7 +166,7 @@ const BoardPin = memo(function BoardPin({
   poi: POIBase
   wx: number
   wy: number
-  isDragging: boolean
+  holdState: PinHoldState
   isSelected: boolean
   lockedByPeer: boolean
   highlightColor?: string
@@ -162,38 +174,44 @@ const BoardPin = memo(function BoardPin({
 }) {
   const signedUrls = useSignedImageUrls(poiImageSources(poi))
   const img = signedUrls[0] ?? ''
-  const showHighlight = isSelected || !!highlightColor
+  const isHeld = holdState !== 'none'
+  const showHighlight = isSelected || isHeld || !!highlightColor
+  const label = pinLabel(poi)
   return (
     <button
       type="button"
-      className={`board-pin board-pin--${poi.poi_type}${isDragging ? ' board-pin--dragging' : ''}${lockedByPeer ? ' board-pin--locked' : ''}${showHighlight ? ' board-pin--selected' : ''}`}
+      className={`board-pin board-pin--${poi.poi_type}${isHeld ? ' board-pin--dragging' : ''}${holdState === 'local' ? ' board-pin--local-drag' : ''}${holdState === 'remote' ? ' board-pin--remote-drag' : ''}${lockedByPeer ? ' board-pin--locked' : ''}${showHighlight ? ' board-pin--selected' : ''}`}
       style={{
         left: `${wx * 100}%`,
         top: `${wy * 100}%`,
         zIndex: Math.round(
-          (poi.board_z ?? 0) + (isDragging || lockedByPeer || isSelected ? 1000 : 0),
+          (poi.board_z ?? 0) + (isHeld || lockedByPeer || isSelected ? 1000 : 0),
         ),
         ...(showHighlight
           ? ({
               '--pin-highlight':
-                highlightColor ?? 'var(--accent)',
+                highlightColor ?? 'var(--board-pin-select, #5b8cff)',
             } as CSSProperties)
           : {}),
+        ['--pin-tilt' as string]: `${pinTilt(poi.id)}deg`,
       }}
       disabled={lockedByPeer}
       onPointerDown={(e) => onPointerDown(e, poi)}
+      aria-label={label}
     >
       <span className="board-pin__tack" aria-hidden />
-      <span className="board-pin__card">
-        {img ? (
-          <img className="board-pin__thumb" src={img} alt="" draggable={false} />
-        ) : (
-          <span className="board-pin__placeholder" aria-hidden>
-            {iconForPoiType(poi.poi_type)}
-          </span>
-        )}
+      <span className="board-pin__polaroid">
+        <span className="board-pin__photo">
+          {img ? (
+            <img className="board-pin__thumb" src={img} alt="" draggable={false} />
+          ) : (
+            <span className="board-pin__placeholder" aria-hidden>
+              {iconForPoiType(poi.poi_type)}
+            </span>
+          )}
+        </span>
+        <span className="board-pin__caption">{label}</span>
       </span>
-      <span className="board-pin__label">{pinLabel(poi)}</span>
     </button>
   )
 })
@@ -238,6 +256,7 @@ const BoardView = forwardRef<
   const { pois, setPois, otherViewers, setError, currentUserId } = useListDetailContext()
   const [drag, setDrag] = useState<DragState | null>(null)
   const [dragPos, setDragPos] = useState<{ wx: number; wy: number } | null>(null)
+  const [pendingPoiId, setPendingPoiId] = useState<string | null>(null)
   /** Drop position we trust over stale context/realtime until the server confirms. */
   const [gospelByPoiId, setGospelByPoiId] = useState<
     Record<string, { wx: number; wy: number }>
@@ -339,14 +358,27 @@ const BoardView = forwardRef<
 
   const hiddenCursorUserIdsWithDrag = useMemo(() => {
     const ids = new Set(hiddenCursorUserIds)
-    if (drag && currentUserId) ids.add(currentUserId)
+    if ((drag || pendingPoiId) && currentUserId) ids.add(currentUserId)
     return ids
-  }, [hiddenCursorUserIds, drag, currentUserId])
+  }, [hiddenCursorUserIds, drag, pendingPoiId, currentUserId])
+
+  const pinHoldState = useCallback(
+    (poiId: string): PinHoldState => {
+      if (drag?.poiId === poiId) return 'local'
+      if (pendingPoiId === poiId) return 'grab'
+      if (peerDragByPoiId.has(poiId)) return 'remote'
+      return 'none'
+    },
+    [drag, pendingPoiId, peerDragByPoiId],
+  )
 
   const pinHighlightColor = useCallback(
     (poiId: string) => {
-      if (drag?.poiId === poiId && currentUserId) {
-        return presenceColorForUserId(currentUserId)
+      const hold = pinHoldState(poiId)
+      if (hold === 'local' || hold === 'grab') {
+        return currentUserId
+          ? presenceColorForUserId(currentUserId)
+          : undefined
       }
       const peerDrag = peerDragByPoiId.get(poiId)
       if (peerDrag) {
@@ -364,7 +396,7 @@ const BoardView = forwardRef<
       }
       return undefined
     },
-    [drag, currentUserId, peerDragByPoiId, peerSelectByPoiId, viewerColorById],
+    [pinHoldState, currentUserId, peerDragByPoiId, peerSelectByPoiId, viewerColorById],
   )
 
   useEffect(() => {
@@ -589,6 +621,7 @@ const BoardView = forwardRef<
   const promotePendingToDrag = useCallback(
     (pending: PendingPinPointer) => {
       pendingPinRef.current = null
+      setPendingPoiId(null)
       const next: DragState = {
         poiId: pending.poiId,
         startWx: pending.startWx,
@@ -696,7 +729,9 @@ const BoardView = forwardRef<
       const pending = pendingPinRef.current
       if (pending && pending.pointerId === e.pointerId) {
         pendingPinRef.current = null
+        setPendingPoiId(null)
         if (!dragRef.current) {
+          broadcastDragEnd(pending.poiId, pending.startWx, pending.startWy)
           onSelectPoiRef.current?.(pending.poiId)
         }
       }
@@ -712,7 +747,7 @@ const BoardView = forwardRef<
         void finishDrag(activeDrag, { wx, wy })
       }
     },
-    [finishDrag, finishPan, commitGospel],
+    [finishDrag, finishPan, commitGospel, broadcastDragEnd],
   )
 
   const onPinPointerDown = useCallback(
@@ -738,13 +773,16 @@ const BoardView = forwardRef<
         startWx: wx,
         startWy: wy,
       }
+      setPendingPoiId(poi.id)
+      broadcastDragStart(poi.id, wx, wy)
     },
-    [pingActivity, lockedPoiIds],
+    [pingActivity, lockedPoiIds, broadcastDragStart],
   )
 
   useEffect(() => {
     return () => {
       pendingPinRef.current = null
+      setPendingPoiId(null)
       const d = dragRef.current
       const pos = dragPosRef.current
       if (d) {
@@ -842,7 +880,7 @@ const BoardView = forwardRef<
                 poi={poi}
                 wx={pos.wx}
                 wy={pos.wy}
-                isDragging={drag?.poiId === poi.id}
+                holdState={pinHoldState(poi.id)}
                 isSelected={selectedPoiId === poi.id}
                 lockedByPeer={lockedByPeer}
                 highlightColor={pinHighlightColor(poi.id)}

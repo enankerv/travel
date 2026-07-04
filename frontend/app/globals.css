@@ -2719,6 +2719,7 @@ button:focus-visible {
   touch-action: none;
   background: #1a1510;
   contain: strict;
+  --board-pin-select: #5b8cff;
 }
 
 .board-view__viewport--active .board-view__world {
@@ -2757,65 +2758,122 @@ button:focus-visible {
 
 .board-pin {
   position: absolute;
-  transform: translate(-50%, -100%);
+  transform: translate(-50%, -100%) rotate(var(--pin-tilt, 0deg));
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0;
   padding: 0;
   border: none;
   background: transparent;
   cursor: grab;
-  max-width: 140px;
   text-align: center;
+  transform-origin: 50% 100%;
+  transition:
+    transform 0.18s ease,
+    filter 0.18s ease;
 }
 
-.board-pin:active,
+.board-pin--remote-drag {
+  transition:
+    left 0.09s linear,
+    top 0.09s linear,
+    transform 0.18s ease,
+    filter 0.18s ease;
+}
+
 .board-pin--dragging {
   cursor: grabbing;
   z-index: 9999 !important;
+  --pin-tilt: 0deg !important;
+  transform: translate(-50%, -100%) rotate(0deg) scale(1.04);
+}
+
+.board-pin--local-drag {
+  transition: none;
 }
 
 .board-pin--locked {
   pointer-events: none;
   cursor: default;
-  filter: saturate(0.85);
 }
 
-.board-pin--locked .board-pin__label {
-  opacity: 0.75;
-}
-
-.board-pin__card {
-  display: block;
-  border-radius: 6px;
-  line-height: 0;
-}
-
-.board-pin--selected .board-pin__thumb,
-.board-pin--selected .board-pin__placeholder {
-  border-color: var(--pin-highlight, var(--accent));
+.board-pin__polaroid {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 104px;
+  background: #fafafa;
+  padding: 7px 7px 0;
   box-shadow:
-    0 0 0 2px var(--pin-highlight, var(--accent)),
-    0 4px 12px rgba(0, 0, 0, 0.35);
+    0 1px 2px rgba(0, 0, 0, 0.12),
+    0 4px 14px rgba(0, 0, 0, 0.22),
+    0 12px 28px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  pointer-events: none;
+  user-select: none;
+  transition: box-shadow 0.18s ease;
+}
+
+.board-pin--selected .board-pin__polaroid {
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.16),
+    0 8px 22px rgba(0, 0, 0, 0.3);
+}
+
+.board-pin--selected .board-pin__polaroid::before {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border: 3px solid var(--pin-highlight, var(--board-pin-select, #5b8cff));
+  pointer-events: none;
+  z-index: 2;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.85),
+    0 0 18px 3px color-mix(in srgb, var(--pin-highlight, var(--board-pin-select, #5b8cff)) 55%, transparent);
+}
+
+.board-pin--selected .board-pin__tack {
+  box-shadow:
+    0 0 0 2px var(--pin-highlight, var(--board-pin-select, #5b8cff)),
+    0 1px 2px rgba(0, 0, 0, 0.45),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.board-pin--dragging .board-pin__polaroid {
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.14),
+    0 8px 24px rgba(0, 0, 0, 0.32);
 }
 
 .board-pin__tack {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
+  margin-bottom: -5px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #e74c3c, #922b21);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+  background: radial-gradient(circle at 35% 32%, #ef5350, #8b1a1a);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.45),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.25);
   flex-shrink: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.board-pin__photo {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: #eceae4;
+  line-height: 0;
 }
 
 .board-pin__thumb {
-  width: 96px;
-  height: 72px;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  border-radius: 4px;
-  border: 3px solid #fff;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  display: block;
   pointer-events: none;
   user-select: none;
 }
@@ -2824,25 +2882,29 @@ button:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 72px;
-  height: 72px;
-  font-size: 1.75rem;
-  border-radius: 4px;
-  border: 3px solid #fff;
-  background: #fffef8;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  width: 100%;
+  height: 100%;
+  font-size: 1.65rem;
+  background: linear-gradient(145deg, #f0eeea 0%, #e4e0d8 100%);
   pointer-events: none;
 }
 
-.board-pin__label {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: #2c1810;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
-  max-width: 120px;
+.board-pin__caption {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  min-height: 1.55rem;
+  padding: 0.32rem 0.28rem 0.42rem;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-size: 0.56rem;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.005em;
+  color: #141414;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
   pointer-events: none;
 }
 
