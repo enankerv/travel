@@ -124,29 +124,35 @@ FROM (
 WHERE sub.poi_id = p.id AND p.thumbnail_url IS NULL;
 
 -- ----------------------------------------------------------------------------
--- 5. Re-point votes.getaway_id → votes.poi_id
+-- 5. Re-point votes.getaway_id → votes.poi_id (list_id dropped; poi determines it)
 -- ----------------------------------------------------------------------------
 
 ALTER TABLE votes DROP CONSTRAINT IF EXISTS votes_getaway_id_fkey;
 ALTER TABLE votes DROP CONSTRAINT IF EXISTS votes_list_id_getaway_id_user_id_key;
+ALTER TABLE votes DROP CONSTRAINT IF EXISTS votes_list_id_fkey;
 ALTER TABLE votes RENAME COLUMN getaway_id TO poi_id;
 ALTER TABLE votes
   ADD CONSTRAINT votes_poi_id_fkey FOREIGN KEY (poi_id) REFERENCES pois(id) ON DELETE CASCADE;
 ALTER TABLE votes
-  ADD CONSTRAINT votes_list_id_poi_id_user_id_key UNIQUE (list_id, poi_id, user_id);
+  ADD CONSTRAINT votes_poi_id_user_id_key UNIQUE (poi_id, user_id);
 ALTER INDEX IF EXISTS idx_votes_getaway_id RENAME TO idx_votes_poi_id;
-ALTER INDEX IF EXISTS idx_votes_list_getaway RENAME TO idx_votes_list_poi;
+DROP INDEX IF EXISTS idx_votes_list_id;
+DROP INDEX IF EXISTS idx_votes_list_getaway;
+ALTER TABLE votes DROP COLUMN IF EXISTS list_id;
 
 -- ----------------------------------------------------------------------------
--- 6. Re-point comments.getaway_id → comments.poi_id
+-- 6. Re-point comments.getaway_id → comments.poi_id (list_id dropped)
 -- ----------------------------------------------------------------------------
 
 ALTER TABLE comments DROP CONSTRAINT IF EXISTS comments_getaway_id_fkey;
+ALTER TABLE comments DROP CONSTRAINT IF EXISTS comments_list_id_fkey;
 ALTER TABLE comments RENAME COLUMN getaway_id TO poi_id;
 ALTER TABLE comments
   ADD CONSTRAINT comments_poi_id_fkey FOREIGN KEY (poi_id) REFERENCES pois(id) ON DELETE CASCADE;
 ALTER INDEX IF EXISTS idx_comments_getaway_id RENAME TO idx_comments_poi_id;
-ALTER INDEX IF EXISTS idx_comments_list_getaway RENAME TO idx_comments_list_poi;
+DROP INDEX IF EXISTS idx_comments_list_id;
+DROP INDEX IF EXISTS idx_comments_list_getaway;
+ALTER TABLE comments DROP COLUMN IF EXISTS list_id;
 
 -- ----------------------------------------------------------------------------
 -- 7. Reshape getaways into the accommodation subtype (id → poi_id PK)
@@ -159,7 +165,10 @@ ALTER TABLE getaways ADD PRIMARY KEY (poi_id);
 ALTER TABLE getaways
   ADD CONSTRAINT getaways_poi_id_fkey FOREIGN KEY (poi_id) REFERENCES pois(id) ON DELETE CASCADE;
 
--- Drop columns that now live on pois (geo depends on lat/lng, so drop it first)
+-- Drop columns that now live on pois (geo depends on lat/lng, so drop it first).
+-- slug and list_id are gone too: a getaway is addressed by its poi_id.
+ALTER TABLE getaways DROP CONSTRAINT IF EXISTS getaways_list_id_slug_key;
+DROP INDEX IF EXISTS idx_getaways_list_id;
 ALTER TABLE getaways DROP COLUMN IF EXISTS geo;
 ALTER TABLE getaways DROP COLUMN IF EXISTS lat;
 ALTER TABLE getaways DROP COLUMN IF EXISTS lng;
@@ -168,6 +177,8 @@ ALTER TABLE getaways DROP COLUMN IF EXISTS name;
 ALTER TABLE getaways DROP COLUMN IF EXISTS location;
 ALTER TABLE getaways DROP COLUMN IF EXISTS description;
 ALTER TABLE getaways DROP COLUMN IF EXISTS source_url;
+ALTER TABLE getaways DROP COLUMN IF EXISTS slug;
+ALTER TABLE getaways DROP COLUMN IF EXISTS list_id;
 ALTER TABLE getaways DROP COLUMN IF EXISTS created_at;
 ALTER TABLE getaways DROP COLUMN IF EXISTS updated_at;
 

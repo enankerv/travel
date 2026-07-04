@@ -123,14 +123,12 @@ CREATE INDEX IF NOT EXISTS idx_pois_geo ON pois USING GIST(geo) WHERE geo IS NOT
 ALTER TABLE pois ENABLE ROW LEVEL SECURITY;
 
 -- Getaways — accommodation subtype of POI (1:1, poi_id = pois.id) -------------
--- Holds only the fields specific to a place to stay. Shared fields
--- (title, description, location, lat/lng, source_url, user_id, timestamps)
--- live on pois.
+-- Holds only the fields specific to a place to stay. Everything shared
+-- (title, description, location, lat/lng, source_url, user_id, list_id,
+-- timestamps) lives on pois; a getaway is addressed by its poi_id.
 
 CREATE TABLE IF NOT EXISTS getaways (
   poi_id UUID PRIMARY KEY REFERENCES pois(id) ON DELETE CASCADE,
-  list_id UUID NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
-  slug TEXT NOT NULL,
 
   import_status TEXT NOT NULL DEFAULT 'loading'
     CHECK (import_status IN ('loading', 'loaded', 'thin', 'error')),
@@ -151,12 +149,9 @@ CREATE TABLE IF NOT EXISTS getaways (
   amenities TEXT[],
   included TEXT[],
 
-  caveats TEXT,
-
-  UNIQUE(list_id, slug)
+  caveats TEXT
 );
 
-CREATE INDEX IF NOT EXISTS idx_getaways_list_id ON getaways(list_id);
 CREATE INDEX IF NOT EXISTS idx_getaways_import_status ON getaways(import_status);
 
 ALTER TABLE getaways ENABLE ROW LEVEL SECURITY;
@@ -199,7 +194,6 @@ ALTER TABLE invite_tokens ENABLE ROW LEVEL SECURITY;
 
 CREATE TABLE IF NOT EXISTS public.comments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  list_id UUID NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
   poi_id UUID NOT NULL REFERENCES pois(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   body TEXT NOT NULL,
@@ -207,10 +201,8 @@ CREATE TABLE IF NOT EXISTS public.comments (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_comments_list_id ON comments(list_id);
 CREATE INDEX IF NOT EXISTS idx_comments_poi_id ON comments(poi_id);
 CREATE INDEX IF NOT EXISTS idx_comments_user_id ON comments(user_id);
-CREATE INDEX IF NOT EXISTS idx_comments_list_poi ON comments(list_id, poi_id);
 
 ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
 
@@ -218,17 +210,14 @@ ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
 
 CREATE TABLE IF NOT EXISTS public.votes (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  list_id UUID NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
   poi_id UUID NOT NULL REFERENCES pois(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(list_id, poi_id, user_id)
+  UNIQUE(poi_id, user_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_votes_list_id ON votes(list_id);
 CREATE INDEX IF NOT EXISTS idx_votes_poi_id ON votes(poi_id);
 CREATE INDEX IF NOT EXISTS idx_votes_user_id ON votes(user_id);
-CREATE INDEX IF NOT EXISTS idx_votes_list_poi ON votes(list_id, poi_id);
 
 ALTER TABLE votes ENABLE ROW LEVEL SECURITY;
 
@@ -276,37 +265,12 @@ DROP TRIGGER IF EXISTS update_pois_updated_at ON pois;
 CREATE TRIGGER update_pois_updated_at BEFORE UPDATE ON pois
   FOR EACH ROW EXECUTE FUNCTION update_pois_updated_at();
 
--- Keep subtype list_id in lockstep with the parent poi ----------------------
--- Authorization delegates to the poi, but getaways/votes/comments keep a
--- denormalized list_id for the realtime broadcast channel. Force it to match
--- the parent poi so it can never drift (and never broadcast to a wrong list).
-
-CREATE OR REPLACE FUNCTION public.sync_list_id_from_poi()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
-AS $$
-DECLARE
-  parent_list uuid;
-BEGIN
-  SELECT list_id INTO parent_list FROM pois WHERE id = NEW.poi_id;
-  IF parent_list IS NULL THEN
-    RAISE EXCEPTION 'poi % does not exist', NEW.poi_id;
-  END IF;
-  NEW.list_id := parent_list;
-  RETURN NEW;
-END;
-$$;
-
+-- Cleanup: subtypes no longer carry a denormalized list_id, so the old
+-- list_id sync trigger (if a prior schema installed it) must go.
 DROP TRIGGER IF EXISTS sync_list_id_from_poi ON getaways;
-CREATE TRIGGER sync_list_id_from_poi BEFORE INSERT OR UPDATE ON getaways
-  FOR EACH ROW EXECUTE FUNCTION public.sync_list_id_from_poi();
-
 DROP TRIGGER IF EXISTS sync_list_id_from_poi ON votes;
-CREATE TRIGGER sync_list_id_from_poi BEFORE INSERT OR UPDATE ON votes
-  FOR EACH ROW EXECUTE FUNCTION public.sync_list_id_from_poi();
-
 DROP TRIGGER IF EXISTS sync_list_id_from_poi ON comments;
-CREATE TRIGGER sync_list_id_from_poi BEFORE INSERT OR UPDATE ON comments
-  FOR EACH ROW EXECUTE FUNCTION public.sync_list_id_from_poi();
+DROP FUNCTION IF EXISTS public.sync_list_id_from_poi();
 
 CREATE OR REPLACE FUNCTION update_comments_updated_at()
 RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
@@ -425,8 +389,8 @@ DECLARE
   payload jsonb;
   msg jsonb;
 BEGIN
-  lid := COALESCE(NEW.list_id, OLD.list_id);
-  IF EXISTS (SELECT 1 FROM pois WHERE id = COALESCE(NEW.poi_id, OLD.poi_id)) THEN
+  SELECT p.list_id INTO lid FROM pois p WHERE p.id = COALESCE(NEW.poi_id, OLD.poi_id);
+  IF lid IS NOT NULL THEN
     payload := public._poi_with_details(COALESCE(NEW.poi_id, OLD.poi_id));
     msg := jsonb_build_object('record', payload, 'old_record', payload);
     PERFORM realtime.send(msg, 'UPDATE', 'list:' || lid::text, true);
@@ -476,15 +440,18 @@ DECLARE
   payload jsonb;
   msg jsonb;
 BEGIN
-  list_id_val := COALESCE(NEW.list_id, OLD.list_id);
   user_id_val := COALESCE(NEW.user_id, OLD.user_id);
+  SELECT p.list_id INTO list_id_val FROM pois p WHERE p.id = COALESCE(NEW.poi_id, OLD.poi_id);
+  IF list_id_val IS NULL THEN
+    RETURN COALESCE(NEW, OLD);
+  END IF;
 
   IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
     SELECT p.first_name, p.avatar_url INTO first_name_val, avatar_url_val
     FROM profiles p WHERE p.id = user_id_val;
     payload := jsonb_build_object(
       'id', NEW.id,
-      'list_id', NEW.list_id,
+      'list_id', list_id_val,
       'poi_id', NEW.poi_id,
       'user_id', NEW.user_id,
       'body', NEW.body,
@@ -532,9 +499,12 @@ DECLARE
   payload jsonb;
   msg jsonb;
 BEGIN
-  list_id_val := COALESCE(NEW.list_id, OLD.list_id);
   user_id_val := COALESCE(NEW.user_id, OLD.user_id);
   poi_id_val := COALESCE(NEW.poi_id, OLD.poi_id);
+  SELECT p.list_id INTO list_id_val FROM pois p WHERE p.id = poi_id_val;
+  IF list_id_val IS NULL THEN
+    RETURN COALESCE(NEW, OLD);
+  END IF;
 
   IF TG_OP = 'INSERT' THEN
     SELECT p.first_name, p.avatar_url INTO first_name_val, avatar_url_val
