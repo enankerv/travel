@@ -44,7 +44,7 @@ export default function MapGetawaySidebar({
   return (
     <div className="map-getaway-sidebar">
       <div className="map-getaway-sidebar__header">
-        <h3>{getaway.name || "Getaway"}</h3>
+        <h3>{getaway.title || "Getaway"}</h3>
         <button
           type="button"
           onClick={onClose}
@@ -63,7 +63,7 @@ export default function MapGetawaySidebar({
               onImageClick?.(signedUrls, 0)
             }
           >
-            <img src={thumbUrl} alt={getaway.name} />
+            <img src={thumbUrl} alt={getaway.title ?? ""} />
           </div>
         )}
 

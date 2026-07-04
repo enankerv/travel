@@ -28,9 +28,9 @@ export function useListVotes({
         }
       : undefined);
 
-  const onVoteInsert = useCallback((voter: { getaway_id: string; user_id: string; first_name?: string; avatar_url?: string }) => {
+  const onVoteInsert = useCallback((voter: { poi_id: string; user_id: string; first_name?: string; avatar_url?: string }) => {
     setVotesByGetaway((prev) =>
-      addVoter(prev, voter.getaway_id, {
+      addVoter(prev, voter.poi_id, {
         user_id: voter.user_id,
         first_name: voter.first_name,
         avatar_url: voter.avatar_url,
@@ -38,8 +38,8 @@ export function useListVotes({
     );
   }, []);
 
-  const onVoteDelete = useCallback((getaway_id: string, user_id: string) => {
-    setVotesByGetaway((prev) => removeVoter(prev, getaway_id, user_id));
+  const onVoteDelete = useCallback((poi_id: string, user_id: string) => {
+    setVotesByGetaway((prev) => removeVoter(prev, poi_id, user_id));
   }, []);
 
   const onVote = useCallback(

@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import type { GetawayUpdate } from './getaway'
 
 function normalizeHttpUrl(url: string): string {
   if (url.startsWith('http://') || url.startsWith('https://')) return url
@@ -11,7 +12,7 @@ export const API_URL = normalizeHttpUrl(process.env.NEXT_PUBLIC_API_URL || 'http
 export function resolveImageUrl(url: string): string {
   if (!url) return ''
   if (url.startsWith('http://') || url.startsWith('https://')) return url
-  // Legacy /images/ and raw storage paths (getaway_id/filename) - not loadable without signed URL
+  // Legacy /images/ and raw storage paths (poi_id/filename) - not loadable without signed URL
   return ''
 }
 
@@ -119,9 +120,9 @@ export async function getGetaways(listId: string) {
   return res.json()
 }
 
-export async function updateGetaway(listId: string, slug: string, updates: any) {
+export async function updateGetaway(listId: string, poiId: string, updates: GetawayUpdate) {
   const headers = await getAuthHeaders()
-  const res = await fetch(`${API_URL}/api/lists/${listId}/getaways/${slug}`, {
+  const res = await fetch(`${API_URL}/api/lists/${listId}/getaways/${poiId}`, {
     method: 'PUT',
     headers,
     body: JSON.stringify(updates),
@@ -130,9 +131,9 @@ export async function updateGetaway(listId: string, slug: string, updates: any) 
   return res.json()
 }
 
-export async function deleteGetaway(listId: string, slug: string) {
+export async function deleteGetaway(listId: string, poiId: string) {
   const headers = await getAuthHeaders()
-  const res = await fetch(`${API_URL}/api/lists/${listId}/getaways/${slug}`, {
+  const res = await fetch(`${API_URL}/api/lists/${listId}/getaways/${poiId}`, {
     method: 'DELETE',
     headers,
   })
@@ -165,10 +166,10 @@ async function scoutErrorFromResponse(res: Response, fallback: string): Promise<
 }
 
 // Scout
-export async function scoutUrl(url: string, listId: string, getawayId?: string) {
+export async function scoutUrl(url: string, listId: string, poiId?: string) {
   const headers = await getAuthHeaders()
   const body: Record<string, unknown> = { url, list_id: listId }
-  if (getawayId) body.getaway_id = getawayId
+  if (poiId) body.poi_id = poiId
   const res = await fetch(`${API_URL}/api/scout`, {
     method: 'POST',
     headers,
@@ -181,10 +182,10 @@ export async function scoutUrl(url: string, listId: string, getawayId?: string) 
   return res.json()
 }
 
-export async function scoutPaste(pasted_text: string, listId: string, original_url?: string, getawayId?: string) {
+export async function scoutPaste(pasted_text: string, listId: string, original_url?: string, poiId?: string) {
   const headers = await getAuthHeaders()
   const body: Record<string, unknown> = { pasted_text, list_id: listId, original_url }
-  if (getawayId) body.getaway_id = getawayId
+  if (poiId) body.poi_id = poiId
   const res = await fetch(`${API_URL}/api/scout-paste`, {
     method: 'POST',
     headers,
@@ -308,7 +309,7 @@ export async function removeListMember(listId: string, userId: string) {
 }
 
 // Votes
-export type VoteRecord = { getaway_id: string; user_id: string; first_name?: string; avatar_url?: string }
+export type VoteRecord = { poi_id: string; user_id: string; first_name?: string; avatar_url?: string }
 
 export async function getListVotes(listId: string): Promise<{ votes: VoteRecord[] }> {
   const headers = await getAuthHeaders()
@@ -340,8 +341,7 @@ export async function removeVote(listId: string, getawayId: string) {
 // Comments (per getaway per list; list members read, owner can edit)
 export type CommentRecord = {
   id: string
-  list_id: string
-  getaway_id: string
+  poi_id: string
   user_id: string
   body: string
   created_at: string

@@ -21,8 +21,8 @@ export default function GetawayEditForm({ editData, setEditData }: GetawayEditFo
         <input
           type="text"
           className="sheet-edit-input"
-          value={editData.name ?? ""}
-          onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+          value={editData.title ?? ""}
+          onChange={(e) => setEditData({ ...editData, title: e.target.value })}
         />
       </div>
       <div className="getaway-detail-sheet__edit-field">

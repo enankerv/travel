@@ -222,9 +222,9 @@ export default function ListGetawaysTab({
   async function handleDeleteGetaway(getawayId: string) {
     if (!confirm("Delete this getaway?")) return;
     try {
-      const getaway = getaways.find((g: any) => g.id === getawayId);
+      const getaway = getaways.find((g) => g.id === getawayId);
       if (getaway) {
-        await deleteGetaway(listId, getaway.slug);
+        await deleteGetaway(listId, getaway.id);
         setGetaways((prev) => prev.filter((g: any) => g.id !== getawayId));
       }
     } catch (err: any) {
@@ -234,9 +234,9 @@ export default function ListGetawaysTab({
 
   async function handleUpdateGetaway(getawayId: string, updatedData: any) {
     try {
-      const getaway = getaways.find((g: any) => g.id === getawayId);
+      const getaway = getaways.find((g) => g.id === getawayId);
       if (getaway) {
-        await updateGetaway(listId, getaway.slug, updatedData);
+        await updateGetaway(listId, getaway.id, updatedData);
         await onRefresh();
       }
     } catch (err: any) {

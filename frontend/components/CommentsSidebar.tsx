@@ -160,7 +160,7 @@ export default function CommentsSidebar({
                   className="comments-sidebar__getaway-title"
                   onClick={() => onGetawayClick?.(g.id)}
                 >
-                  {g.name || "(Untitled)"}
+                  {g.title || "(Untitled)"}
                 </button>
                 {(grouped[g.id] || []).map((c) => (
                   <div key={c.id} className="comments-sidebar__comment">
@@ -273,7 +273,7 @@ export default function CommentsSidebar({
                   className="comments-sidebar__getaway-title"
                   onClick={() => onGetawayClick?.(g.id)}
                 >
-                  {g.name || "(Untitled)"}
+                  {g.title || "(Untitled)"}
                 </button>
                 {isListMember &&
                   (newCommentGetaway === g.id ? (

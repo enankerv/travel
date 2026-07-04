@@ -3,6 +3,7 @@
 import { createContext, useContext, type ReactNode } from "react";
 import type { VotesByGetaway } from "./votes";
 import type { CommentRecord } from "./api";
+import type { Getaway } from "./getaway";
 import type { PresenceUser } from "./realtime";
 
 export type CommentsByGetaway = Record<string, CommentRecord[]>;
@@ -10,8 +11,8 @@ export type CommentsByGetaway = Record<string, CommentRecord[]>;
 export type ListDetailContextValue = {
   list: { id: string; name: string; user_id?: string; member_count?: number };
   members: any[];
-  getaways: any[];
-  setGetaways: React.Dispatch<React.SetStateAction<any[]>>;
+  getaways: Getaway[];
+  setGetaways: React.Dispatch<React.SetStateAction<Getaway[]>>;
   votesByGetaway: VotesByGetaway;
   onVote: (getawayId: string) => Promise<void>;
   onUnvote: (getawayId: string) => Promise<void>;

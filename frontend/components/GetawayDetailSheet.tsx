@@ -61,7 +61,7 @@ export default function GetawayDetailSheet({
     if (toSend.included != null && !Array.isArray(toSend.included)) {
       toSend.included = [String(toSend.included)];
     }
-    const { id, list_id, slug, images, created_at, updated_at, import_status, import_error, source_url, ...rest } = toSend;
+    const { id, list_id, poi_type, images, created_at, updated_at, import_status, import_error, source_url, user_id, thumbnail_url, board_x, board_y, board_z, ...rest } = toSend;
     onUpdate(getaway.id, rest);
     setIsEditing(false);
     onClose();
@@ -112,7 +112,7 @@ export default function GetawayDetailSheet({
       />
       <div className="getaway-detail-sheet__panel">
         <div className="getaway-detail-sheet__header">
-          <h2>{isEditing ? "Edit listing" : (getaway.name || "Getaway")}</h2>
+          <h2>{isEditing ? "Edit listing" : getaway.title || "Getaway"}</h2>
           <div className="getaway-detail-sheet__header-actions">
             {isEditing ? (
               <>
@@ -171,7 +171,7 @@ export default function GetawayDetailSheet({
               {signedUrls.length > 0 && (
                 <ImageCarousel
                   images={signedUrls}
-                  alt={getaway.name || "Getaway"}
+                  alt={getaway.title ?? ""}
                   className="getaway-detail-sheet__carousel"
                 />
               )}

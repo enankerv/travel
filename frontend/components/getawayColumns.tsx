@@ -156,14 +156,14 @@ const COLUMN_CONFIG: Record<ColumnKey, ColumnDef> = {
       <td className={className}>
         {getaway.images?.length > 0 && thumbUrl ? (
           isEditing ? (
-            <img src={thumbUrl} alt={getaway.name} className="thumb" />
+            <img src={thumbUrl} alt={getaway.title ?? ""} className="thumb" />
           ) : (
             <div
               className="thumb-link"
               onClick={onImageClick}
               title="Click to view images"
             >
-              <img src={thumbUrl} alt={getaway.name} className="thumb" />
+              <img src={thumbUrl} alt={getaway.title ?? ""} className="thumb" />
             </div>
           )
         ) : (
@@ -181,12 +181,12 @@ const COLUMN_CONFIG: Record<ColumnKey, ColumnDef> = {
         <EditableCell
           type="text"
           cellClassName={className}
-          value={editData.name}
-          onChange={(v) => setEditData({ ...editData, name: v as string })}
+          value={editData.title}
+          onChange={(v) => setEditData({ ...editData, title: v as string })}
         />
       ) : (
         <ExpandableCell
-          value={getaway.name}
+          value={getaway.title}
           cellClassName={className}
           truncateLen={40}
           suffix={

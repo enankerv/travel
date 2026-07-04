@@ -55,7 +55,7 @@ export default function GetawayRow({
     if (toSend.included != null && !Array.isArray(toSend.included)) {
       toSend.included = [String(toSend.included)]
     }
-    const { id, list_id, slug, images, created_at, updated_at, import_status, import_error, source_url, ...rest } = toSend
+    const { id, list_id, poi_type, images, created_at, updated_at, import_status, import_error, source_url, user_id, thumbnail_url, board_x, board_y, board_z, ...rest } = toSend
     if (onEditEnd) onEditEnd(rest)
   }
 

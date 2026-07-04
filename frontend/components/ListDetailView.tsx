@@ -12,6 +12,7 @@ import { useListRealtime, useListPresence, PresenceUser } from "@/lib/realtime";
 import { presenceColorForUserId } from "@/lib/presenceColors";
 import { useListVotes } from "@/hooks/useListVotes";
 import { ListDetailProvider } from "@/lib/ListDetailContext";
+import type { Getaway } from "@/lib/getaway";
 import ListGetawaysTab from "./ListGetawaysTab";
 import ListMembersTab from "./ListMembersTab";
 import ScoutCredits from "./ScoutCredits";
@@ -35,7 +36,7 @@ export default function ListDetailView({
   const { user } = useAuth();
 
   const [activeTab, setActiveTab] = useState<"places" | "members">("places");
-  const [getaways, setGetaways] = useState<any[]>([]);
+  const [getaways, setGetaways] = useState<Getaway[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [commentsByGetaway, setCommentsByGetaway] = useState<
     Record<string, any[]>
@@ -66,19 +67,24 @@ export default function ListDetailView({
   useListRealtime({
     listId: list.id,
     enabled: dataLoaded && !!user,
-    onInsert: (row) => setGetaways((prev) => [row, ...prev]),
-    onUpdate: (row) =>
-      setGetaways((prev) => prev.map((g) => (g.id === row.id ? row : g))),
+    onInsert: (row) => {
+      if (row.poi_type && row.poi_type !== "getaway") return;
+      setGetaways((prev) => [row as Getaway, ...prev]);
+    },
+    onUpdate: (row) => {
+      if (row.poi_type && row.poi_type !== "getaway") return;
+      setGetaways((prev) => prev.map((g) => (g.id === row.id ? (row as Getaway) : g)));
+    },
     onDelete: (id) => setGetaways((prev) => prev.filter((g) => g.id !== id)),
     onImagesChange: () => loadData(true),
     onVoteInsert: votes.onVoteInsert,
     onVoteDelete: votes.onVoteDelete,
     onCommentInsert: (c) =>
       setCommentsByGetaway((prev) => {
-        const existing = prev[c.getaway_id] || [];
+        const existing = prev[c.poi_id] || [];
         if (existing.some((x) => x.id === c.id)) return prev;
         const next = { ...prev };
-        next[c.getaway_id] = [...existing, c];
+        next[c.poi_id] = [...existing, c];
         return next;
       }),
     onCommentUpdate: (c) =>
@@ -145,7 +151,7 @@ export default function ListDetailView({
           getListVotes(list.id),
           getListComments(list.id),
         ]);
-      setGetaways(getawaysData || []);
+      setGetaways((getawaysData || []) as Getaway[]);
       const memberRows = membersData?.members || [];
       setMembers(memberRows);
       if (!dataLoaded) {
@@ -155,7 +161,7 @@ export default function ListDetailView({
       const commentsList = commentsData?.comments || [];
       const commentsByGid: Record<string, any[]> = {};
       for (const c of commentsList) {
-        const gid = c.getaway_id;
+        const gid = c.poi_id;
         if (!commentsByGid[gid]) commentsByGid[gid] = [];
         commentsByGid[gid].push(c);
       }
@@ -165,7 +171,7 @@ export default function ListDetailView({
         { user_id: string; first_name?: string; avatar_url?: string }[]
       > = {};
       for (const v of votesList) {
-        const gid = v.getaway_id;
+        const gid = v.poi_id;
         if (!votesByGid[gid]) votesByGid[gid] = [];
         votesByGid[gid].push({
           user_id: v.user_id,

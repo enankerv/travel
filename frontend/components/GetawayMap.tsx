@@ -4,6 +4,7 @@ import { useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import type { Getaway } from "@/lib/getaway";
 
 const MapContainer = dynamic(
   () => import("react-leaflet").then((m) => m.MapContainer),
@@ -37,14 +38,15 @@ export default function GetawayMap({
   getaways,
   onGetawayClick,
 }: {
-  getaways: { id: string; name?: string; location?: string; region?: string; lat?: number; lng?: number }[];
+  getaways: Getaway[];
   onGetawayClick?: (getawayId: string) => void;
 }) {
   const withCoords = useMemo(
     () =>
       getaways.filter(
-        (g) => g.lat != null && g.lng != null
-      ) as { id: string; name?: string; location?: string; region?: string; lat: number; lng: number }[],
+        (g): g is Getaway & { lat: number; lng: number } =>
+          g.lat != null && g.lng != null
+      ),
     [getaways]
   );
 
@@ -101,7 +103,7 @@ export default function GetawayMap({
             }}
           >
             <Popup>
-              <strong>{g.name || "Getaway"}</strong>
+              <strong>{g.title || "Getaway"}</strong>
               {(g.location || g.region) && (
                 <p style={{ margin: "0.25rem 0 0", fontSize: "0.85em", color: "var(--muted)" }}>
                   {[g.location, g.region].filter(Boolean).join(", ")}

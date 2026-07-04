@@ -65,7 +65,7 @@ export function subscribeListCursorBroadcast(
   };
 }
 
-type GetawayRow = { id: string; updated_at?: string; [key: string]: any };
+type GetawayRow = { id: string; updated_at?: string; title?: string; poi_type?: string; [key: string]: any };
 
 type UseListGetawaysRealtimeOptions = {
   listId: string;
@@ -137,7 +137,7 @@ export function useListGetawaysRealtime({
         {
           event: "*",
           schema: "public",
-          table: "getaways",
+          table: "pois",
           filter: `list_id=eq.${listId}`,
         },
         (payload: { eventType?: string; new?: any; old?: any }) => {
@@ -153,7 +153,7 @@ export function useListGetawaysRealtime({
         {
           event: "*",
           schema: "public",
-          table: "getaway_images",
+          table: "poi_images",
         },
         () => {
           onImagesChange?.();
@@ -170,8 +170,8 @@ export function useListGetawaysRealtime({
 type UseListVotesRealtimeOptions = {
   listId: string;
   enabled: boolean;
-  onVoteInsert: (voter: { getaway_id: string; user_id: string; first_name?: string; avatar_url?: string }) => void;
-  onVoteDelete: (getaway_id: string, user_id: string) => void;
+  onVoteInsert: (voter: { poi_id: string; user_id: string; first_name?: string; avatar_url?: string }) => void;
+  onVoteDelete: (poi_id: string, user_id: string) => void;
 };
 
 type UseListCommentsRealtimeOptions = {
@@ -242,9 +242,9 @@ export function useListRealtime({
       })
       .on("broadcast", { event: "VOTE_INSERT" }, (p: any) => {
         const r = p.payload?.record;
-        if (r?.getaway_id && r?.user_id) {
+        if (r?.poi_id && r?.user_id) {
           onVoteInsert({
-            getaway_id: r.getaway_id,
+            poi_id: r.poi_id,
             user_id: r.user_id,
             first_name: r.first_name || undefined,
             avatar_url: r.avatar_url || undefined,
@@ -253,8 +253,8 @@ export function useListRealtime({
       })
       .on("broadcast", { event: "VOTE_DELETE" }, (p: any) => {
         const r = p.payload?.old_record;
-        if (r?.getaway_id && r?.user_id) {
-          onVoteDelete(r.getaway_id, r.user_id);
+        if (r?.poi_id && r?.user_id) {
+          onVoteDelete(r.poi_id, r.user_id);
         }
       })
       .on("broadcast", { event: "COMMENT_INSERT" }, (p: any) => {
@@ -267,7 +267,7 @@ export function useListRealtime({
       })
       .on("broadcast", { event: "COMMENT_DELETE" }, (p: any) => {
         const r = p.payload?.old_record;
-        if (r?.id && r?.getaway_id && onCommentDelete) onCommentDelete(r.id, r.getaway_id);
+        if (r?.id && r?.poi_id && onCommentDelete) onCommentDelete(r.id, r.poi_id);
       })
       .on("broadcast", { event: "cursor" }, (p: any) => {
         dispatchListCursor(listId, (p.payload ?? {}) as ListCursorBroadcastPayload);
@@ -277,7 +277,7 @@ export function useListRealtime({
         {
           event: "*",
           schema: "public",
-          table: "getaways",
+          table: "pois",
           filter: `list_id=eq.${listId}`,
         },
         (payload: { eventType?: string; new?: any; old?: any }) => {
@@ -293,7 +293,7 @@ export function useListRealtime({
         {
           event: "*",
           schema: "public",
-          table: "getaway_images",
+          table: "poi_images",
         },
         () => {
           onImagesChange?.();
@@ -341,9 +341,9 @@ export function useListVotesRealtime({
       })
       .on("broadcast", { event: "VOTE_INSERT" }, (p: any) => {
         const r = p.payload?.record;
-        if (r?.getaway_id && r?.user_id) {
+        if (r?.poi_id && r?.user_id) {
           onVoteInsert({
-            getaway_id: r.getaway_id,
+            poi_id: r.poi_id,
             user_id: r.user_id,
             first_name: r.first_name || undefined,
             avatar_url: r.avatar_url || undefined,
@@ -352,8 +352,8 @@ export function useListVotesRealtime({
       })
       .on("broadcast", { event: "VOTE_DELETE" }, (p: any) => {
         const r = p.payload?.old_record;
-        if (r?.getaway_id && r?.user_id) {
-          onVoteDelete(r.getaway_id, r.user_id);
+        if (r?.poi_id && r?.user_id) {
+          onVoteDelete(r.poi_id, r.user_id);
         }
       })
       .subscribe();

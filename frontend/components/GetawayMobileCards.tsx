@@ -212,14 +212,14 @@ function GetawayMobileCard({
     <div className="getaway-mobile-card" onClick={onClick}>
       <div className="getaway-mobile-card__hero">
         {thumbUrl ? (
-          <img src={thumbUrl} alt={getaway.name} />
+          <img src={thumbUrl} alt={getaway.title ?? ""} />
         ) : (
           <div className="getaway-mobile-card__hero-placeholder">—</div>
         )}
       </div>
       <div className="getaway-mobile-card__body">
         <div className="getaway-mobile-card__body-main">
-          <span className="getaway-mobile-card__name">{getaway.name || "Getaway"}</span>
+          <span className="getaway-mobile-card__name">{getaway.title || "Getaway"}</span>
           {getaway.price != null && (
             <div className="getaway-mobile-card__price">
               <span>{formatListingPrice(getaway.price, getaway.price_currency)}</span>

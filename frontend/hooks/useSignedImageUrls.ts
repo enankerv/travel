@@ -8,7 +8,7 @@ const EXPIRE_SEC = 3600
 
 function isStoragePath(url: string): boolean {
   if (!url || url.startsWith('http') || url.startsWith('/images/')) return false
-  return url.includes('/')  // e.g. getaway_id/00.jpg
+  return url.includes('/')  // e.g. poi_id/00.jpg
 }
 
 /** Sign storage paths to signed URLs; pass through http URLs as-is. Preserves order. */
