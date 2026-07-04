@@ -22,7 +22,7 @@ import {
 } from '@/lib/api'
 import { useAuth } from '@/lib/AuthContext'
 import { useListRealtime, useListPresence, type PresenceUser } from '@/lib/realtime'
-import type { Getaway, GetawayUpdate } from '@/lib/getaway'
+import type { GetawayUpdate } from '@/lib/getaway'
 import type { POIUpdate } from '@/lib/poi'
 import {
   addCommentToBoardPoi,
