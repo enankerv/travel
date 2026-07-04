@@ -23,6 +23,16 @@ import {
   screenToBoardNorm,
   type BoardCamera,
 } from '@/lib/boardCoords'
+import {
+  anchorFromDragPointer,
+  cameraTransform,
+  computeFitCamera,
+  computePinGrabOffsets,
+  exceedsDragThreshold,
+  pinCoordsEqual,
+  zoomCameraAtPoint,
+  type PinDragGrab,
+} from '@/lib/boardMath'
 import type { POIBase } from '@/lib/getaway'
 import {
   BOARD_POI_TYPE_OPTIONS,
@@ -35,103 +45,9 @@ import type { BoardPoi } from '@/lib/board'
 import BoardAddItemButton from './BoardAddItemButton'
 import BoardCursorLayer from './BoardCursorLayer'
 
-const MIN_SCALE = 0.08
-const MAX_SCALE = 2.5
-/** Visual padding around pin anchors when fitting (world px). */
-const PIN_PAD_X = 88
-const PIN_PAD_TOP = 142
-const PIN_PAD_BOTTOM = 14
-const MIN_FIT_SPAN = 180
-const FIT_MARGIN = 0.88
-/** Screen px before a pin pointer down becomes a drag (not a click). */
-const PIN_DRAG_THRESHOLD_PX = 6
-
-function poiBoundsWorld(
-  pois: POIBase[],
-  posOverride?: { poiId: string; wx: number; wy: number } | null,
-) {
-  if (pois.length === 0) return null
-
-  let minX = Infinity
-  let minY = Infinity
-  let maxX = -Infinity
-  let maxY = -Infinity
-
-  for (const poi of pois) {
-    const overridden =
-      posOverride?.poiId === poi.id ? posOverride : null
-    const wx = overridden?.wx ?? poi.board_x ?? 0.5
-    const wy = overridden?.wy ?? poi.board_y ?? 0.5
-    const bx = wx * BOARD_WORLD_W
-    const by = wy * BOARD_WORLD_H
-    minX = Math.min(minX, bx - PIN_PAD_X)
-    maxX = Math.max(maxX, bx + PIN_PAD_X)
-    minY = Math.min(minY, by - PIN_PAD_TOP)
-    maxY = Math.max(maxY, by + PIN_PAD_BOTTOM)
-  }
-
-  return { minX, minY, maxX, maxY }
-}
-
-function cameraForBounds(
-  viewportW: number,
-  viewportH: number,
-  bounds: { minX: number; minY: number; maxX: number; maxY: number },
-): BoardCamera {
-  let { minX, minY, maxX, maxY } = bounds
-  let bw = maxX - minX
-  let bh = maxY - minY
-
-  if (bw < MIN_FIT_SPAN) {
-    const cx = (minX + maxX) / 2
-    minX = cx - MIN_FIT_SPAN / 2
-    maxX = cx + MIN_FIT_SPAN / 2
-    bw = MIN_FIT_SPAN
-  }
-  if (bh < MIN_FIT_SPAN) {
-    const cy = (minY + maxY) / 2
-    minY = cy - MIN_FIT_SPAN / 2
-    maxY = cy + MIN_FIT_SPAN / 2
-    bh = MIN_FIT_SPAN
-  }
-
-  const scale = clamp(
-    Math.min(viewportW / bw, viewportH / bh) * FIT_MARGIN,
-    MIN_SCALE,
-    MAX_SCALE,
-  )
-  const cx = (minX + maxX) / 2
-  const cy = (minY + maxY) / 2
-
-  return {
-    x: viewportW / 2 - cx * scale,
-    y: viewportH / 2 - cy * scale,
-    scale,
-  }
-}
-
 export type BoardViewHandle = {
   fitCamera: () => void
   addPoiAtCenter: (poiType: BoardCreatablePoiType) => void
-}
-
-function clamp(n: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, n))
-}
-
-function coordsMatch(a: number, b: number) {
-  return Math.abs(a - b) < 0.0001
-}
-
-function pinCoordsEqual(
-  a: { wx: number; wy: number },
-  b: { wx: number; wy: number },
-) {
-  return coordsMatch(a.wx, b.wx) && coordsMatch(a.wy, b.wy)
-}
-
-function cameraTransform(cam: BoardCamera) {
-  return `translate3d(${cam.x}px, ${cam.y}px, 0) scale(${cam.scale})`
 }
 
 function pinLabel(poi: POIBase): string {
@@ -222,13 +138,7 @@ type DragState = {
   startWx: number
   startWy: number
   pointerId: number
-  /** Cursor − pin center at pointer down (normalized). */
-  grabOffsetWx: number
-  grabOffsetWy: number
-  /** Anchor − pin center at pointer down (normalized). */
-  anchorFromCenterWx: number
-  anchorFromCenterWy: number
-}
+} & PinDragGrab
 
 type PendingPinPointer = {
   poiId: string
@@ -237,42 +147,7 @@ type PendingPinPointer = {
   startClientY: number
   startWx: number
   startWy: number
-  grabOffsetWx: number
-  grabOffsetWy: number
-  anchorFromCenterWx: number
-  anchorFromCenterWy: number
-}
-
-function pinCenterNorm(
-  pinEl: HTMLElement,
-  viewport: HTMLDivElement,
-  camera: BoardCamera,
-): { wx: number; wy: number } | null {
-  const rect = pinEl.getBoundingClientRect()
-  return screenToBoardNorm(
-    viewport,
-    camera,
-    rect.left + rect.width / 2,
-    rect.top + rect.height / 2,
-  )
-}
-
-/** Map cursor position → anchor, keeping pin center fixed relative to the grab. */
-function anchorFromDragPointer(
-  drag: Pick<
-    PendingPinPointer,
-    'grabOffsetWx' | 'grabOffsetWy' | 'anchorFromCenterWx' | 'anchorFromCenterWy'
-  >,
-  cursorWx: number,
-  cursorWy: number,
-): { wx: number; wy: number } {
-  const centerWx = cursorWx - drag.grabOffsetWx
-  const centerWy = cursorWy - drag.grabOffsetWy
-  return {
-    wx: clamp(centerWx + drag.anchorFromCenterWx, 0, 1),
-    wy: clamp(centerWy + drag.anchorFromCenterWy, 0, 1),
-  }
-}
+} & PinDragGrab
 
 const BoardView = forwardRef<
   BoardViewHandle,
@@ -466,24 +341,7 @@ const BoardView = forwardRef<
 
     const posOverride =
       drag && dragPos ? { poiId: drag.poiId, wx: dragPos.wx, wy: dragPos.wy } : null
-    const bounds = poiBoundsWorld(pois, posOverride)
-
-    if (!bounds) {
-      const scale = clamp(
-        Math.min(width / (BOARD_WORLD_W * 0.35), height / (BOARD_WORLD_H * 0.35)) *
-          FIT_MARGIN,
-        MIN_SCALE,
-        MAX_SCALE,
-      )
-      applyCamera({
-        x: width / 2 - (BOARD_WORLD_W * 0.5) * scale,
-        y: height / 2 - (BOARD_WORLD_H * 0.5) * scale,
-        scale,
-      })
-      return true
-    }
-
-    applyCamera(cameraForBounds(width, height, bounds))
+    applyCamera(computeFitCamera(width, height, pois, posOverride))
     return true
   }, [applyCamera, pois, drag, dragPos])
 
@@ -613,16 +471,12 @@ const BoardView = forwardRef<
       const rect = vp.getBoundingClientRect()
       const mx = e.clientX - rect.left
       const my = e.clientY - rect.top
-      const cam = cameraRef.current
-      const wx = (mx - cam.x) / cam.scale
-      const wy = (my - cam.y) / cam.scale
-      const factor = e.deltaY < 0 ? 1.08 : 1 / 1.08
-      const newScale = clamp(cam.scale * factor, MIN_SCALE, MAX_SCALE)
-      pendingCameraRef.current = {
-        x: mx - wx * newScale,
-        y: my - wy * newScale,
-        scale: newScale,
-      }
+      pendingCameraRef.current = zoomCameraAtPoint(
+        cameraRef.current,
+        mx,
+        my,
+        e.deltaY,
+      )
       if (!cameraRafRef.current) {
         cameraRafRef.current = requestAnimationFrame(flushCamera)
       }
@@ -696,9 +550,7 @@ const BoardView = forwardRef<
 
       const pending = pendingPinRef.current
       if (pending && pending.pointerId === e.pointerId && !dragRef.current) {
-        const dx = e.clientX - pending.startClientX
-        const dy = e.clientY - pending.startClientY
-        if (Math.hypot(dx, dy) >= PIN_DRAG_THRESHOLD_PX) {
+        if (exceedsDragThreshold(pending.startClientX, pending.startClientY, e.clientX, e.clientY)) {
           promotePendingToDrag(pending)
           pingActivity()
           const vp = viewportRef.current
@@ -810,22 +662,22 @@ const BoardView = forwardRef<
       const wx = poi.board_x ?? 0.5
       const wy = poi.board_y ?? 0.5
       const vp = viewportRef.current
-      const cursorNorm = vp
-        ? screenToBoardNorm(vp, cameraRef.current, e.clientX, e.clientY)
-        : null
-      const centerNorm = vp
-        ? pinCenterNorm(e.currentTarget, vp, cameraRef.current)
-        : null
-      let grabOffsetWx = 0
-      let grabOffsetWy = 0
-      let anchorFromCenterWx = 0
-      let anchorFromCenterWy = 0
-      if (cursorNorm && centerNorm) {
-        grabOffsetWx = cursorNorm.wx - centerNorm.wx
-        grabOffsetWy = cursorNorm.wy - centerNorm.wy
-        anchorFromCenterWx = wx - centerNorm.wx
-        anchorFromCenterWy = wy - centerNorm.wy
-      }
+      const grab = vp
+        ? computePinGrabOffsets(
+            e.currentTarget,
+            vp,
+            cameraRef.current,
+            e.clientX,
+            e.clientY,
+            wx,
+            wy,
+          )
+        : {
+            grabOffsetWx: 0,
+            grabOffsetWy: 0,
+            anchorFromCenterWx: 0,
+            anchorFromCenterWy: 0,
+          }
       pendingPinRef.current = {
         poiId: poi.id,
         pointerId: e.pointerId,
@@ -833,10 +685,7 @@ const BoardView = forwardRef<
         startClientY: e.clientY,
         startWx: wx,
         startWy: wy,
-        grabOffsetWx,
-        grabOffsetWy,
-        anchorFromCenterWx,
-        anchorFromCenterWy,
+        ...grab,
       }
       setPendingPoiId(poi.id)
       broadcastDragStart(poi.id, wx, wy)
@@ -874,28 +723,6 @@ const BoardView = forwardRef<
     [drag, dragPos, peerDragByPoiId, gospelByPoiId],
   )
 
-  const onBoardDoubleClick = useCallback(
-    (e: ReactPointerEvent<HTMLDivElement>) => {
-      const t = e.target as HTMLElement
-      if (
-        !t.classList.contains('board-view__world') &&
-        !t.classList.contains('board-view__cork')
-      ) {
-        return
-      }
-      const vp = viewportRef.current
-      if (!vp) return
-      const norm = screenToBoardNorm(vp, cameraRef.current, e.clientX, e.clientY)
-      if (!norm) return
-      void addPoiAt(
-        clamp(norm.wx, 0.02, 0.98),
-        clamp(norm.wy, 0.02, 0.98),
-        'poi',
-      )
-    },
-    [addPoiAt],
-  )
-
   return (
     <div className={`board-view${fullscreen ? ' board-view--fullscreen' : ''}`}>
       {!fullscreen && (
@@ -914,7 +741,7 @@ const BoardView = forwardRef<
             onAdd={(poiType) => void addPoiAt(0.5, 0.5, poiType)}
           />
           <span className="board-view__hint">
-            Scroll to zoom · drag background to pan · double-click to add a pin
+            Scroll to zoom · drag background to pan
           </span>
         </div>
       )}
@@ -932,7 +759,6 @@ const BoardView = forwardRef<
           ref={worldRef}
           className="board-view__world"
           style={{ width: BOARD_WORLD_W, height: BOARD_WORLD_H }}
-          onDoubleClick={onBoardDoubleClick}
         >
           <div className="board-view__cork" aria-hidden />
 
