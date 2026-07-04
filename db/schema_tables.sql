@@ -276,6 +276,38 @@ DROP TRIGGER IF EXISTS update_pois_updated_at ON pois;
 CREATE TRIGGER update_pois_updated_at BEFORE UPDATE ON pois
   FOR EACH ROW EXECUTE FUNCTION update_pois_updated_at();
 
+-- Keep subtype list_id in lockstep with the parent poi ----------------------
+-- Authorization delegates to the poi, but getaways/votes/comments keep a
+-- denormalized list_id for the realtime broadcast channel. Force it to match
+-- the parent poi so it can never drift (and never broadcast to a wrong list).
+
+CREATE OR REPLACE FUNCTION public.sync_list_id_from_poi()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  parent_list uuid;
+BEGIN
+  SELECT list_id INTO parent_list FROM pois WHERE id = NEW.poi_id;
+  IF parent_list IS NULL THEN
+    RAISE EXCEPTION 'poi % does not exist', NEW.poi_id;
+  END IF;
+  NEW.list_id := parent_list;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS sync_list_id_from_poi ON getaways;
+CREATE TRIGGER sync_list_id_from_poi BEFORE INSERT OR UPDATE ON getaways
+  FOR EACH ROW EXECUTE FUNCTION public.sync_list_id_from_poi();
+
+DROP TRIGGER IF EXISTS sync_list_id_from_poi ON votes;
+CREATE TRIGGER sync_list_id_from_poi BEFORE INSERT OR UPDATE ON votes
+  FOR EACH ROW EXECUTE FUNCTION public.sync_list_id_from_poi();
+
+DROP TRIGGER IF EXISTS sync_list_id_from_poi ON comments;
+CREATE TRIGGER sync_list_id_from_poi BEFORE INSERT OR UPDATE ON comments
+  FOR EACH ROW EXECUTE FUNCTION public.sync_list_id_from_poi();
+
 CREATE OR REPLACE FUNCTION update_comments_updated_at()
 RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS update_comments_updated_at ON comments;

@@ -72,6 +72,31 @@ AS $$
   SELECT EXISTS (SELECT 1 FROM list_members WHERE list_id = check_list_id AND user_id = check_user_id);
 $$;
 
+-- poi access helpers: subtypes (getaways, images, votes, comments) delegate
+-- authorization to their parent poi. Visibility/mutability follows the poi's
+-- list — if you can see/edit the poi, you can see/edit everything hanging off it.
+CREATE OR REPLACE FUNCTION public.can_view_poi(check_poi_id uuid, check_user_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM pois p
+    WHERE p.id = check_poi_id
+      AND public.is_list_owner_or_member(p.list_id, check_user_id)
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.can_edit_poi(check_poi_id uuid, check_user_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM pois p
+    WHERE p.id = check_poi_id
+      AND public.is_list_owner_or_editor(p.list_id, check_user_id)
+  );
+$$;
+
 -- storage upload: resolves poi → list ownership inside SECURITY DEFINER
 -- (image objects are stored under the poi id as the top folder)
 CREATE OR REPLACE FUNCTION public.can_upload_poi_image(object_path text, check_user_id uuid)
@@ -208,46 +233,50 @@ CREATE POLICY "Editors can delete pois from lists"
   ON pois FOR DELETE
   USING (user_has_verified_terms_and_age() AND is_list_owner_or_editor(pois.list_id, auth.uid()));
 
--- Getaways (accommodation subtype) -------------------------------------------
+-- Getaways (accommodation subtype) — delegates to parent poi -----------------
 
 DROP POLICY IF EXISTS "Users can view getaways in their lists" ON getaways;
 CREATE POLICY "Users can view getaways in their lists"
   ON getaways FOR SELECT
-  USING (user_has_verified_terms_and_age() AND is_list_owner_or_member(getaways.list_id, auth.uid()));
+  USING (user_has_verified_terms_and_age() AND can_view_poi(getaways.poi_id, auth.uid()));
 
 DROP POLICY IF EXISTS "Users can add getaways to lists they have access to" ON getaways;
 CREATE POLICY "Users can add getaways to lists they have access to"
   ON getaways FOR INSERT
-  WITH CHECK (user_has_verified_terms_and_age() AND is_list_owner_or_editor(getaways.list_id, auth.uid()));
+  WITH CHECK (user_has_verified_terms_and_age() AND can_edit_poi(getaways.poi_id, auth.uid()));
 
 DROP POLICY IF EXISTS "Users can update getaways in lists they have access to" ON getaways;
 CREATE POLICY "Users can update getaways in lists they have access to"
   ON getaways FOR UPDATE
-  USING (user_has_verified_terms_and_age() AND is_list_owner_or_editor(getaways.list_id, auth.uid()));
+  USING (user_has_verified_terms_and_age() AND can_edit_poi(getaways.poi_id, auth.uid()));
 
 DROP POLICY IF EXISTS "Admins can delete getaways from lists" ON getaways;
 DROP POLICY IF EXISTS "Editors can delete getaways from lists" ON getaways;
 CREATE POLICY "Editors can delete getaways from lists"
   ON getaways FOR DELETE
-  USING (user_has_verified_terms_and_age() AND is_list_owner_or_editor(getaways.list_id, auth.uid()));
+  USING (user_has_verified_terms_and_age() AND can_edit_poi(getaways.poi_id, auth.uid()));
 
--- POI images -----------------------------------------------------------------
+-- POI images — delegates to parent poi ---------------------------------------
 
 DROP POLICY IF EXISTS "Users can view images in their pois" ON poi_images;
 CREATE POLICY "Users can view images in their pois"
   ON poi_images FOR SELECT
-  USING (
-    user_has_verified_terms_and_age()
-    AND EXISTS (SELECT 1 FROM pois p WHERE p.id = poi_images.poi_id AND is_list_owner_or_member(p.list_id, auth.uid()))
-  );
+  USING (user_has_verified_terms_and_age() AND can_view_poi(poi_images.poi_id, auth.uid()));
 
 DROP POLICY IF EXISTS "Users can add images to their pois" ON poi_images;
 CREATE POLICY "Users can add images to their pois"
   ON poi_images FOR INSERT
-  WITH CHECK (
-    user_has_verified_terms_and_age()
-    AND EXISTS (SELECT 1 FROM pois p WHERE p.id = poi_images.poi_id AND is_list_owner_or_editor(p.list_id, auth.uid()))
-  );
+  WITH CHECK (user_has_verified_terms_and_age() AND can_edit_poi(poi_images.poi_id, auth.uid()));
+
+DROP POLICY IF EXISTS "Users can update images in their pois" ON poi_images;
+CREATE POLICY "Users can update images in their pois"
+  ON poi_images FOR UPDATE
+  USING (user_has_verified_terms_and_age() AND can_edit_poi(poi_images.poi_id, auth.uid()));
+
+DROP POLICY IF EXISTS "Users can delete images in their pois" ON poi_images;
+CREATE POLICY "Users can delete images in their pois"
+  ON poi_images FOR DELETE
+  USING (user_has_verified_terms_and_age() AND can_edit_poi(poi_images.poi_id, auth.uid()));
 
 -- Invite tokens --------------------------------------------------------------
 
@@ -273,7 +302,7 @@ CREATE POLICY "List members can read comments"
   ON comments FOR SELECT
   USING (
     user_has_verified_terms_and_age()
-    AND is_list_owner_or_member(comments.list_id, auth.uid())
+    AND can_view_poi(comments.poi_id, auth.uid())
   );
 
 DROP POLICY IF EXISTS "List members can add own comment" ON comments;
@@ -282,7 +311,7 @@ CREATE POLICY "List members can add own comment"
   WITH CHECK (
     user_has_verified_terms_and_age()
     AND user_id = auth.uid()
-    AND is_list_owner_or_member(list_id, auth.uid())
+    AND can_view_poi(comments.poi_id, auth.uid())
   );
 
 DROP POLICY IF EXISTS "Comment owner can update" ON comments;
@@ -303,7 +332,7 @@ CREATE POLICY "List members can read votes"
   ON votes FOR SELECT
   USING (
     user_has_verified_terms_and_age()
-    AND is_list_owner_or_member(votes.list_id, auth.uid())
+    AND can_view_poi(votes.poi_id, auth.uid())
   );
 
 DROP POLICY IF EXISTS "List members can add own vote" ON votes;
@@ -312,7 +341,7 @@ CREATE POLICY "List members can add own vote"
   WITH CHECK (
     user_has_verified_terms_and_age()
     AND user_id = auth.uid()
-    AND is_list_owner_or_member(list_id, auth.uid())
+    AND can_view_poi(votes.poi_id, auth.uid())
   );
 
 DROP POLICY IF EXISTS "Users can remove own vote" ON votes;
