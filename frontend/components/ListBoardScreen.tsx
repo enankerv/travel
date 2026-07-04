@@ -127,7 +127,6 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
         ref={boardRef}
         listId={listId}
         enabled={!isMobile}
-        fullscreen
         onActivity={hideChromeOnActivity}
         selectedPoiId={selectedPoiId}
         onSelectPoi={setSelectedPoiId}

@@ -42,7 +42,6 @@ import {
   type BoardCreatablePoiType,
 } from '@/lib/poi'
 import type { BoardPoi } from '@/lib/board'
-import BoardAddItemButton from './BoardAddItemButton'
 import BoardCursorLayer from './BoardCursorLayer'
 
 export type BoardViewHandle = {
@@ -154,7 +153,6 @@ const BoardView = forwardRef<
   {
     listId: string
     enabled: boolean
-    fullscreen?: boolean
     onActivity?: () => void
     selectedPoiId?: string | null
     onSelectPoi?: (poiId: string | null) => void
@@ -163,7 +161,6 @@ const BoardView = forwardRef<
   {
     listId,
     enabled,
-    fullscreen = false,
     onActivity,
     selectedPoiId = null,
     onSelectPoi,
@@ -724,28 +721,7 @@ const BoardView = forwardRef<
   )
 
   return (
-    <div className={`board-view${fullscreen ? ' board-view--fullscreen' : ''}`}>
-      {!fullscreen && (
-        <div className="board-view__toolbar">
-          <button
-            type="button"
-            className="board-view__tool-btn"
-            onClick={() => fitCamera()}
-            title="Fit board to view"
-          >
-            Fit
-          </button>
-          <BoardAddItemButton
-            creating={creating}
-            buttonClassName="board-view__tool-btn"
-            onAdd={(poiType) => void addPoiAt(0.5, 0.5, poiType)}
-          />
-          <span className="board-view__hint">
-            Scroll to zoom · drag background to pan
-          </span>
-        </div>
-      )}
-
+    <div className="board-view board-view--fullscreen">
       <div
         ref={viewportRef}
         className={`board-view__viewport${interacting ? ' board-view__viewport--active' : ''}`}
