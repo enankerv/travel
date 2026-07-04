@@ -3,30 +3,9 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Header
 
 from models import Getaway
-from utils.geocode import geocode_from_location_region
 from routes.auth import extract_auth_token
 
 router = APIRouter(prefix="/lists", tags=["getaways"])
-
-
-def _apply_geocode_if_location_changed(current: Getaway, updates: dict) -> None:
-    """When location or region in `updates` differs from `current`, re-geocode into lat/lng."""
-
-    def _strip(s: Optional[str]) -> str:
-        return (s or "").strip()
-
-    touched_loc = "location" in updates
-    touched_reg = "region" in updates
-    if not touched_loc and not touched_reg:
-        return
-    old_loc = _strip(current.location)
-    old_reg = _strip(getattr(current, "region", None))
-    new_loc = _strip(updates["location"]) if touched_loc else old_loc
-    new_reg = _strip(updates["region"]) if touched_reg else old_reg
-    if new_loc != old_loc or new_reg != old_reg:
-        lat, lng = geocode_from_location_region(new_loc, new_reg)
-        updates["lat"] = lat
-        updates["lng"] = lng
 
 
 @router.get("/{list_id}/getaways", response_model=list[Getaway])
@@ -54,11 +33,6 @@ async def update_getaway_endpoint(
         updates = body.model_dump(exclude_unset=True)
         if not updates:
             raise HTTPException(status_code=400, detail="No fields to update.")
-        if "location" in updates or "region" in updates:
-            current = Getaway.get(poi_id, token)
-            if not current:
-                raise HTTPException(status_code=404, detail="Getaway not found")
-            _apply_geocode_if_location_changed(current, updates)
 
         result = Getaway.update_by_id(poi_id, token, **updates)
         if not result:

@@ -206,6 +206,13 @@ class POI(POIBase):
         cls, poi_id: str, auth_token: str, model_cls: type["POI"], changes: dict,
     ) -> Optional["POI"]:
         from db.pois import update_poi_row, update_subtype_row
+        from utils.geocode import apply_geocode_if_location_changed
+
+        if "location" in changes or "region" in changes:
+            current = model_cls.get(poi_id, auth_token)
+            if current:
+                apply_geocode_if_location_changed(current, changes)
+
         spine, sub = model_cls._split_writable(changes)
         if spine:
             update_poi_row(poi_id, spine, auth_token)
@@ -227,10 +234,17 @@ class POI(POIBase):
         return obj if isinstance(obj, cls) else None
 
     @classmethod
-    def for_list(cls, list_id: str, auth_token: str) -> list["POI"]:
-        """Fetch all POIs in a list. Token is stored on each instance."""
+    def for_list(
+        cls, list_id: str, auth_token: str, *, poi_type: str | None = None,
+    ) -> list["POI"]:
+        """Fetch POIs in a list. Token is stored on each instance.
+
+        Optional ``poi_type`` filters the query (spine ``poi_type`` column).
+        When omitted, uses ``cls._TYPE_FILTER`` (``None`` on base ``POI`` = all types).
+        """
         from db.pois import fetch_list_poi_rows
-        rows = fetch_list_poi_rows(list_id, auth_token, poi_type=cls._TYPE_FILTER)
+        type_filter = poi_type if poi_type is not None else cls._TYPE_FILTER
+        rows = fetch_list_poi_rows(list_id, auth_token, poi_type=type_filter)
         return [poi_from_row(r, auth_token) for r in rows]
 
     # ---- create -----------------------------------------------------------
@@ -238,8 +252,14 @@ class POI(POIBase):
     def new(cls, list_id: str, auth_token: str, *, user_id: Optional[str] = None, **fields) -> Optional["POI"]:
         """Create a POI (+ subtype row). Token is stored on the returned instance."""
         from db.pois import insert_poi_row, insert_subtype_row
+        from utils.geocode import apply_geocode_on_create
+
+        apply_geocode_on_create(fields)
         spine, sub = cls._split_writable(fields)
-        spine["poi_type"] = cls.model_fields["poi_type"].default
+        if cls._SUBTYPE_TABLE is not None:
+            spine["poi_type"] = cls.model_fields["poi_type"].default
+        else:
+            spine["poi_type"] = fields.get("poi_type") or cls.model_fields["poi_type"].default
         row = insert_poi_row(list_id, spine, auth_token, user_id=user_id)
         if not row:
             return None
@@ -371,10 +391,57 @@ class Getaway(POI, GetawayFields):
 GetawayEditorUpdate = Getaway.Update
 
 
+class POIUpdateResponse(BaseModel):
+    ok: bool
+    poi: POI
+
+
+class POICreate(BaseModel):
+    """HTTP body for creating a spine-only POI (no subtype fields)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    poi_type: PoiType = "poi"
+    title: Optional[str] = None
+    description: Optional[str] = None
+    location: Optional[str] = None
+    address: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    source_url: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    board_x: Optional[float] = None
+    board_y: Optional[float] = None
+    board_z: Optional[int] = None
+
+
+class POIUpdate(BaseModel):
+    """HTTP body for updating spine fields on any POI."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    title: Optional[str] = None
+    description: Optional[str] = None
+    location: Optional[str] = None
+    address: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    source_url: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    board_x: Optional[float] = None
+    board_y: Optional[float] = None
+    board_z: Optional[int] = None
+
+
 # Maps pois.poi_type -> concrete model. POI is the fallback for plain pins.
 _POI_MODELS: dict[str, type[POI]] = {
     "getaway": Getaway,
 }
+
+
+def poi_class_for_type(poi_type: str) -> type[POI]:
+    """Return the domain model class for a ``poi_type`` (``POI`` for spine-only types)."""
+    return _POI_MODELS.get(poi_type, POI)
 
 
 def poi_from_row(row: dict, auth_token: str) -> POI:

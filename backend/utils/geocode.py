@@ -89,3 +89,36 @@ def geocode_from_location_region(
     if not q:
         return (None, None)
     return geocode(q)
+
+
+def apply_geocode_if_location_changed(current, updates: dict) -> None:
+    """When location or region in ``updates`` differs from ``current``, set lat/lng."""
+
+    def _strip(s: str | None) -> str:
+        return (s or "").strip()
+
+    touched_loc = "location" in updates
+    touched_reg = "region" in updates
+    if not touched_loc and not touched_reg:
+        return
+    old_loc = _strip(current.location)
+    old_reg = _strip(getattr(current, "region", None))
+    new_loc = _strip(updates["location"]) if touched_loc else old_loc
+    new_reg = _strip(updates["region"]) if touched_reg else old_reg
+    if new_loc != old_loc or new_reg != old_reg:
+        lat, lng = geocode_from_location_region(new_loc, new_reg)
+        updates["lat"] = lat
+        updates["lng"] = lng
+
+
+def apply_geocode_on_create(fields: dict) -> None:
+    """Geocode into lat/lng when create payload has location but no coords."""
+    if fields.get("lat") is not None and fields.get("lng") is not None:
+        return
+    loc = (fields.get("location") or "").strip()
+    if not loc:
+        return
+    lat, lng = geocode_from_location_region(loc, None)
+    if lat is not None and lng is not None:
+        fields["lat"] = lat
+        fields["lng"] = lng
