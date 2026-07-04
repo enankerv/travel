@@ -1,17 +1,15 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { BoardProvider, useBoardContext } from '@/lib/BoardContext'
-import { presenceColorForUserId } from '@/lib/presenceColors'
 import type { BoardCreatablePoiType } from '@/lib/poi'
 import BoardView, { type BoardViewHandle } from './BoardView'
-import BoardAddItemButton from './BoardAddItemButton'
+import BoardScreenChrome from './BoardScreenChrome'
+import BoardScreenToolbar from './BoardScreenToolbar'
 import PoiDetailSidebar from './PoiDetailSidebar'
 import GetawayDetailSheet from './GetawayDetailSheet'
 import CommentsSidebar from './CommentsSidebar'
 import ImageGallery from './ImageGallery'
-import ScoutCredits from './ScoutCredits'
 import { useIsMobile } from '@/hooks/useIsMobile'
 
 const IDLE_MS = 1000
@@ -25,7 +23,6 @@ export default function ListBoardScreen({ listId }: { listId: string }) {
 }
 
 function ListBoardScreenInner({ listId }: { listId: string }) {
-  const router = useRouter()
   const isMobile = useIsMobile()
   const boardRef = useRef<BoardViewHandle>(null)
   const idleTimerRef = useRef<number>()
@@ -83,6 +80,11 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
     [revealChrome],
   )
 
+  const handleFitCamera = useCallback(() => {
+    revealChrome()
+    boardRef.current?.fitCamera()
+  }, [revealChrome])
+
   const onDeletePoi = useCallback(
     async (poiId: string) => {
       const deleted = await handleDeletePoi(poiId)
@@ -100,64 +102,16 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
       <div
         className={`board-screen__overlay${chromeVisible ? '' : ' board-screen__overlay--hidden'}`}
       >
-        <header className="board-screen__header">
-          <div className="board-screen__header-left">
-            <button
-              type="button"
-              className="board-screen__back"
-              onClick={() => router.push(`/?list=${listId}`)}
-              aria-label="Back to list"
-            >
-              ←
-            </button>
-            <h1 className="board-screen__title">{list.name}</h1>
-            {otherViewers.length > 0 && (
-              <div
-                className="board-screen__presence"
-                title={otherViewers
-                  .map((u) => u.first_name || u.user_id.slice(0, 8))
-                  .join(', ')}
-              >
-                {otherViewers.slice(0, 5).map((u) => (
-                  <div
-                    key={u.user_id}
-                    className="board-screen__presence-avatar"
-                    title={u.first_name || u.user_id.slice(0, 8)}
-                    style={{
-                      borderColor:
-                        u.cursor_color || presenceColorForUserId(u.user_id),
-                    }}
-                  >
-                    {u.avatar_url ? (
-                      <img src={u.avatar_url} alt="" referrerPolicy="no-referrer" />
-                    ) : (
-                      <span>
-                        {(u.first_name || u.user_id).charAt(0).toUpperCase()}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="board-screen__header-right">
-            <ScoutCredits />
-          </div>
-        </header>
-
-        <div className="board-screen__tools">
-          <button
-            type="button"
-            className="board-screen__tool-btn"
-            onClick={() => {
-              revealChrome()
-              boardRef.current?.fitCamera()
-            }}
-          >
-            Fit
-          </button>
-          <BoardAddItemButton creating={creating} onAdd={handleAddItem} />
-        </div>
+        <BoardScreenChrome
+          listId={listId}
+          listName={list.name}
+          otherViewers={otherViewers}
+        />
+        <BoardScreenToolbar
+          creating={creating}
+          onFitCamera={handleFitCamera}
+          onAddItem={handleAddItem}
+        />
       </div>
 
       {error && (
