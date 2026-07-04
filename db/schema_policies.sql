@@ -72,20 +72,21 @@ AS $$
   SELECT EXISTS (SELECT 1 FROM list_members WHERE list_id = check_list_id AND user_id = check_user_id);
 $$;
 
--- storage upload: resolves getaway → list ownership inside SECURITY DEFINER
-CREATE OR REPLACE FUNCTION public.can_upload_getaway_image(object_path text, check_user_id uuid)
+-- storage upload: resolves poi → list ownership inside SECURITY DEFINER
+-- (image objects are stored under the poi id as the top folder)
+CREATE OR REPLACE FUNCTION public.can_upload_poi_image(object_path text, check_user_id uuid)
 RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
 AS $$
   SELECT EXISTS (
     SELECT 1
-    FROM getaways g
-    JOIN lists l ON l.id = g.list_id
-    WHERE g.id::text = split_part(object_path, '/', 1)
+    FROM pois p
+    JOIN lists l ON l.id = p.list_id
+    WHERE p.id::text = split_part(object_path, '/', 1)
       AND (l.user_id = check_user_id
            OR EXISTS (
              SELECT 1 FROM list_members lm
-             WHERE lm.list_id = g.list_id AND lm.user_id = check_user_id AND lm.role IN ('admin', 'editor')
+             WHERE lm.list_id = p.list_id AND lm.user_id = check_user_id AND lm.role IN ('admin', 'editor')
            ))
   );
 $$;
@@ -185,7 +186,29 @@ CREATE POLICY "Users can remove themselves from a list"
   ON list_members FOR DELETE
   USING (user_has_verified_terms_and_age() AND user_id = auth.uid());
 
--- Getaways -------------------------------------------------------------------
+-- POIs -----------------------------------------------------------------------
+
+DROP POLICY IF EXISTS "Users can view pois in their lists" ON pois;
+CREATE POLICY "Users can view pois in their lists"
+  ON pois FOR SELECT
+  USING (user_has_verified_terms_and_age() AND is_list_owner_or_member(pois.list_id, auth.uid()));
+
+DROP POLICY IF EXISTS "Users can add pois to lists they have access to" ON pois;
+CREATE POLICY "Users can add pois to lists they have access to"
+  ON pois FOR INSERT
+  WITH CHECK (user_has_verified_terms_and_age() AND is_list_owner_or_editor(pois.list_id, auth.uid()));
+
+DROP POLICY IF EXISTS "Users can update pois in lists they have access to" ON pois;
+CREATE POLICY "Users can update pois in lists they have access to"
+  ON pois FOR UPDATE
+  USING (user_has_verified_terms_and_age() AND is_list_owner_or_editor(pois.list_id, auth.uid()));
+
+DROP POLICY IF EXISTS "Editors can delete pois from lists" ON pois;
+CREATE POLICY "Editors can delete pois from lists"
+  ON pois FOR DELETE
+  USING (user_has_verified_terms_and_age() AND is_list_owner_or_editor(pois.list_id, auth.uid()));
+
+-- Getaways (accommodation subtype) -------------------------------------------
 
 DROP POLICY IF EXISTS "Users can view getaways in their lists" ON getaways;
 CREATE POLICY "Users can view getaways in their lists"
@@ -208,22 +231,22 @@ CREATE POLICY "Editors can delete getaways from lists"
   ON getaways FOR DELETE
   USING (user_has_verified_terms_and_age() AND is_list_owner_or_editor(getaways.list_id, auth.uid()));
 
--- Getaway images -------------------------------------------------------------
+-- POI images -----------------------------------------------------------------
 
-DROP POLICY IF EXISTS "Users can view images in their getaways" ON getaway_images;
-CREATE POLICY "Users can view images in their getaways"
-  ON getaway_images FOR SELECT
+DROP POLICY IF EXISTS "Users can view images in their pois" ON poi_images;
+CREATE POLICY "Users can view images in their pois"
+  ON poi_images FOR SELECT
   USING (
     user_has_verified_terms_and_age()
-    AND EXISTS (SELECT 1 FROM getaways g WHERE g.id = getaway_images.getaway_id AND is_list_owner_or_member(g.list_id, auth.uid()))
+    AND EXISTS (SELECT 1 FROM pois p WHERE p.id = poi_images.poi_id AND is_list_owner_or_member(p.list_id, auth.uid()))
   );
 
-DROP POLICY IF EXISTS "Users can add images to their getaways" ON getaway_images;
-CREATE POLICY "Users can add images to their getaways"
-  ON getaway_images FOR INSERT
+DROP POLICY IF EXISTS "Users can add images to their pois" ON poi_images;
+CREATE POLICY "Users can add images to their pois"
+  ON poi_images FOR INSERT
   WITH CHECK (
     user_has_verified_terms_and_age()
-    AND EXISTS (SELECT 1 FROM getaways g WHERE g.id = getaway_images.getaway_id AND is_list_owner_or_editor(g.list_id, auth.uid()))
+    AND EXISTS (SELECT 1 FROM pois p WHERE p.id = poi_images.poi_id AND is_list_owner_or_editor(p.list_id, auth.uid()))
   );
 
 -- Invite tokens --------------------------------------------------------------
@@ -314,11 +337,11 @@ CREATE POLICY "Allow getaway image uploads" ON storage.objects
     user_has_verified_terms_and_age()
     AND (bucket_id = 'getaway-images')
     AND EXISTS (
-      SELECT 1 FROM getaways g
-      WHERE (g.id)::text = (storage.foldername(objects.name))[1]
+      SELECT 1 FROM pois p
+      WHERE (p.id)::text = (storage.foldername(objects.name))[1]
       AND (
-        EXISTS (SELECT 1 FROM lists l WHERE (l.id = g.list_id) AND (l.user_id = auth.uid()))
-        OR EXISTS (SELECT 1 FROM list_members lm WHERE (lm.list_id = g.list_id) AND (lm.user_id = auth.uid()))
+        EXISTS (SELECT 1 FROM lists l WHERE (l.id = p.list_id) AND (l.user_id = auth.uid()))
+        OR EXISTS (SELECT 1 FROM list_members lm WHERE (lm.list_id = p.list_id) AND (lm.user_id = auth.uid()))
       )
     )
   );
@@ -331,11 +354,11 @@ CREATE POLICY "Allow getaway image reads" ON storage.objects
     user_has_verified_terms_and_age()
     AND (bucket_id = 'getaway-images')
     AND EXISTS (
-      SELECT 1 FROM getaways g
-      WHERE (g.id)::text = (storage.foldername(objects.name))[1]
+      SELECT 1 FROM pois p
+      WHERE (p.id)::text = (storage.foldername(objects.name))[1]
       AND (
-        EXISTS (SELECT 1 FROM lists l WHERE (l.id = g.list_id) AND (l.user_id = auth.uid()))
-        OR EXISTS (SELECT 1 FROM list_members lm WHERE (lm.list_id = g.list_id) AND (lm.user_id = auth.uid()))
+        EXISTS (SELECT 1 FROM lists l WHERE (l.id = p.list_id) AND (l.user_id = auth.uid()))
+        OR EXISTS (SELECT 1 FROM list_members lm WHERE (lm.list_id = p.list_id) AND (lm.user_id = auth.uid()))
       )
     )
   );
@@ -351,11 +374,11 @@ CREATE POLICY "List members can view legacy villa-images" ON storage.objects
     user_has_verified_terms_and_age()
     AND (bucket_id = 'villa-images')
     AND EXISTS (
-      SELECT 1 FROM getaways g
-      WHERE (g.id)::text = (storage.foldername(objects.name))[1]
+      SELECT 1 FROM pois p
+      WHERE (p.id)::text = (storage.foldername(objects.name))[1]
       AND (
-        EXISTS (SELECT 1 FROM lists l WHERE (l.id = g.list_id) AND (l.user_id = auth.uid()))
-        OR EXISTS (SELECT 1 FROM list_members lm WHERE (lm.list_id = g.list_id) AND (lm.user_id = auth.uid()))
+        EXISTS (SELECT 1 FROM lists l WHERE (l.id = p.list_id) AND (l.user_id = auth.uid()))
+        OR EXISTS (SELECT 1 FROM list_members lm WHERE (lm.list_id = p.list_id) AND (lm.user_id = auth.uid()))
       )
     )
   );

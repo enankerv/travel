@@ -11,6 +11,7 @@
 -- ============================================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS postgis;
 
 
 -- ============================================================================
@@ -77,23 +78,64 @@ CREATE INDEX IF NOT EXISTS idx_list_members_list_user ON list_members(list_id, u
 
 ALTER TABLE list_members ENABLE ROW LEVEL SECURITY;
 
--- Getaways -------------------------------------------------------------------
+-- POIs (points of interest) — spine for every board pin ----------------------
+-- Shared fields for all pin types (getaway, activity, restaurant, flight,
+-- note, ...). Subtype-specific data lives in 1:1 extension tables like
+-- getaways, keyed by poi_id = pois.id.
 
-CREATE TABLE IF NOT EXISTS getaways (
+CREATE TABLE IF NOT EXISTS pois (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   list_id UUID NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
   user_id UUID,
-  slug TEXT NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  poi_type TEXT NOT NULL DEFAULT 'getaway'
+    CHECK (poi_type IN ('getaway', 'activity', 'restaurant', 'flight', 'note', 'poi')),
+
+  title TEXT,
+  description TEXT,
+
+  location TEXT,
+  address TEXT,
+  lat DOUBLE PRECISION,
+  lng DOUBLE PRECISION,
+  geo geography(POINT, 4326) GENERATED ALWAYS AS (
+    CASE WHEN lat IS NOT NULL AND lng IS NOT NULL
+    THEN ST_SetSRID(ST_MakePoint(lng, lat), 4326)::geography
+    ELSE NULL END
+  ) STORED,
 
   source_url TEXT,
+  thumbnail_url TEXT,
+
+  board_x DOUBLE PRECISION NOT NULL DEFAULT 0.5,
+  board_y DOUBLE PRECISION NOT NULL DEFAULT 0.5,
+  board_z INTEGER NOT NULL DEFAULT 0,
+
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_pois_list_id ON pois(list_id);
+CREATE INDEX IF NOT EXISTS idx_pois_user_id ON pois(user_id);
+CREATE INDEX IF NOT EXISTS idx_pois_poi_type ON pois(poi_type);
+CREATE INDEX IF NOT EXISTS idx_pois_created_at ON pois(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_pois_geo ON pois USING GIST(geo) WHERE geo IS NOT NULL;
+
+ALTER TABLE pois ENABLE ROW LEVEL SECURITY;
+
+-- Getaways — accommodation subtype of POI (1:1, poi_id = pois.id) -------------
+-- Holds only the fields specific to a place to stay. Shared fields
+-- (title, description, location, lat/lng, source_url, user_id, timestamps)
+-- live on pois.
+
+CREATE TABLE IF NOT EXISTS getaways (
+  poi_id UUID PRIMARY KEY REFERENCES pois(id) ON DELETE CASCADE,
+  list_id UUID NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
+  slug TEXT NOT NULL,
+
   import_status TEXT NOT NULL DEFAULT 'loading'
     CHECK (import_status IN ('loading', 'loaded', 'thin', 'error')),
   import_error TEXT,
 
-  name TEXT,
-  location TEXT,
   region TEXT,
 
   bedrooms INTEGER,
@@ -109,32 +151,29 @@ CREATE TABLE IF NOT EXISTS getaways (
   amenities TEXT[],
   included TEXT[],
 
-  description TEXT,
   caveats TEXT,
 
   UNIQUE(list_id, slug)
 );
 
 CREATE INDEX IF NOT EXISTS idx_getaways_list_id ON getaways(list_id);
-CREATE INDEX IF NOT EXISTS idx_getaways_user_id ON getaways(user_id);
-CREATE INDEX IF NOT EXISTS idx_getaways_created_at ON getaways(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_getaways_import_status ON getaways(import_status);
 
 ALTER TABLE getaways ENABLE ROW LEVEL SECURITY;
 
--- Getaway images -------------------------------------------------------------
+-- POI images -----------------------------------------------------------------
 
-CREATE TABLE IF NOT EXISTS getaway_images (
+CREATE TABLE IF NOT EXISTS poi_images (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  getaway_id UUID NOT NULL REFERENCES getaways(id) ON DELETE CASCADE,
+  poi_id UUID NOT NULL REFERENCES pois(id) ON DELETE CASCADE,
   image_url TEXT NOT NULL,
   position INTEGER DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_getaway_images_getaway_id ON getaway_images(getaway_id);
+CREATE INDEX IF NOT EXISTS idx_poi_images_poi_id ON poi_images(poi_id);
 
-ALTER TABLE getaway_images ENABLE ROW LEVEL SECURITY;
+ALTER TABLE poi_images ENABLE ROW LEVEL SECURITY;
 
 -- Invite tokens --------------------------------------------------------------
 
@@ -161,7 +200,7 @@ ALTER TABLE invite_tokens ENABLE ROW LEVEL SECURITY;
 CREATE TABLE IF NOT EXISTS public.comments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   list_id UUID NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
-  getaway_id UUID NOT NULL REFERENCES getaways(id) ON DELETE CASCADE,
+  poi_id UUID NOT NULL REFERENCES pois(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   body TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -169,9 +208,9 @@ CREATE TABLE IF NOT EXISTS public.comments (
 );
 
 CREATE INDEX IF NOT EXISTS idx_comments_list_id ON comments(list_id);
-CREATE INDEX IF NOT EXISTS idx_comments_getaway_id ON comments(getaway_id);
+CREATE INDEX IF NOT EXISTS idx_comments_poi_id ON comments(poi_id);
 CREATE INDEX IF NOT EXISTS idx_comments_user_id ON comments(user_id);
-CREATE INDEX IF NOT EXISTS idx_comments_list_getaway ON comments(list_id, getaway_id);
+CREATE INDEX IF NOT EXISTS idx_comments_list_poi ON comments(list_id, poi_id);
 
 ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
 
@@ -180,16 +219,16 @@ ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
 CREATE TABLE IF NOT EXISTS public.votes (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   list_id UUID NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
-  getaway_id UUID NOT NULL REFERENCES getaways(id) ON DELETE CASCADE,
+  poi_id UUID NOT NULL REFERENCES pois(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(list_id, getaway_id, user_id)
+  UNIQUE(list_id, poi_id, user_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_votes_list_id ON votes(list_id);
-CREATE INDEX IF NOT EXISTS idx_votes_getaway_id ON votes(getaway_id);
+CREATE INDEX IF NOT EXISTS idx_votes_poi_id ON votes(poi_id);
 CREATE INDEX IF NOT EXISTS idx_votes_user_id ON votes(user_id);
-CREATE INDEX IF NOT EXISTS idx_votes_list_getaway ON votes(list_id, getaway_id);
+CREATE INDEX IF NOT EXISTS idx_votes_list_poi ON votes(list_id, poi_id);
 
 ALTER TABLE votes ENABLE ROW LEVEL SECURITY;
 
@@ -230,12 +269,12 @@ DROP TRIGGER IF EXISTS update_lists_updated_at ON lists;
 CREATE TRIGGER update_lists_updated_at BEFORE UPDATE ON lists
   FOR EACH ROW EXECUTE FUNCTION update_lists_updated_at();
 
-CREATE OR REPLACE FUNCTION update_getaways_updated_at()
+CREATE OR REPLACE FUNCTION update_pois_updated_at()
 RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS update_getaways_updated_at ON getaways;
-CREATE TRIGGER update_getaways_updated_at BEFORE UPDATE ON getaways
-  FOR EACH ROW EXECUTE FUNCTION update_getaways_updated_at();
+DROP TRIGGER IF EXISTS update_pois_updated_at ON pois;
+CREATE TRIGGER update_pois_updated_at BEFORE UPDATE ON pois
+  FOR EACH ROW EXECUTE FUNCTION update_pois_updated_at();
 
 CREATE OR REPLACE FUNCTION update_comments_updated_at()
 RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
@@ -292,34 +331,74 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
--- Broadcast getaway changes to realtime channel list:<list_id> ---------------
+-- Broadcast POI changes to realtime channel list:<list_id> ------------------
+-- Composes the flat POI payload: pois spine + subtype fields (e.g. getaways)
+-- + ordered image urls. Frontend receives one merged record per pin.
 
-CREATE OR REPLACE FUNCTION public._getaway_with_images(rec RECORD)
+CREATE OR REPLACE FUNCTION public._poi_with_details(p_id uuid)
 RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
-  rid uuid;
   imgs jsonb;
+  result jsonb;
 BEGIN
-  rid := (rec).id;
-  SELECT COALESCE(jsonb_agg(gi.image_url ORDER BY gi.position), '[]'::jsonb)
-    INTO imgs FROM getaway_images gi WHERE gi.getaway_id = rid;
-  RETURN row_to_json(rec)::jsonb || jsonb_build_object('images', imgs);
+  SELECT COALESCE(jsonb_agg(pi.image_url ORDER BY pi.position), '[]'::jsonb)
+    INTO imgs FROM poi_images pi WHERE pi.poi_id = p_id;
+  SELECT (to_jsonb(p) - 'geo')
+         || COALESCE(to_jsonb(g) - 'poi_id' - 'list_id', '{}'::jsonb)
+         || jsonb_build_object('images', imgs)
+    INTO result
+    FROM pois p
+    LEFT JOIN getaways g ON g.poi_id = p.id
+    WHERE p.id = p_id;
+  RETURN result;
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.pois_broadcast_list_trigger()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  payload jsonb;
+  msg jsonb;
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    payload := (to_jsonb(OLD) - 'geo');
+    msg := jsonb_build_object('record', payload, 'old_record', payload);
+    PERFORM realtime.send(msg, 'DELETE', 'list:' || OLD.list_id::text, true);
+  ELSE
+    payload := public._poi_with_details(NEW.id);
+    msg := jsonb_build_object(
+      'record', payload,
+      'old_record', CASE WHEN TG_OP = 'UPDATE' THEN payload ELSE NULL END
+    );
+    PERFORM realtime.send(msg, TG_OP, 'list:' || NEW.list_id::text, true);
+  END IF;
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+DROP TRIGGER IF EXISTS pois_broadcast_list_trigger ON public.pois;
+CREATE TRIGGER pois_broadcast_list_trigger
+  AFTER INSERT OR UPDATE OR DELETE ON public.pois
+  FOR EACH ROW EXECUTE FUNCTION public.pois_broadcast_list_trigger();
+
+-- Subtype changes (e.g. scout filling in getaway fields) re-broadcast the
+-- composed parent POI so clients see the merged update.
 CREATE OR REPLACE FUNCTION public.getaways_broadcast_list_trigger()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
-  new_payload jsonb;
-  old_payload jsonb;
+  lid uuid;
+  payload jsonb;
   msg jsonb;
 BEGIN
-  new_payload := public._getaway_with_images(COALESCE(NEW, OLD));
-  old_payload := CASE WHEN OLD IS NOT NULL THEN public._getaway_with_images(OLD) ELSE NULL END;
-  msg := jsonb_build_object('record', new_payload, 'old_record', old_payload);
-  PERFORM realtime.send(msg, TG_OP, 'list:' || COALESCE(NEW.list_id, OLD.list_id)::text, true);
+  lid := COALESCE(NEW.list_id, OLD.list_id);
+  IF EXISTS (SELECT 1 FROM pois WHERE id = COALESCE(NEW.poi_id, OLD.poi_id)) THEN
+    payload := public._poi_with_details(COALESCE(NEW.poi_id, OLD.poi_id));
+    msg := jsonb_build_object('record', payload, 'old_record', payload);
+    PERFORM realtime.send(msg, 'UPDATE', 'list:' || lid::text, true);
+  END IF;
   RETURN COALESCE(NEW, OLD);
 END;
 $$;
@@ -329,28 +408,28 @@ CREATE TRIGGER getaways_broadcast_list_trigger
   AFTER INSERT OR UPDATE OR DELETE ON public.getaways
   FOR EACH ROW EXECUTE FUNCTION public.getaways_broadcast_list_trigger();
 
-CREATE OR REPLACE FUNCTION public.getaway_images_broadcast_trigger()
+CREATE OR REPLACE FUNCTION public.poi_images_broadcast_trigger()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
-  g getaways%ROWTYPE;
+  lid uuid;
   payload jsonb;
   msg jsonb;
 BEGIN
-  SELECT * INTO g FROM getaways WHERE id = COALESCE(NEW.getaway_id, OLD.getaway_id);
-  IF FOUND THEN
-    payload := public._getaway_with_images(g);
+  SELECT p.list_id INTO lid FROM pois p WHERE p.id = COALESCE(NEW.poi_id, OLD.poi_id);
+  IF lid IS NOT NULL THEN
+    payload := public._poi_with_details(COALESCE(NEW.poi_id, OLD.poi_id));
     msg := jsonb_build_object('record', payload, 'old_record', payload);
-    PERFORM realtime.send(msg, 'UPDATE', 'list:' || g.list_id::text, true);
+    PERFORM realtime.send(msg, 'UPDATE', 'list:' || lid::text, true);
   END IF;
   RETURN COALESCE(NEW, OLD);
 END;
 $$;
 
-DROP TRIGGER IF EXISTS getaway_images_broadcast_trigger ON public.getaway_images;
-CREATE TRIGGER getaway_images_broadcast_trigger
-  AFTER INSERT OR UPDATE OR DELETE ON public.getaway_images
-  FOR EACH ROW EXECUTE FUNCTION public.getaway_images_broadcast_trigger();
+DROP TRIGGER IF EXISTS poi_images_broadcast_trigger ON public.poi_images;
+CREATE TRIGGER poi_images_broadcast_trigger
+  AFTER INSERT OR UPDATE OR DELETE ON public.poi_images
+  FOR EACH ROW EXECUTE FUNCTION public.poi_images_broadcast_trigger();
 
 -- Broadcast comment changes ---------------------------------------------------
 
@@ -374,7 +453,7 @@ BEGIN
     payload := jsonb_build_object(
       'id', NEW.id,
       'list_id', NEW.list_id,
-      'getaway_id', NEW.getaway_id,
+      'poi_id', NEW.poi_id,
       'user_id', NEW.user_id,
       'body', NEW.body,
       'created_at', NEW.created_at,
@@ -391,7 +470,7 @@ BEGIN
   ELSIF TG_OP = 'DELETE' THEN
     payload := jsonb_build_object(
       'id', OLD.id,
-      'getaway_id', OLD.getaway_id,
+      'poi_id', OLD.poi_id,
       'user_id', OLD.user_id
     );
     msg := jsonb_build_object('old_record', payload);
@@ -415,7 +494,7 @@ AS $$
 DECLARE
   list_id_val uuid;
   user_id_val uuid;
-  getaway_id_val uuid;
+  poi_id_val uuid;
   first_name_val text;
   avatar_url_val text;
   payload jsonb;
@@ -423,13 +502,13 @@ DECLARE
 BEGIN
   list_id_val := COALESCE(NEW.list_id, OLD.list_id);
   user_id_val := COALESCE(NEW.user_id, OLD.user_id);
-  getaway_id_val := COALESCE(NEW.getaway_id, OLD.getaway_id);
+  poi_id_val := COALESCE(NEW.poi_id, OLD.poi_id);
 
   IF TG_OP = 'INSERT' THEN
     SELECT p.first_name, p.avatar_url INTO first_name_val, avatar_url_val
     FROM profiles p WHERE p.id = user_id_val;
     payload := jsonb_build_object(
-      'getaway_id', getaway_id_val,
+      'poi_id', poi_id_val,
       'user_id', user_id_val,
       'first_name', COALESCE(first_name_val, ''),
       'avatar_url', COALESCE(avatar_url_val, '')
@@ -437,7 +516,7 @@ BEGIN
     msg := jsonb_build_object('record', payload);
     PERFORM realtime.send(msg, 'VOTE_INSERT', 'list:' || list_id_val::text, true);
   ELSIF TG_OP = 'DELETE' THEN
-    payload := jsonb_build_object('getaway_id', getaway_id_val, 'user_id', user_id_val);
+    payload := jsonb_build_object('poi_id', poi_id_val, 'user_id', user_id_val);
     msg := jsonb_build_object('old_record', payload);
     PERFORM realtime.send(msg, 'VOTE_DELETE', 'list:' || list_id_val::text, true);
   END IF;
@@ -460,9 +539,19 @@ DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_publication_tables
-    WHERE pubname = 'supabase_realtime' AND tablename = 'getaways'
+    WHERE pubname = 'supabase_realtime' AND tablename = 'pois'
   ) THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE getaways;
+    ALTER PUBLICATION supabase_realtime ADD TABLE pois;
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'poi_images'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE poi_images;
   END IF;
 END $$;
 
