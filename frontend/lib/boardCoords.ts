@@ -4,7 +4,7 @@ export const BOARD_WORLD_H = 3000
 export type BoardCamera = { x: number; y: number; scale: number }
 
 export function screenToBoardNorm(
-  viewport: HTMLDivElement,
+  viewport: HTMLElement,
   camera: BoardCamera,
   clientX: number,
   clientY: number,
