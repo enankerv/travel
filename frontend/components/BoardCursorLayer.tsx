@@ -11,6 +11,12 @@ import {
 } from 'react'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabase'
+import {
+  BOARD_WORLD_H,
+  BOARD_WORLD_W,
+  screenToBoardNorm,
+  type BoardCamera,
+} from '@/lib/boardCoords'
 import { presenceColorForUserId } from '@/lib/presenceColors'
 import {
   subscribeListCursorBroadcast,
@@ -20,50 +26,11 @@ import {
 
 const CURSOR_SURFACE = 'board' as const
 
-export const BOARD_WORLD_W = 4000
-export const BOARD_WORLD_H = 3000
-
 type PeerPos = { wx: number; wy: number; ts: number }
 
-export type BoardCamera = { x: number; y: number; scale: number }
-
-function logCursor(...args: unknown[]) {
-  if (process.env.NODE_ENV !== 'development') return
-  console.log('[board-cursor]', ...args)
-}
-
-export function screenToBoardNorm(
-  viewport: HTMLDivElement,
-  camera: BoardCamera,
-  clientX: number,
-  clientY: number,
-): { wx: number; wy: number } | null {
-  const r = viewport.getBoundingClientRect()
-  if (r.width <= 0 || r.height <= 0 || camera.scale <= 0) return null
-  const sx = clientX - r.left
-  const sy = clientY - r.top
-  const worldX = (sx - camera.x) / camera.scale
-  const worldY = (sy - camera.y) / camera.scale
-  return {
-    wx: worldX / BOARD_WORLD_W,
-    wy: worldY / BOARD_WORLD_H,
-  }
-}
-
-/** Peer pointer rendered in board world space — scales with pan/zoom via parent transform. */
-function BoardPeerCursor({
-  color,
-  wx,
-  wy,
-}: {
-  color: string
-  wx: number
-  wy: number
-}) {
+function BoardPeerCursor({ color, wx, wy }: { color: string; wx: number; wy: number }) {
   const svgRef = useRef<SVGSVGElement>(null)
   const pcRef = useRef<PerfectCursor | null>(null)
-  const latestRef = useRef({ wx, wy })
-  latestRef.current = { wx, wy }
 
   const toPx = useCallback((nx: number, ny: number): [number, number] => {
     return [nx * BOARD_WORLD_W, ny * BOARD_WORLD_H]
@@ -124,8 +91,8 @@ function BoardPeerCursor({
 }
 
 /**
- * Broadcasts/receives cursors in normalized board world coords (wx/wy).
- * Peer cursors render inside the transformed world layer so they zoom with the board.
+ * Board multiplayer cursors in world space. Hidden while a user is dragging a pin
+ * (selection is shown on the pin border instead).
  */
 export default function BoardCursorLayer({
   listId,
@@ -133,12 +100,14 @@ export default function BoardCursorLayer({
   otherViewers,
   viewportRef,
   cameraRef,
+  hiddenCursorUserIds,
 }: {
   listId: string
   enabled: boolean
   otherViewers: PresenceUser[]
   viewportRef: RefObject<HTMLDivElement | null>
   cameraRef: RefObject<BoardCamera>
+  hiddenCursorUserIds?: ReadonlySet<string>
 }) {
   const { user } = useAuth()
   const userId = user?.id
@@ -148,6 +117,8 @@ export default function BoardCursorLayer({
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   const hasOtherViewers = otherViewers.length > 0
+  const hideLocalCursor = !!(userId && hiddenCursorUserIds?.has(userId))
+
   const viewerColorById = useMemo(() => {
     const m = new Map<string, string | undefined>()
     for (const v of otherViewers) m.set(v.user_id, v.cursor_color)
@@ -192,6 +163,7 @@ export default function BoardCursorLayer({
         !pu ||
         pu === userId ||
         s !== CURSOR_SURFACE ||
+        hiddenCursorUserIds?.has(pu) ||
         typeof wx !== 'number' ||
         typeof wy !== 'number'
       ) {
@@ -204,7 +176,7 @@ export default function BoardCursorLayer({
     })
 
     return unsub
-  }, [listId, enabled, userId])
+  }, [listId, enabled, userId, hiddenCursorUserIds])
 
   useEffect(() => {
     if (!enabled || !userId) return
@@ -224,13 +196,10 @@ export default function BoardCursorLayer({
   const sendLeave = useCallback(() => {
     const ch = channelRef.current
     if (!ch || !userId || !hasOtherViewers) return
-    const payload: ListCursorBroadcastPayload = {
-      user_id: userId,
-      surface: CURSOR_SURFACE,
-      leave: true,
-    }
-    void ch.send({ type: 'broadcast', event: 'cursor', payload }).catch((e: unknown) => {
-      logCursor('send leave error', e)
+    void ch.send({
+      type: 'broadcast',
+      event: 'cursor',
+      payload: { user_id: userId, surface: CURSOR_SURFACE, leave: true },
     })
   }, [userId, hasOtherViewers])
 
@@ -241,18 +210,36 @@ export default function BoardCursorLayer({
       const now = Date.now()
       if (now - lastSendRef.current < 120) return
       lastSendRef.current = now
-      const payload: ListCursorBroadcastPayload = {
-        user_id: userId,
-        surface: CURSOR_SURFACE,
-        wx,
-        wy,
-      }
-      void ch.send({ type: 'broadcast', event: 'cursor', payload }).catch((e: unknown) => {
-        logCursor('send error', e)
+      void ch.send({
+        type: 'broadcast',
+        event: 'cursor',
+        payload: { user_id: userId, surface: CURSOR_SURFACE, wx, wy },
       })
     },
     [userId, hasOtherViewers],
   )
+
+  useEffect(() => {
+    if (!hideLocalCursor || !lastInsideRef.current) return
+    lastInsideRef.current = false
+    lastSendRef.current = 0
+    sendLeave()
+  }, [hideLocalCursor, sendLeave])
+
+  useEffect(() => {
+    if (!hiddenCursorUserIds?.size) return
+    setPeers((prev) => {
+      let changed = false
+      const next = { ...prev }
+      for (const id of hiddenCursorUserIds) {
+        if (id in next) {
+          delete next[id]
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [hiddenCursorUserIds])
 
   useEffect(() => {
     if (hasOtherViewers) return
@@ -263,6 +250,7 @@ export default function BoardCursorLayer({
     if (!enabled || !userId) return
 
     const onMove = (e: MouseEvent) => {
+      if (hideLocalCursor) return
       const vp = viewportRef.current
       if (!vp) return
       const norm = screenToBoardNorm(
@@ -300,11 +288,16 @@ export default function BoardCursorLayer({
       if (lastInsideRef.current) sendLeave()
       lastInsideRef.current = false
     }
-  }, [enabled, userId, send, sendLeave, viewportRef, cameraRef])
+  }, [enabled, userId, send, sendLeave, viewportRef, cameraRef, hideLocalCursor])
+
+  const visiblePeers = useMemo(
+    () => Object.entries(peers).filter(([id]) => !hiddenCursorUserIds?.has(id)),
+    [peers, hiddenCursorUserIds],
+  )
 
   return (
     <>
-      {Object.entries(peers).map(([id, pos]) => (
+      {visiblePeers.map(([id, pos]) => (
         <BoardPeerCursor
           key={id}
           color={viewerColorById.get(id) ?? presenceColorForUserId(id)}

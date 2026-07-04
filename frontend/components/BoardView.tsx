@@ -9,17 +9,21 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import { createPoi, resolveImageUrl, updatePoi } from '@/lib/api'
 import { useListDetailContext } from '@/lib/ListDetailContext'
-import type { POIBase } from '@/lib/getaway'
-import BoardCursorLayer, {
+import { useBoardPinDragSync } from '@/hooks/useBoardPinDragSync'
+import { presenceColorForUserId } from '@/lib/presenceColors'
+import {
   BOARD_WORLD_H,
   BOARD_WORLD_W,
   screenToBoardNorm,
   type BoardCamera,
-} from './BoardCursorLayer'
+} from '@/lib/boardCoords'
+import type { POIBase } from '@/lib/getaway'
+import BoardCursorLayer from './BoardCursorLayer'
 
 const MIN_SCALE = 0.08
 const MAX_SCALE = 2.5
@@ -103,6 +107,17 @@ function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n))
 }
 
+function coordsMatch(a: number, b: number) {
+  return Math.abs(a - b) < 0.0001
+}
+
+function pinCoordsEqual(
+  a: { wx: number; wy: number },
+  b: { wx: number; wy: number },
+) {
+  return coordsMatch(a.wx, b.wx) && coordsMatch(a.wy, b.wy)
+}
+
 function cameraTransform(cam: BoardCamera) {
   return `translate3d(${cam.x}px, ${cam.y}px, 0) scale(${cam.scale})`
 }
@@ -126,34 +141,43 @@ const BoardPin = memo(function BoardPin({
   wx,
   wy,
   isDragging,
+  lockedByPeer,
+  highlightColor,
   onPointerDown,
 }: {
   poi: POIBase
   wx: number
   wy: number
   isDragging: boolean
+  lockedByPeer: boolean
+  highlightColor?: string
   onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>, poi: POIBase) => void
 }) {
   const img = pinImage(poi)
+  const selected = !!highlightColor
   return (
     <button
       type="button"
-      className={`board-pin board-pin--${poi.poi_type}${isDragging ? ' board-pin--dragging' : ''}`}
+      className={`board-pin board-pin--${poi.poi_type}${isDragging ? ' board-pin--dragging' : ''}${lockedByPeer ? ' board-pin--locked' : ''}${selected ? ' board-pin--selected' : ''}`}
       style={{
         left: `${wx * 100}%`,
         top: `${wy * 100}%`,
-        zIndex: Math.round((poi.board_z ?? 0) + (isDragging ? 1000 : 0)),
+        zIndex: Math.round((poi.board_z ?? 0) + (isDragging || lockedByPeer ? 1000 : 0)),
+        ...(highlightColor ? ({ '--pin-highlight': highlightColor } as CSSProperties) : {}),
       }}
+      disabled={lockedByPeer}
       onPointerDown={(e) => onPointerDown(e, poi)}
     >
       <span className="board-pin__tack" aria-hidden />
-      {img ? (
-        <img className="board-pin__thumb" src={img} alt="" draggable={false} />
-      ) : (
-        <span className="board-pin__placeholder" aria-hidden>
-          {poi.poi_type === 'note' ? '📝' : '📍'}
-        </span>
-      )}
+      <span className="board-pin__card">
+        {img ? (
+          <img className="board-pin__thumb" src={img} alt="" draggable={false} />
+        ) : (
+          <span className="board-pin__placeholder" aria-hidden>
+            {poi.poi_type === 'note' ? '📝' : '📍'}
+          </span>
+        )}
+      </span>
       <span className="board-pin__label">{pinLabel(poi)}</span>
     </button>
   )
@@ -175,14 +199,43 @@ const BoardView = forwardRef<
     onActivity?: () => void
   }
 >(function BoardView({ listId, enabled, fullscreen = false, onActivity }, ref) {
-  const { pois, setPois, otherViewers, setError } = useListDetailContext()
+  const { pois, setPois, otherViewers, setError, currentUserId } = useListDetailContext()
+  const [drag, setDrag] = useState<DragState | null>(null)
+  const [dragPos, setDragPos] = useState<{ wx: number; wy: number } | null>(null)
+  /** Drop position we trust over stale context/realtime until the server confirms. */
+  const [gospelByPoiId, setGospelByPoiId] = useState<
+    Record<string, { wx: number; wy: number }>
+  >({})
+
+  const commitGospel = useCallback((poiId: string, wx: number, wy: number) => {
+    setGospelByPoiId((prev) => ({ ...prev, [poiId]: { wx, wy } }))
+  }, [])
+
+  const handlePeerDragEnd = useCallback(
+    (poiId: string, wx: number, wy: number) => {
+      commitGospel(poiId, wx, wy)
+    },
+    [commitGospel],
+  )
+
+  const {
+    lockedPoiIds,
+    peerDragByPoiId,
+    broadcastDragStart,
+    broadcastDragMove,
+    broadcastDragEnd,
+  } = useBoardPinDragSync({
+    listId,
+    enabled,
+    userId: currentUserId,
+    otherViewers,
+    onPeerDragEnd: handlePeerDragEnd,
+  })
   const viewportRef = useRef<HTMLDivElement>(null)
   const worldRef = useRef<HTMLDivElement>(null)
   const cameraRef = useRef<BoardCamera>({ x: 0, y: 0, scale: 0.35 })
   const cameraRafRef = useRef(0)
   const pendingCameraRef = useRef<BoardCamera | null>(null)
-  const [drag, setDrag] = useState<DragState | null>(null)
-  const [dragPos, setDragPos] = useState<{ wx: number; wy: number } | null>(null)
   const panningRef = useRef<{
     pointerId: number
     startX: number
@@ -195,6 +248,12 @@ const BoardView = forwardRef<
   const spaceDownRef = useRef(false)
   const onActivityRef = useRef(onActivity)
   onActivityRef.current = onActivity
+  const dragRef = useRef(drag)
+  dragRef.current = drag
+  const dragPosRef = useRef(dragPos)
+  dragPosRef.current = dragPos
+  const broadcastDragEndRef = useRef(broadcastDragEnd)
+  broadcastDragEndRef.current = broadcastDragEnd
 
   const pingActivity = useCallback(() => {
     onActivityRef.current?.()
@@ -226,6 +285,55 @@ const BoardView = forwardRef<
 
   const sortedPins = useMemo(() => {
     return [...pois].sort((a, b) => (a.board_z ?? 0) - (b.board_z ?? 0))
+  }, [pois])
+
+  const viewerColorById = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const v of otherViewers) {
+      m.set(v.user_id, v.cursor_color ?? presenceColorForUserId(v.user_id))
+    }
+    return m
+  }, [otherViewers])
+
+  const hiddenCursorUserIds = useMemo(() => {
+    const ids = new Set<string>()
+    if (drag && currentUserId) ids.add(currentUserId)
+    for (const peerDrag of peerDragByPoiId.values()) {
+      ids.add(peerDrag.userId)
+    }
+    return ids
+  }, [drag, currentUserId, peerDragByPoiId])
+
+  const pinHighlightColor = useCallback(
+    (poiId: string) => {
+      if (drag?.poiId === poiId && currentUserId) {
+        return presenceColorForUserId(currentUserId)
+      }
+      const peerDrag = peerDragByPoiId.get(poiId)
+      if (!peerDrag) return undefined
+      return (
+        viewerColorById.get(peerDrag.userId) ??
+        presenceColorForUserId(peerDrag.userId)
+      )
+    },
+    [drag, currentUserId, peerDragByPoiId, viewerColorById],
+  )
+
+  useEffect(() => {
+    setGospelByPoiId((prev) => {
+      let next: Record<string, { wx: number; wy: number }> | null = null
+      for (const poiId of Object.keys(prev)) {
+        const poi = pois.find((p) => p.id === poiId)
+        if (!poi) continue
+        const gospel = prev[poiId]
+        const server = { wx: poi.board_x ?? 0.5, wy: poi.board_y ?? 0.5 }
+        if (pinCoordsEqual(gospel, server)) {
+          if (!next) next = { ...prev }
+          delete next[poiId]
+        }
+      }
+      return next ?? prev
+    })
   }, [pois])
 
   const fitCamera = useCallback(() => {
@@ -281,6 +389,10 @@ const BoardView = forwardRef<
     [creating, listId, setPois, setError, pingActivity],
   )
 
+  const fitCameraRef = useRef(fitCamera)
+  fitCameraRef.current = fitCamera
+  const initialFitDone = useRef(false)
+
   useImperativeHandle(
     ref,
     () => ({
@@ -290,12 +402,16 @@ const BoardView = forwardRef<
     [fitCamera, addNoteAt],
   )
 
+  // Fit once on mount (page load); never passive re-fit when pois/data change.
   useEffect(() => {
-    fitCamera()
+    if (initialFitDone.current) return
+    initialFitDone.current = true
+    const id = requestAnimationFrame(() => fitCameraRef.current())
     return () => {
+      cancelAnimationFrame(id)
       if (cameraRafRef.current) cancelAnimationFrame(cameraRafRef.current)
     }
-  }, [fitCamera])
+  }, [])
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -385,13 +501,13 @@ const BoardView = forwardRef<
         if (!vp) return
         const norm = screenToBoardNorm(vp, cameraRef.current, e.clientX, e.clientY)
         if (!norm) return
-        setDragPos({
-          wx: clamp(norm.wx, 0, 1),
-          wy: clamp(norm.wy, 0, 1),
-        })
+        const wx = clamp(norm.wx, 0, 1)
+        const wy = clamp(norm.wy, 0, 1)
+        setDragPos({ wx, wy })
+        broadcastDragMove(drag.poiId, wx, wy)
       }
     },
-    [drag, scheduleCamera, pingActivity],
+    [drag, scheduleCamera, pingActivity, broadcastDragMove],
   )
 
   const finishPan = useCallback((pointerId: number) => {
@@ -402,39 +518,61 @@ const BoardView = forwardRef<
   }, [])
 
   const finishDrag = useCallback(
-    async (state: DragState, pos: { wx: number; wy: number } | null) => {
-      const wx = pos?.wx ?? state.startWx
-      const wy = pos?.wy ?? state.startWy
+    async (state: DragState, pos: { wx: number; wy: number }) => {
+      commitGospel(state.poiId, pos.wx, pos.wy)
+      broadcastDragEnd(state.poiId, pos.wx, pos.wy)
       setPois((prev) =>
         prev.map((p) =>
-          p.id === state.poiId ? { ...p, board_x: wx, board_y: wy } : p,
+          p.id === state.poiId ? { ...p, board_x: pos.wx, board_y: pos.wy } : p,
         ),
       )
       try {
-        await updatePoi(listId, state.poiId, { board_x: wx, board_y: wy })
+        await updatePoi(listId, state.poiId, { board_x: pos.wx, board_y: pos.wy })
       } catch {
         setError('Failed to save pin position')
+        setGospelByPoiId((prev) => {
+          const next = { ...prev }
+          delete next[state.poiId]
+          return next
+        })
+        setPois((prev) =>
+          prev.map((p) =>
+            p.id === state.poiId
+              ? { ...p, board_x: state.startWx, board_y: state.startWy }
+              : p,
+          ),
+        )
       }
     },
-    [listId, setPois, setError],
+    [listId, setPois, setError, broadcastDragEnd, commitGospel],
   )
 
   const onViewportPointerUp = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
       finishPan(e.pointerId)
       if (drag && drag.pointerId === e.pointerId) {
-        void finishDrag(drag, dragPos)
+        const wx = dragPos?.wx ?? drag.startWx
+        const wy = dragPos?.wy ?? drag.startWy
+        commitGospel(drag.poiId, wx, wy)
         setDrag(null)
         setDragPos(null)
+        void finishDrag(drag, { wx, wy })
       }
     },
-    [drag, dragPos, finishDrag, finishPan],
+    [drag, dragPos, finishDrag, finishPan, commitGospel],
   )
 
   const onPinPointerDown = useCallback(
     (e: ReactPointerEvent<HTMLButtonElement>, poi: POIBase) => {
       e.stopPropagation()
       if (e.button !== 0) return
+      if (lockedPoiIds.has(poi.id)) return
+      setGospelByPoiId((prev) => {
+        if (!(poi.id in prev)) return prev
+        const next = { ...prev }
+        delete next[poi.id]
+        return next
+      })
       pingActivity()
       e.currentTarget.setPointerCapture(e.pointerId)
       const wx = poi.board_x ?? 0.5
@@ -446,8 +584,35 @@ const BoardView = forwardRef<
         pointerId: e.pointerId,
       })
       setDragPos({ wx, wy })
+      broadcastDragStart(poi.id, wx, wy)
     },
-    [pingActivity],
+    [pingActivity, lockedPoiIds, broadcastDragStart],
+  )
+
+  useEffect(() => {
+    return () => {
+      const d = dragRef.current
+      const pos = dragPosRef.current
+      if (d) {
+        broadcastDragEndRef.current(
+          d.poiId,
+          pos?.wx ?? d.startWx,
+          pos?.wy ?? d.startWy,
+        )
+      }
+    }
+  }, [])
+
+  const resolvePinPos = useCallback(
+    (poi: POIBase) => {
+      if (drag?.poiId === poi.id && dragPos) return dragPos
+      const peer = peerDragByPoiId.get(poi.id)
+      if (peer) return { wx: peer.wx, wy: peer.wy }
+      const gospel = gospelByPoiId[poi.id]
+      if (gospel) return gospel
+      return { wx: poi.board_x ?? 0.5, wy: poi.board_y ?? 0.5 }
+    },
+    [drag, dragPos, peerDragByPoiId, gospelByPoiId],
   )
 
   const onBoardDoubleClick = useCallback(
@@ -515,10 +680,8 @@ const BoardView = forwardRef<
           <div className="board-view__cork" aria-hidden />
 
           {sortedPins.map((poi) => {
-            const pos =
-              drag?.poiId === poi.id && dragPos
-                ? dragPos
-                : { wx: poi.board_x ?? 0.5, wy: poi.board_y ?? 0.5 }
+            const pos = resolvePinPos(poi)
+            const lockedByPeer = lockedPoiIds.has(poi.id) && drag?.poiId !== poi.id
             return (
               <BoardPin
                 key={poi.id}
@@ -526,6 +689,8 @@ const BoardView = forwardRef<
                 wx={pos.wx}
                 wy={pos.wy}
                 isDragging={drag?.poiId === poi.id}
+                lockedByPeer={lockedByPeer}
+                highlightColor={pinHighlightColor(poi.id)}
                 onPointerDown={onPinPointerDown}
               />
             )
@@ -537,6 +702,7 @@ const BoardView = forwardRef<
             otherViewers={otherViewers}
             viewportRef={viewportRef}
             cameraRef={cameraRef}
+            hiddenCursorUserIds={hiddenCursorUserIds}
           />
         </div>
       </div>

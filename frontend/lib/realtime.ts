@@ -35,9 +35,24 @@ export type ListCursorBroadcastPayload = {
   leave?: boolean;
 };
 
+/** Ephemeral in-progress pin drag on the cork board (not persisted until PUT on release). */
+export type PinDragBroadcastPayload = {
+  user_id?: string;
+  poi_id?: string;
+  wx?: number;
+  wy?: number;
+  /** false when the user releases the pin (position may still be included). */
+  active?: boolean;
+};
+
 const listCursorSubscribers = new Map<
   string,
   Set<(p: ListCursorBroadcastPayload) => void>
+>();
+
+const pinDragSubscribers = new Map<
+  string,
+  Set<(p: PinDragBroadcastPayload) => void>
 >();
 
 function dispatchListCursor(listId: string, payload: ListCursorBroadcastPayload) {
@@ -66,6 +81,35 @@ export function subscribeListCursorBroadcast(
   return () => {
     set!.delete(cb);
     if (set!.size === 0) listCursorSubscribers.delete(listId);
+  };
+}
+
+function dispatchPinDrag(listId: string, payload: PinDragBroadcastPayload) {
+  const set = pinDragSubscribers.get(listId);
+  if (!set?.size) return;
+  for (const cb of set) {
+    try {
+      cb(payload);
+    } catch {
+      /* ignore subscriber errors */
+    }
+  }
+}
+
+/** Register for ephemeral `pin_drag` broadcasts on `list:<listId>`. */
+export function subscribePinDragBroadcast(
+  listId: string,
+  cb: (p: PinDragBroadcastPayload) => void,
+): () => void {
+  let set = pinDragSubscribers.get(listId);
+  if (!set) {
+    set = new Set();
+    pinDragSubscribers.set(listId, set);
+  }
+  set.add(cb);
+  return () => {
+    set!.delete(cb);
+    if (set!.size === 0) pinDragSubscribers.delete(listId);
   };
 }
 
@@ -275,6 +319,9 @@ export function useListRealtime({
       })
       .on("broadcast", { event: "cursor" }, (p: any) => {
         dispatchListCursor(listId, (p.payload ?? {}) as ListCursorBroadcastPayload);
+      })
+      .on("broadcast", { event: "pin_drag" }, (p: any) => {
+        dispatchPinDrag(listId, (p.payload ?? {}) as PinDragBroadcastPayload);
       })
       .on(
         "postgres_changes",

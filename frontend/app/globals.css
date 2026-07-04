@@ -2759,6 +2759,30 @@ button:focus-visible {
   z-index: 9999 !important;
 }
 
+.board-pin--locked {
+  pointer-events: none;
+  cursor: default;
+  filter: saturate(0.85);
+}
+
+.board-pin--locked .board-pin__label {
+  opacity: 0.75;
+}
+
+.board-pin__card {
+  display: block;
+  border-radius: 6px;
+  line-height: 0;
+}
+
+.board-pin--selected .board-pin__thumb,
+.board-pin--selected .board-pin__placeholder {
+  border-color: var(--pin-highlight, var(--accent));
+  box-shadow:
+    0 0 0 2px var(--pin-highlight, var(--accent)),
+    0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
 .board-pin__tack {
   width: 14px;
   height: 14px;
