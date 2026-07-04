@@ -12,6 +12,24 @@ from db import get_supabase_client
 # Bump this when you update Terms/Privacy. Must match frontend lib/constants.ts
 TERMS_UPDATED_AT = os.getenv("TERMS_UPDATED_AT", "2026-03-18T00:00:00Z")
 
+# In-process cache of users verified for the current TERMS_UPDATED_AT version.
+# Cleared on redeploy (new process) or when TERMS_UPDATED_AT changes.
+_verified_user_ids: set[str] = set()
+_verified_cache_terms_version: str | None = None
+
+
+def _sync_verified_cache_version() -> None:
+    """Drop cached verifications when terms version changes (redeploy or terms bump)."""
+    global _verified_cache_terms_version
+    if _verified_cache_terms_version != TERMS_UPDATED_AT:
+        _verified_user_ids.clear()
+        _verified_cache_terms_version = TERMS_UPDATED_AT
+
+
+def clear_terms_verified_cache() -> None:
+    """Clear cached verifications (tests / admin)."""
+    _verified_user_ids.clear()
+
 
 def _get_user_id_from_token(token: str) -> Optional[str]:
     """Extract user_id (sub) from Supabase JWT payload."""
@@ -72,4 +90,12 @@ def check_terms_and_age(token: str) -> tuple[bool, Optional[str]]:
     user_id = _get_user_id_from_token(token)
     if not user_id:
         return False, "TERMS_NOT_ACCEPTED"
-    return get_profile_terms_status(user_id, token)
+
+    _sync_verified_cache_version()
+    if user_id in _verified_user_ids:
+        return True, None
+
+    ok, error_code = get_profile_terms_status(user_id, token)
+    if ok:
+        _verified_user_ids.add(user_id)
+    return ok, error_code
