@@ -3,7 +3,15 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Header, Query
 
-from models import POI, POICreate, POIUpdate, POIUpdateResponse, poi_class_for_type
+from models import (
+    POI,
+    POICreate,
+    POIUpdate,
+    POIUpdateResponse,
+    BulkPoiPositionsUpdate,
+    BulkPoiPositionsResponse,
+    poi_class_for_type,
+)
 from routes.auth import extract_auth_token, extract_user_id_from_token
 
 router = APIRouter(prefix="/lists", tags=["pois"])
@@ -35,6 +43,28 @@ async def list_pois_endpoint(
         if poi_type:
             _reject_subtyped_poi_type(poi_type)
         return POI.for_list(list_id, token, poi_type=poi_type)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/{list_id}/pois/positions", response_model=BulkPoiPositionsResponse)
+async def bulk_update_poi_positions_endpoint(
+    list_id: str,
+    body: BulkPoiPositionsUpdate,
+    authorization: Optional[str] = Header(None),
+) -> BulkPoiPositionsResponse:
+    """Bulk-update normalized board positions for POIs on a list."""
+    try:
+        token = extract_auth_token(authorization)
+        from db.pois import bulk_update_poi_positions
+
+        payload = [p.model_dump() for p in body.positions]
+        updated = bulk_update_poi_positions(list_id, payload, token)
+        if updated == 0:
+            raise HTTPException(status_code=404, detail="No POIs updated")
+        return BulkPoiPositionsResponse(updated=updated)
     except HTTPException:
         raise
     except Exception as e:

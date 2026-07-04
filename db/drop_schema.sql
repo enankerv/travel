@@ -127,6 +127,7 @@ DROP FUNCTION IF EXISTS public.can_view_list(uuid);
 DROP FUNCTION IF EXISTS public.create_list_rpc(text, text);
 DROP FUNCTION IF EXISTS public.get_invite_for_accept(text);
 DROP FUNCTION IF EXISTS public.accept_invite_rpc(text, uuid);
+DROP FUNCTION IF EXISTS public.bulk_update_poi_positions(uuid, jsonb);
 DROP FUNCTION IF EXISTS public.hook_before_user_created(jsonb);
 
 -- Legacy (safe to run even if already gone) ----------------------------------

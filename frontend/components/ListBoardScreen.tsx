@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BoardProvider, useBoardContext } from '@/lib/BoardContext'
+import type { BoardLayoutMode } from '@/lib/boardLayout'
 import type { BoardCreatablePoiType } from '@/lib/poi'
 import BoardView, { type BoardViewHandle } from './BoardView'
 import BoardScreenChrome from './BoardScreenChrome'
@@ -39,6 +40,7 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
 
   const [chromeVisible, setChromeVisible] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [sorting, setSorting] = useState(false)
   const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null)
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [focusedGetawayId, setFocusedGetawayId] = useState<string | null>(null)
@@ -85,6 +87,19 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
     boardRef.current?.fitCamera()
   }, [revealChrome])
 
+  const handleSort = useCallback(
+    async (mode: BoardLayoutMode) => {
+      revealChrome()
+      setSorting(true)
+      try {
+        await boardRef.current?.applyBoardSort(mode)
+      } finally {
+        setSorting(false)
+      }
+    },
+    [revealChrome],
+  )
+
   const onDeletePoi = useCallback(
     async (poiId: string) => {
       const deleted = await handleDeletePoi(poiId)
@@ -109,8 +124,10 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
         />
         <BoardScreenToolbar
           creating={creating}
+          sorting={sorting}
           onFitCamera={handleFitCamera}
           onAddItem={handleAddItem}
+          onSort={handleSort}
         />
       </div>
 

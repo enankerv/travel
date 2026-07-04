@@ -11,7 +11,9 @@ import {
 } from 'react'
 import { createPoi } from '@/lib/api'
 import { useBoardContext } from '@/lib/BoardContext'
+import { useBoardLayout } from '@/hooks/useBoardLayout'
 import { useBoardPinFocusSync } from '@/hooks/useBoardPinFocusSync'
+import type { BoardLayoutMode } from '@/lib/boardLayout'
 import { useBoardPinDrag } from '@/hooks/useBoardPinDrag'
 import { useBoardPinPresence } from '@/hooks/useBoardPinPresence'
 import { useBoardViewport } from '@/hooks/useBoardViewport'
@@ -31,6 +33,7 @@ import BoardCursorLayer from './BoardCursorLayer'
 export type BoardViewHandle = {
   fitCamera: () => void
   addPoiAtCenter: (poiType: BoardCreatablePoiType) => void
+  applyBoardSort: (mode: BoardLayoutMode) => Promise<void>
 }
 
 const BoardPin = memo(function BoardPin({
@@ -41,6 +44,7 @@ const BoardPin = memo(function BoardPin({
   isSelected,
   lockedByPeer,
   highlightColor,
+  layoutAnimating,
   onPointerDown,
 }: {
   poi: POIBase
@@ -50,6 +54,7 @@ const BoardPin = memo(function BoardPin({
   isSelected: boolean
   lockedByPeer: boolean
   highlightColor?: string
+  layoutAnimating?: boolean
   onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>, poi: POIBase) => void
 }) {
   const signedUrls = useSignedImageUrls(poiImageSources(poi))
@@ -60,7 +65,7 @@ const BoardPin = memo(function BoardPin({
   return (
     <button
       type="button"
-      className={`board-pin board-pin--${poi.poi_type}${isHeld ? ' board-pin--dragging' : ''}${holdState === 'local' ? ' board-pin--local-drag' : ''}${holdState === 'remote' ? ' board-pin--remote-drag' : ''}${lockedByPeer ? ' board-pin--locked' : ''}${showHighlight ? ' board-pin--selected' : ''}`}
+      className={`board-pin board-pin--${poi.poi_type}${isHeld ? ' board-pin--dragging' : ''}${holdState === 'local' ? ' board-pin--local-drag' : ''}${holdState === 'remote' ? ' board-pin--remote-drag' : ''}${lockedByPeer ? ' board-pin--locked' : ''}${showHighlight ? ' board-pin--selected' : ''}${layoutAnimating ? ' board-pin--layout-animating' : ''}`}
       style={{
         left: `${wx * 100}%`,
         top: `${wy * 100}%`,
@@ -116,7 +121,13 @@ const BoardView = forwardRef<
   },
   ref,
 ) {
-  const { pois, setPois, otherViewers, setError, currentUserId } = useBoardContext()
+  const {
+    pois,
+    setPois,
+    otherViewers,
+    setError,
+    currentUserId,
+  } = useBoardContext()
   const dragPosOverrideRef = useRef<{ poiId: string; wx: number; wy: number } | null>(
     null,
   )
@@ -175,6 +186,18 @@ const BoardView = forwardRef<
   handlePeerDragEndRef.current = pinDrag.handlePeerDragEnd
   dragPosOverrideRef.current = pinDrag.dragPosOverride
 
+  const boardLayout = useBoardLayout({
+    listId,
+    userId: currentUserId,
+    otherViewers,
+    enabled,
+    pois,
+    setPois,
+    setError,
+    isDragActive: !!pinDrag.drag || !!pinDrag.pendingPoiId,
+    onAfterLayout: fitCamera,
+  })
+
   const presence = useBoardPinPresence({
     pois,
     otherViewers,
@@ -211,8 +234,9 @@ const BoardView = forwardRef<
     () => ({
       fitCamera,
       addPoiAtCenter: (poiType: BoardCreatablePoiType) => void addPoiAt(0.5, 0.5, poiType),
+      applyBoardSort: boardLayout.applyBoardSort,
     }),
-    [addPoiAt, fitCamera],
+    [addPoiAt, fitCamera, boardLayout.applyBoardSort],
   )
 
   const onViewportPointerDown = useCallback(
@@ -257,7 +281,14 @@ const BoardView = forwardRef<
           <div className="board-view__cork" aria-hidden />
 
           {presence.sortedPins.map((poi) => {
-            const pos = pinDrag.getPinPos(poi)
+            const dragPos = pinDrag.getPinPos(poi)
+            const layoutGospel = boardLayout.getLayoutGospel(poi.id)
+            const pos =
+              layoutGospel &&
+              pinDrag.drag?.poiId !== poi.id &&
+              pinDrag.pendingPoiId !== poi.id
+                ? layoutGospel
+                : dragPos
             const lockedByPeer = isLockedByPeer(
               poi.id,
               lockedPoiIds,
@@ -273,6 +304,7 @@ const BoardView = forwardRef<
                 isSelected={selectedPoiId === poi.id}
                 lockedByPeer={lockedByPeer}
                 highlightColor={presence.getPinHighlightColor(poi.id)}
+                layoutAnimating={boardLayout.layoutAnimating}
                 onPointerDown={pinDrag.onPinPointerDown}
               />
             )

@@ -477,6 +477,21 @@ class POIUpdate(BaseModel):
     board_z: Optional[int] = None
 
 
+class PoiBoardPosition(BaseModel):
+    id: str
+    board_x: float = Field(ge=0, le=1)
+    board_y: float = Field(ge=0, le=1)
+
+
+class BulkPoiPositionsUpdate(BaseModel):
+    positions: list[PoiBoardPosition] = Field(min_length=1)
+
+
+class BulkPoiPositionsResponse(BaseModel):
+    ok: bool = True
+    updated: int
+
+
 class BoardPoi(POI):
     """POI snapshot for the cork board, with nested comments and votes."""
 

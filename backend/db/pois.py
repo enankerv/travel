@@ -85,6 +85,23 @@ def update_poi_row(poi_id: str, fields: dict, auth_token: str) -> dict | None:
     return response.data[0] if response.data else None
 
 
+def bulk_update_poi_positions(
+    list_id: str,
+    positions: list[dict],
+    auth_token: str,
+) -> int:
+    """Update board_x/board_y for many POIs on one list via a single RPC call."""
+    if not positions:
+        return 0
+    client = get_supabase_client(auth_token)
+    response = client.rpc(
+        "bulk_update_poi_positions",
+        {"p_list_id": list_id, "p_positions": positions},
+    ).execute()
+    count = response.data
+    return int(count) if count is not None else 0
+
+
 def delete_poi_row(poi_id: str, auth_token: str) -> bool:
     """Delete a POI (subtype rows, images, votes, comments cascade)."""
     client = get_supabase_client(auth_token)

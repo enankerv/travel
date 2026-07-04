@@ -194,6 +194,26 @@ export async function updatePoi(
   return data.poi
 }
 
+export type PoiBoardPosition = {
+  id: string
+  board_x: number
+  board_y: number
+}
+
+export async function bulkUpdatePoiPositions(
+  listId: string,
+  positions: PoiBoardPosition[],
+): Promise<{ ok: boolean; updated: number }> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_URL}/api/lists/${listId}/pois/positions`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ positions }),
+  })
+  if (!res.ok) throw new Error('Failed to save board layout')
+  return res.json()
+}
+
 export async function deletePoi(listId: string, poiId: string) {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_URL}/api/lists/${listId}/pois/${poiId}`, {

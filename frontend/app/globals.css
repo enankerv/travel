@@ -2788,6 +2788,14 @@ button:focus-visible {
     filter 0.18s ease;
 }
 
+.board-pin--layout-animating {
+  transition:
+    left 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+    top 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.18s ease,
+    filter 0.18s ease;
+}
+
 .board-pin--dragging {
   cursor: grabbing;
   z-index: 9999 !important;

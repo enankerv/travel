@@ -35,6 +35,13 @@ export type ListCursorBroadcastPayload = {
   leave?: boolean;
 };
 
+/** Collaborative board layout — sort-by-type or cluster-nearby. */
+export type BoardSortBroadcastPayload = {
+  user_id?: string;
+  mode?: "poi_type" | "proximity";
+  positions: Array<{ id: string; board_x: number; board_y: number }>;
+};
+
 /** Ephemeral pin focus on the cork board — drag (live wx/wy) or static selection. */
 export type PinFocusBroadcastPayload = {
   user_id?: string;
@@ -58,6 +65,11 @@ const listCursorSubscribers = new Map<
 const pinFocusSubscribers = new Map<
   string,
   Set<(p: PinFocusBroadcastPayload) => void>
+>();
+
+const boardSortSubscribers = new Map<
+  string,
+  Set<(p: BoardSortBroadcastPayload) => void>
 >();
 
 function dispatchListCursor(listId: string, payload: ListCursorBroadcastPayload) {
@@ -124,6 +136,35 @@ export function subscribePinDragBroadcast(
   cb: (p: PinFocusBroadcastPayload) => void,
 ): () => void {
   return subscribePinFocusBroadcast(listId, cb);
+}
+
+function dispatchBoardSort(listId: string, payload: BoardSortBroadcastPayload) {
+  const set = boardSortSubscribers.get(listId);
+  if (!set?.size) return;
+  for (const cb of set) {
+    try {
+      cb(payload);
+    } catch {
+      /* ignore subscriber errors */
+    }
+  }
+}
+
+/** Register for collaborative `sort` broadcasts on `list:<listId>`. */
+export function subscribeBoardSortBroadcast(
+  listId: string,
+  cb: (p: BoardSortBroadcastPayload) => void,
+): () => void {
+  let set = boardSortSubscribers.get(listId);
+  if (!set) {
+    set = new Set();
+    boardSortSubscribers.set(listId, set);
+  }
+  set.add(cb);
+  return () => {
+    set!.delete(cb);
+    if (set!.size === 0) boardSortSubscribers.delete(listId);
+  };
 }
 
 type GetawayRow = { id: string; updated_at?: string; title?: string; poi_type?: string; [key: string]: any };
@@ -339,6 +380,9 @@ export function useListRealtime({
       .on("broadcast", { event: "pin_drag" }, (p: any) => {
         const raw = (p.payload ?? {}) as PinFocusBroadcastPayload;
         dispatchPinFocus(listId, { ...raw, dragging: raw.dragging ?? true });
+      })
+      .on("broadcast", { event: "sort" }, (p: any) => {
+        dispatchBoardSort(listId, (p.payload ?? {}) as BoardSortBroadcastPayload);
       })
       .on(
         "postgres_changes",
