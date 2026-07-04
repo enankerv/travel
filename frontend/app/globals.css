@@ -3005,6 +3005,53 @@ body.board-screen-active main {
   cursor: default;
 }
 
+.board-add-item {
+  position: relative;
+}
+
+.board-add-item__menu {
+  position: absolute;
+  bottom: calc(100% + 0.45rem);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 10.5rem;
+  padding: 0.35rem;
+  border-radius: 8px;
+  background: rgba(13, 13, 13, 0.94);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(10px);
+  z-index: 20;
+}
+
+.board-add-item__option {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--light);
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.board-add-item__option:hover {
+  background: var(--surface-hover);
+  color: var(--accent);
+}
+
+.board-add-item__icon {
+  flex-shrink: 0;
+  width: 1.25rem;
+  text-align: center;
+  font-size: 1rem;
+  line-height: 1;
+}
+
 .board-screen__error {
   position: absolute;
   top: 5rem;
@@ -3033,10 +3080,6 @@ body.board-screen-active main {
 .list-villas-tab__view-btn--board:hover {
   color: var(--accent);
   border-color: var(--accent);
-}
-
-.board-pin--note .board-pin__placeholder {
-  background: #fff9c4;
 }
 
 .board-cursor-peer {

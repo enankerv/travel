@@ -142,7 +142,7 @@ export async function deleteGetaway(listId: string, poiId: string) {
   return res.json()
 }
 
-// POIs (spine — cork board pins, notes, etc.)
+// POIs (spine — cork board pins, etc.)
 export async function listPois(listId: string, poiType?: string): Promise<POIBase[]> {
   const headers = await getAuthHeaders()
   const qs = poiType ? `?poi_type=${encodeURIComponent(poiType)}` : ''

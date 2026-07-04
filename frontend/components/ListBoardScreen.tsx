@@ -10,6 +10,8 @@ import { ListDetailProvider } from '@/lib/ListDetailContext'
 import type { POIBase } from '@/lib/getaway'
 import { mergePoiFromRealtime } from '@/lib/poi'
 import BoardView, { type BoardViewHandle } from './BoardView'
+import BoardAddItemButton from './BoardAddItemButton'
+import type { BoardCreatablePoiType } from '@/lib/poi'
 import ScoutCredits from './ScoutCredits'
 import LoadingView from './LoadingView'
 import { useIsMobile } from '@/hooks/useIsMobile'
@@ -101,7 +103,15 @@ export default function ListBoardScreen({ listId }: { listId: string }) {
     onUsersChange: setViewingUsers,
   })
 
-  const noop = async () => {}
+  const handleAddItem = useCallback(
+    (poiType: BoardCreatablePoiType) => {
+      revealChrome()
+      setCreating(true)
+      boardRef.current?.addPoiAtCenter(poiType)
+      window.setTimeout(() => setCreating(false), 400)
+    },
+    [revealChrome],
+  )
 
   if (isLoading || !list) {
     return <LoadingView message="Loading board…" />
@@ -115,8 +125,8 @@ export default function ListBoardScreen({ listId }: { listId: string }) {
     pois,
     setPois,
     votesByGetaway: {},
-    onVote: noop,
-    onUnvote: noop,
+    onVote: async () => {},
+    onUnvote: async () => {},
     isListMember: true,
     currentUserId: user?.id,
     currentUserProfile: undefined,
@@ -193,19 +203,7 @@ export default function ListBoardScreen({ listId }: { listId: string }) {
             >
               Fit
             </button>
-            <button
-              type="button"
-              className="board-screen__tool-btn"
-              disabled={creating}
-              onClick={() => {
-                revealChrome()
-                setCreating(true)
-                boardRef.current?.addNoteAtCenter()
-                window.setTimeout(() => setCreating(false), 400)
-              }}
-            >
-              {creating ? 'Adding…' : 'Add note'}
-            </button>
+            <BoardAddItemButton creating={creating} onAdd={handleAddItem} />
           </div>
         </div>
 

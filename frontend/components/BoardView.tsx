@@ -23,6 +23,13 @@ import {
   type BoardCamera,
 } from '@/lib/boardCoords'
 import type { POIBase } from '@/lib/getaway'
+import {
+  BOARD_POI_TYPE_OPTIONS,
+  defaultTitleForPoiType,
+  iconForPoiType,
+  type BoardCreatablePoiType,
+} from '@/lib/poi'
+import BoardAddItemButton from './BoardAddItemButton'
 import BoardCursorLayer from './BoardCursorLayer'
 
 const MIN_SCALE = 0.08
@@ -100,7 +107,7 @@ function cameraForBounds(
 
 export type BoardViewHandle = {
   fitCamera: () => void
-  addNoteAtCenter: () => void
+  addPoiAtCenter: (poiType: BoardCreatablePoiType) => void
 }
 
 function clamp(n: number, min: number, max: number) {
@@ -131,8 +138,9 @@ function pinImage(poi: POIBase): string {
 
 function pinLabel(poi: POIBase): string {
   if (poi.title?.trim()) return poi.title.trim()
+  const opt = BOARD_POI_TYPE_OPTIONS.find((o) => o.type === poi.poi_type)
+  if (opt) return opt.label
   if (poi.poi_type === 'getaway') return 'Getaway'
-  if (poi.poi_type === 'note') return 'Note'
   return 'Pin'
 }
 
@@ -174,7 +182,7 @@ const BoardPin = memo(function BoardPin({
           <img className="board-pin__thumb" src={img} alt="" draggable={false} />
         ) : (
           <span className="board-pin__placeholder" aria-hidden>
-            {poi.poi_type === 'note' ? '📝' : '📍'}
+            {iconForPoiType(poi.poi_type)}
           </span>
         )}
       </span>
@@ -336,11 +344,11 @@ const BoardView = forwardRef<
     })
   }, [pois])
 
-  const fitCamera = useCallback(() => {
+  const fitCamera = useCallback((): boolean => {
     const vp = viewportRef.current
-    if (!vp) return
+    if (!vp) return false
     const { width, height } = vp.getBoundingClientRect()
-    if (width <= 0 || height <= 0) return
+    if (width <= 0 || height <= 0) return false
 
     const posOverride =
       drag && dragPos ? { poiId: drag.poiId, wx: dragPos.wx, wy: dragPos.wy } : null
@@ -358,21 +366,22 @@ const BoardView = forwardRef<
         y: height / 2 - (BOARD_WORLD_H * 0.5) * scale,
         scale,
       })
-      return
+      return true
     }
 
     applyCamera(cameraForBounds(width, height, bounds))
+    return true
   }, [applyCamera, pois, drag, dragPos])
 
-  const addNoteAt = useCallback(
-    async (wx: number, wy: number) => {
+  const addPoiAt = useCallback(
+    async (wx: number, wy: number, poiType: BoardCreatablePoiType) => {
       if (creating) return
       pingActivity()
       setCreating(true)
       try {
         const poi = await createPoi(listId, {
-          poi_type: 'note',
-          title: 'New note',
+          poi_type: poiType,
+          title: defaultTitleForPoiType(poiType),
           board_x: wx,
           board_y: wy,
         })
@@ -381,7 +390,7 @@ const BoardView = forwardRef<
           return [...prev, poi]
         })
       } catch {
-        setError('Failed to create note')
+        setError('Failed to add item')
       } finally {
         setCreating(false)
       }
@@ -391,24 +400,76 @@ const BoardView = forwardRef<
 
   const fitCameraRef = useRef(fitCamera)
   fitCameraRef.current = fitCamera
+  const applyCameraRef = useRef(applyCamera)
+  applyCameraRef.current = applyCamera
   const initialFitDone = useRef(false)
 
   useImperativeHandle(
     ref,
     () => ({
-      fitCamera,
-      addNoteAtCenter: () => void addNoteAt(0.5, 0.5),
+      fitCamera: () => {
+        fitCameraRef.current()
+      },
+      addPoiAtCenter: (poiType: BoardCreatablePoiType) => void addPoiAt(0.5, 0.5, poiType),
     }),
-    [fitCamera, addNoteAt],
+    [addPoiAt],
   )
 
-  // Fit once on mount (page load); never passive re-fit when pois/data change.
+  // Fit once when the viewport has real dimensions; re-sync transform when the tab
+  // returns from background (browsers may drop the GPU layer / report 0×0 while hidden).
   useEffect(() => {
-    if (initialFitDone.current) return
-    initialFitDone.current = true
-    const id = requestAnimationFrame(() => fitCameraRef.current())
+    let raf = 0
+
+    const syncCameraDom = () => {
+      const vp = viewportRef.current
+      if (!vp) return
+      const { width, height } = vp.getBoundingClientRect()
+      if (width <= 0 || height <= 0) return
+      applyCameraRef.current(cameraRef.current)
+    }
+
+    const tryInitialFit = () => {
+      if (initialFitDone.current) return true
+      if (fitCameraRef.current()) {
+        initialFitDone.current = true
+        return true
+      }
+      return false
+    }
+
+    const scheduleFitRetry = () => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(function tick() {
+        if (tryInitialFit()) return
+        if (document.visibilityState !== 'visible') return
+        raf = requestAnimationFrame(tick)
+      })
+    }
+
+    const onViewportReady = () => {
+      if (tryInitialFit()) return
+      syncCameraDom()
+    }
+
+    scheduleFitRetry()
+
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') return
+      raf = requestAnimationFrame(onViewportReady)
+      if (!initialFitDone.current) scheduleFitRetry()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+
+    const ro = new ResizeObserver(() => {
+      raf = requestAnimationFrame(onViewportReady)
+    })
+    const vp = viewportRef.current
+    if (vp) ro.observe(vp)
+
     return () => {
-      cancelAnimationFrame(id)
+      cancelAnimationFrame(raf)
+      document.removeEventListener('visibilitychange', onVisibility)
+      ro.disconnect()
       if (cameraRafRef.current) cancelAnimationFrame(cameraRafRef.current)
     }
   }, [])
@@ -628,12 +689,13 @@ const BoardView = forwardRef<
       if (!vp) return
       const norm = screenToBoardNorm(vp, cameraRef.current, e.clientX, e.clientY)
       if (!norm) return
-      void addNoteAt(
+      void addPoiAt(
         clamp(norm.wx, 0.02, 0.98),
         clamp(norm.wy, 0.02, 0.98),
+        'poi',
       )
     },
-    [addNoteAt],
+    [addPoiAt],
   )
 
   return (
@@ -648,16 +710,13 @@ const BoardView = forwardRef<
           >
             Fit
           </button>
-          <button
-            type="button"
-            className="board-view__tool-btn"
-            disabled={creating}
-            onClick={() => void addNoteAt(0.5, 0.5)}
-          >
-            {creating ? 'Adding…' : 'Add note'}
-          </button>
+          <BoardAddItemButton
+            creating={creating}
+            buttonClassName="board-view__tool-btn"
+            onAdd={(poiType) => void addPoiAt(0.5, 0.5, poiType)}
+          />
           <span className="board-view__hint">
-            Scroll to zoom · drag background to pan · double-click to add a note
+            Scroll to zoom · drag background to pan · double-click to add a pin
           </span>
         </div>
       )}
