@@ -1,20 +1,36 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { getList, listPois } from '@/lib/api'
+import {
+  deleteGetaway,
+  deletePoi,
+  getList,
+  getListComments,
+  getListMembers,
+  getListVotes,
+  listPois,
+  updateGetaway,
+  updatePoi,
+} from '@/lib/api'
 import { useAuth } from '@/lib/AuthContext'
+import { useListVotes } from '@/hooks/useListVotes'
 import { useListRealtime, useListPresence, type PresenceUser } from '@/lib/realtime'
 import { presenceColorForUserId } from '@/lib/presenceColors'
 import { ListDetailProvider } from '@/lib/ListDetailContext'
-import type { POIBase } from '@/lib/getaway'
-import { mergePoiFromRealtime } from '@/lib/poi'
+import type { Getaway, GetawayUpdate, POIBase } from '@/lib/getaway'
+import { mergePoiFromRealtime, type POIUpdate } from '@/lib/poi'
 import BoardView, { type BoardViewHandle } from './BoardView'
 import BoardAddItemButton from './BoardAddItemButton'
+import PoiDetailSidebar from './PoiDetailSidebar'
+import GetawayDetailSheet from './GetawayDetailSheet'
+import CommentsSidebar from './CommentsSidebar'
+import ImageGallery from './ImageGallery'
 import type { BoardCreatablePoiType } from '@/lib/poi'
 import ScoutCredits from './ScoutCredits'
 import LoadingView from './LoadingView'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import type { CommentsByGetaway } from '@/lib/ListDetailContext'
 
 const IDLE_MS = 1000
 
@@ -26,11 +42,30 @@ export default function ListBoardScreen({ listId }: { listId: string }) {
   const idleTimerRef = useRef<number>()
   const [list, setList] = useState<{ id: string; name: string } | null>(null)
   const [pois, setPois] = useState<POIBase[]>([])
+  const [members, setMembers] = useState<any[]>([])
   const [viewingUsers, setViewingUsers] = useState<PresenceUser[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [chromeVisible, setChromeVisible] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null)
+  const [commentsByGetaway, setCommentsByGetaway] = useState<CommentsByGetaway>({})
+  const [commentsOpen, setCommentsOpen] = useState(false)
+  const [focusedGetawayId, setFocusedGetawayId] = useState<string | null>(null)
+  const [galleryImages, setGalleryImages] = useState<string[] | null>(null)
+  const [galleryIndex, setGalleryIndex] = useState(0)
+
+  const votes = useListVotes({
+    listId,
+    user,
+    members,
+    setError,
+  })
+
+  const selectedPoi = useMemo(
+    () => (selectedPoiId ? pois.find((p) => p.id === selectedPoiId) : undefined),
+    [selectedPoiId, pois],
+  )
 
   const otherViewers = viewingUsers.filter((u) => u.user_id !== user?.id)
 
@@ -57,19 +92,47 @@ export default function ListBoardScreen({ listId }: { listId: string }) {
   const loadData = useCallback(async () => {
     setIsLoading(true)
     try {
-      const [listData, poisData] = await Promise.all([
-        getList(listId),
-        listPois(listId),
-      ])
+      const [listData, poisData, commentsData, membersData, votesData] =
+        await Promise.all([
+          getList(listId),
+          listPois(listId),
+          getListComments(listId),
+          getListMembers(listId),
+          getListVotes(listId),
+        ])
       setList(listData)
       setPois(poisData || [])
+      setMembers(membersData?.members || [])
+      const commentsList = commentsData?.comments || []
+      const commentsByGid: CommentsByGetaway = {}
+      for (const c of commentsList) {
+        const gid = c.poi_id
+        if (!commentsByGid[gid]) commentsByGid[gid] = []
+        commentsByGid[gid].push(c)
+      }
+      setCommentsByGetaway(commentsByGid)
+      const votesList = votesData?.votes || []
+      const votesByGid: Record<
+        string,
+        { user_id: string; first_name?: string; avatar_url?: string }[]
+      > = {}
+      for (const v of votesList) {
+        const gid = v.poi_id
+        if (!votesByGid[gid]) votesByGid[gid] = []
+        votesByGid[gid].push({
+          user_id: v.user_id,
+          first_name: v.first_name,
+          avatar_url: v.avatar_url,
+        })
+      }
+      votes.setVotesByGetaway(votesByGid)
       setError('')
     } catch {
       setError('Failed to load board')
     } finally {
       setIsLoading(false)
     }
-  }, [listId])
+  }, [listId, votes.setVotesByGetaway])
 
   useEffect(() => {
     void loadData()
@@ -91,9 +154,31 @@ export default function ListBoardScreen({ listId }: { listId: string }) {
         ),
       )
     },
-    onDelete: (id) => setPois((prev) => prev.filter((p) => p.id !== id)),
-    onVoteInsert: () => {},
-    onVoteDelete: () => {},
+    onDelete: (id) => {
+      setPois((prev) => prev.filter((p) => p.id !== id))
+      setSelectedPoiId((prev) => (prev === id ? null : prev))
+    },
+    onCommentInsert: (c) =>
+      setCommentsByGetaway((prev) => {
+        const existing = prev[c.poi_id] || []
+        if (existing.some((x) => x.id === c.id)) return prev
+        return { ...prev, [c.poi_id]: [...existing, c] }
+      }),
+    onCommentUpdate: (c) =>
+      setCommentsByGetaway((prev) => {
+        const next = { ...prev }
+        for (const gid of Object.keys(next)) {
+          next[gid] = next[gid].map((x) => (x.id === c.id ? { ...x, ...c } : x))
+        }
+        return next
+      }),
+    onCommentDelete: (id, poiId) =>
+      setCommentsByGetaway((prev) => ({
+        ...prev,
+        [poiId]: (prev[poiId] || []).filter((x) => x.id !== id),
+      })),
+    onVoteInsert: votes.onVoteInsert,
+    onVoteDelete: votes.onVoteDelete,
   })
 
   useListPresence({
@@ -102,6 +187,55 @@ export default function ListBoardScreen({ listId }: { listId: string }) {
     user,
     onUsersChange: setViewingUsers,
   })
+
+  const handleUpdateGetaway = useCallback(
+    async (poiId: string, updates: GetawayUpdate) => {
+      try {
+        await updateGetaway(listId, poiId, updates)
+        setPois((prev) =>
+          prev.map((p) => (p.id === poiId ? { ...p, ...updates } : p)),
+        )
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Failed to update getaway'
+        setError(message)
+      }
+    },
+    [listId],
+  )
+
+  const handleUpdatePoi = useCallback(
+    async (poiId: string, updates: POIUpdate) => {
+      try {
+        const updated = await updatePoi(listId, poiId, updates)
+        setPois((prev) =>
+          prev.map((p) => (p.id === poiId ? { ...p, ...updated } : p)),
+        )
+      } catch {
+        setError('Failed to update item')
+      }
+    },
+    [listId],
+  )
+
+  const handleDeletePoi = useCallback(
+    async (poiId: string) => {
+      const poi = pois.find((p) => p.id === poiId)
+      if (!poi || !confirm('Delete this item?')) return
+      try {
+        if (poi.poi_type === 'getaway') {
+          await deleteGetaway(listId, poiId)
+        } else {
+          await deletePoi(listId, poiId)
+        }
+        setPois((prev) => prev.filter((p) => p.id !== poiId))
+        setSelectedPoiId((prev) => (prev === poiId ? null : prev))
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Failed to delete item'
+        setError(message)
+      }
+    },
+    [listId, pois],
+  )
 
   const handleAddItem = useCallback(
     (poiType: BoardCreatablePoiType) => {
@@ -119,19 +253,19 @@ export default function ListBoardScreen({ listId }: { listId: string }) {
 
   const contextValue = {
     list,
-    members: [],
-    getaways: [],
+    members,
+    getaways: pois as Getaway[],
     setGetaways: () => {},
     pois,
     setPois,
-    votesByGetaway: {},
-    onVote: async () => {},
-    onUnvote: async () => {},
-    isListMember: true,
-    currentUserId: user?.id,
-    currentUserProfile: undefined,
-    commentsByGetaway: {},
-    setCommentsByGetaway: () => {},
+    votesByGetaway: votes.votesByGetaway,
+    onVote: votes.onVote,
+    onUnvote: votes.onUnvote,
+    isListMember: votes.isListMember,
+    currentUserId: votes.currentUserId,
+    currentUserProfile: votes.currentUserProfile,
+    commentsByGetaway,
+    setCommentsByGetaway,
     isLoading,
     error,
     setError,
@@ -222,7 +356,62 @@ export default function ListBoardScreen({ listId }: { listId: string }) {
           enabled={!isMobile}
           fullscreen
           onActivity={hideChromeOnActivity}
+          selectedPoiId={selectedPoiId}
+          onSelectPoi={setSelectedPoiId}
         />
+
+        {selectedPoi && !isMobile && (
+          <PoiDetailSidebar
+            poi={selectedPoi}
+            onClose={() => setSelectedPoiId(null)}
+            onImageClick={(images, index) => {
+              setGalleryImages(images)
+              setGalleryIndex(index)
+            }}
+            onUpdateGetaway={handleUpdateGetaway}
+            onUpdatePoi={handleUpdatePoi}
+            onDelete={handleDeletePoi}
+          />
+        )}
+
+        {selectedPoi && isMobile && (
+          <GetawayDetailSheet
+            getaway={selectedPoi}
+            onClose={() => setSelectedPoiId(null)}
+            onUpdate={
+              selectedPoi.poi_type === 'getaway'
+                ? (id, updates) => void handleUpdateGetaway(id, updates)
+                : (id, updates) =>
+                    void handleUpdatePoi(id, {
+                      title: updates.title,
+                      description: updates.description,
+                      location: updates.location,
+                    })
+            }
+            onDelete={(id) => void handleDeletePoi(id)}
+          />
+        )}
+
+        <CommentsSidebar
+          isOpen={commentsOpen}
+          onClose={() => {
+            setCommentsOpen(false)
+            setFocusedGetawayId(null)
+          }}
+          focusedGetawayId={focusedGetawayId}
+          onGetawayClick={(id) => {
+            setFocusedGetawayId(id)
+            setSelectedPoiId(id)
+          }}
+        />
+
+        {galleryImages && (
+          <ImageGallery
+            images={galleryImages}
+            initialIndex={galleryIndex}
+            onClose={() => setGalleryImages(null)}
+          />
+        )}
       </div>
     </ListDetailProvider>
   )

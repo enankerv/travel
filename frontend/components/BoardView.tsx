@@ -40,6 +40,8 @@ const PIN_PAD_TOP = 128
 const PIN_PAD_BOTTOM = 12
 const MIN_FIT_SPAN = 180
 const FIT_MARGIN = 0.88
+/** Screen px before a pin pointer down becomes a drag (not a click). */
+const PIN_DRAG_THRESHOLD_PX = 6
 
 function poiBoundsWorld(
   pois: POIBase[],
@@ -149,6 +151,7 @@ const BoardPin = memo(function BoardPin({
   wx,
   wy,
   isDragging,
+  isSelected,
   lockedByPeer,
   highlightColor,
   onPointerDown,
@@ -157,21 +160,29 @@ const BoardPin = memo(function BoardPin({
   wx: number
   wy: number
   isDragging: boolean
+  isSelected: boolean
   lockedByPeer: boolean
   highlightColor?: string
   onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>, poi: POIBase) => void
 }) {
   const img = pinImage(poi)
-  const selected = !!highlightColor
+  const showHighlight = isSelected || !!highlightColor
   return (
     <button
       type="button"
-      className={`board-pin board-pin--${poi.poi_type}${isDragging ? ' board-pin--dragging' : ''}${lockedByPeer ? ' board-pin--locked' : ''}${selected ? ' board-pin--selected' : ''}`}
+      className={`board-pin board-pin--${poi.poi_type}${isDragging ? ' board-pin--dragging' : ''}${lockedByPeer ? ' board-pin--locked' : ''}${showHighlight ? ' board-pin--selected' : ''}`}
       style={{
         left: `${wx * 100}%`,
         top: `${wy * 100}%`,
-        zIndex: Math.round((poi.board_z ?? 0) + (isDragging || lockedByPeer ? 1000 : 0)),
-        ...(highlightColor ? ({ '--pin-highlight': highlightColor } as CSSProperties) : {}),
+        zIndex: Math.round(
+          (poi.board_z ?? 0) + (isDragging || lockedByPeer || isSelected ? 1000 : 0),
+        ),
+        ...(showHighlight
+          ? ({
+              '--pin-highlight':
+                highlightColor ?? 'var(--accent)',
+            } as CSSProperties)
+          : {}),
       }}
       disabled={lockedByPeer}
       onPointerDown={(e) => onPointerDown(e, poi)}
@@ -198,6 +209,15 @@ type DragState = {
   pointerId: number
 }
 
+type PendingPinPointer = {
+  poiId: string
+  pointerId: number
+  startClientX: number
+  startClientY: number
+  startWx: number
+  startWy: number
+}
+
 const BoardView = forwardRef<
   BoardViewHandle,
   {
@@ -205,8 +225,20 @@ const BoardView = forwardRef<
     enabled: boolean
     fullscreen?: boolean
     onActivity?: () => void
+    selectedPoiId?: string | null
+    onSelectPoi?: (poiId: string | null) => void
   }
->(function BoardView({ listId, enabled, fullscreen = false, onActivity }, ref) {
+>(function BoardView(
+  {
+    listId,
+    enabled,
+    fullscreen = false,
+    onActivity,
+    selectedPoiId = null,
+    onSelectPoi,
+  },
+  ref,
+) {
   const { pois, setPois, otherViewers, setError, currentUserId } = useListDetailContext()
   const [drag, setDrag] = useState<DragState | null>(null)
   const [dragPos, setDragPos] = useState<{ wx: number; wy: number } | null>(null)
@@ -262,6 +294,9 @@ const BoardView = forwardRef<
   dragPosRef.current = dragPos
   const broadcastDragEndRef = useRef(broadcastDragEnd)
   broadcastDragEndRef.current = broadcastDragEnd
+  const pendingPinRef = useRef<PendingPinPointer | null>(null)
+  const onSelectPoiRef = useRef(onSelectPoi)
+  onSelectPoiRef.current = onSelectPoi
 
   const pingActivity = useCallback(() => {
     onActivityRef.current?.()
@@ -318,11 +353,13 @@ const BoardView = forwardRef<
         return presenceColorForUserId(currentUserId)
       }
       const peerDrag = peerDragByPoiId.get(poiId)
-      if (!peerDrag) return undefined
-      return (
-        viewerColorById.get(peerDrag.userId) ??
-        presenceColorForUserId(peerDrag.userId)
-      )
+      if (peerDrag) {
+        return (
+          viewerColorById.get(peerDrag.userId) ??
+          presenceColorForUserId(peerDrag.userId)
+        )
+      }
+      return undefined
     },
     [drag, currentUserId, peerDragByPoiId, viewerColorById],
   )
@@ -531,6 +568,7 @@ const BoardView = forwardRef<
         spaceDownRef.current ||
         (e.button === 0 && onBackground)
       if (!isPan) return
+      onSelectPoiRef.current?.(null)
       pingActivity()
       e.currentTarget.setPointerCapture(e.pointerId)
       setInteracting(true)
@@ -545,6 +583,23 @@ const BoardView = forwardRef<
     [pingActivity],
   )
 
+  const promotePendingToDrag = useCallback(
+    (pending: PendingPinPointer) => {
+      pendingPinRef.current = null
+      const next: DragState = {
+        poiId: pending.poiId,
+        startWx: pending.startWx,
+        startWy: pending.startWy,
+        pointerId: pending.pointerId,
+      }
+      dragRef.current = next
+      setDrag(next)
+      setDragPos({ wx: pending.startWx, wy: pending.startWy })
+      broadcastDragStart(pending.poiId, pending.startWx, pending.startWy)
+    },
+    [broadcastDragStart],
+  )
+
   const onViewportPointerMove = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
       const pan = panningRef.current
@@ -556,7 +611,30 @@ const BoardView = forwardRef<
         })
         return
       }
-      if (drag && drag.pointerId === e.pointerId) {
+
+      const pending = pendingPinRef.current
+      if (pending && pending.pointerId === e.pointerId && !dragRef.current) {
+        const dx = e.clientX - pending.startClientX
+        const dy = e.clientY - pending.startClientY
+        if (Math.hypot(dx, dy) >= PIN_DRAG_THRESHOLD_PX) {
+          promotePendingToDrag(pending)
+          pingActivity()
+          const vp = viewportRef.current
+          if (vp) {
+            const norm = screenToBoardNorm(vp, cameraRef.current, e.clientX, e.clientY)
+            if (norm) {
+              const wx = clamp(norm.wx, 0, 1)
+              const wy = clamp(norm.wy, 0, 1)
+              setDragPos({ wx, wy })
+              broadcastDragMove(pending.poiId, wx, wy)
+            }
+          }
+          return
+        }
+      }
+
+      const activeDrag = dragRef.current
+      if (activeDrag && activeDrag.pointerId === e.pointerId) {
         pingActivity()
         const vp = viewportRef.current
         if (!vp) return
@@ -565,10 +643,10 @@ const BoardView = forwardRef<
         const wx = clamp(norm.wx, 0, 1)
         const wy = clamp(norm.wy, 0, 1)
         setDragPos({ wx, wy })
-        broadcastDragMove(drag.poiId, wx, wy)
+        broadcastDragMove(activeDrag.poiId, wx, wy)
       }
     },
-    [drag, scheduleCamera, pingActivity, broadcastDragMove],
+    [scheduleCamera, pingActivity, broadcastDragMove, promotePendingToDrag],
   )
 
   const finishPan = useCallback((pointerId: number) => {
@@ -611,16 +689,27 @@ const BoardView = forwardRef<
   const onViewportPointerUp = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
       finishPan(e.pointerId)
-      if (drag && drag.pointerId === e.pointerId) {
-        const wx = dragPos?.wx ?? drag.startWx
-        const wy = dragPos?.wy ?? drag.startWy
-        commitGospel(drag.poiId, wx, wy)
+
+      const pending = pendingPinRef.current
+      if (pending && pending.pointerId === e.pointerId) {
+        pendingPinRef.current = null
+        if (!dragRef.current) {
+          onSelectPoiRef.current?.(pending.poiId)
+        }
+      }
+
+      const activeDrag = dragRef.current
+      if (activeDrag && activeDrag.pointerId === e.pointerId) {
+        const wx = dragPosRef.current?.wx ?? activeDrag.startWx
+        const wy = dragPosRef.current?.wy ?? activeDrag.startWy
+        commitGospel(activeDrag.poiId, wx, wy)
+        dragRef.current = null
         setDrag(null)
         setDragPos(null)
-        void finishDrag(drag, { wx, wy })
+        void finishDrag(activeDrag, { wx, wy })
       }
     },
-    [drag, dragPos, finishDrag, finishPan, commitGospel],
+    [finishDrag, finishPan, commitGospel],
   )
 
   const onPinPointerDown = useCallback(
@@ -638,20 +727,21 @@ const BoardView = forwardRef<
       e.currentTarget.setPointerCapture(e.pointerId)
       const wx = poi.board_x ?? 0.5
       const wy = poi.board_y ?? 0.5
-      setDrag({
+      pendingPinRef.current = {
         poiId: poi.id,
+        pointerId: e.pointerId,
+        startClientX: e.clientX,
+        startClientY: e.clientY,
         startWx: wx,
         startWy: wy,
-        pointerId: e.pointerId,
-      })
-      setDragPos({ wx, wy })
-      broadcastDragStart(poi.id, wx, wy)
+      }
     },
-    [pingActivity, lockedPoiIds, broadcastDragStart],
+    [pingActivity, lockedPoiIds],
   )
 
   useEffect(() => {
     return () => {
+      pendingPinRef.current = null
       const d = dragRef.current
       const pos = dragPosRef.current
       if (d) {
@@ -748,6 +838,7 @@ const BoardView = forwardRef<
                 wx={pos.wx}
                 wy={pos.wy}
                 isDragging={drag?.poiId === poi.id}
+                isSelected={selectedPoiId === poi.id}
                 lockedByPeer={lockedByPeer}
                 highlightColor={pinHighlightColor(poi.id)}
                 onPointerDown={onPinPointerDown}

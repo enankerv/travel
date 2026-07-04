@@ -3785,6 +3785,31 @@ body.board-screen-active main {
   animation: comments-sidebar-slide-in 0.2s ease-out;
 }
 
+.board-poi-sidebar__type {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.board-poi-sidebar .map-getaway-sidebar__header {
+  gap: 0.5rem;
+}
+
+.board-poi-sidebar .map-getaway-sidebar__header h3 {
+  flex: 1;
+  min-width: 0;
+}
+
+.board-poi-sidebar__votes {
+  margin-bottom: 0.75rem;
+}
+
+.board-poi-sidebar__comments {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
 .map-getaway-sidebar__header {
   display: flex;
   align-items: center;

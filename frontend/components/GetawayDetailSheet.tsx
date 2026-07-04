@@ -7,6 +7,8 @@ import { useSignedImageUrls } from "@/hooks/useSignedImageUrls";
 import { parseAmenitiesInput } from "@/components/AmenitiesCell";
 import { ExternalLinkIcon, TrashIcon } from "./icons";
 import GetawayEditForm from "./GetawayEditForm";
+import PoiEditForm from "./PoiEditForm";
+import PoiVoteBar from "./PoiVoteBar";
 import ImageCarousel from "./ImageCarousel";
 import InlineComments from "./InlineComments";
 
@@ -46,8 +48,20 @@ export default function GetawayDetailSheet({
     partySize,
   );
 
+  const isGetaway = getaway.poi_type === "getaway";
+
   const handleSave = () => {
     if (!onUpdate) return;
+    if (!isGetaway) {
+      onUpdate(getaway.id, {
+        title: editData.title,
+        description: editData.description,
+        location: editData.location,
+      });
+      setIsEditing(false);
+      onClose();
+      return;
+    }
     const toSend = { ...editData };
     if (toSend.amenities != null && typeof toSend.amenities === "string") {
       toSend.amenities = parseAmenitiesInput(toSend.amenities);
@@ -165,7 +179,11 @@ export default function GetawayDetailSheet({
 
         <div key={getaway.id} className="getaway-detail-sheet__content">
           {isEditing ? (
-            <GetawayEditForm editData={editData} setEditData={setEditData} />
+            isGetaway ? (
+              <GetawayEditForm editData={editData} setEditData={setEditData} />
+            ) : (
+              <PoiEditForm editData={editData} setEditData={setEditData} />
+            )
           ) : (
             <>
               {signedUrls.length > 0 && (
@@ -176,6 +194,16 @@ export default function GetawayDetailSheet({
                 />
               )}
 
+              <PoiVoteBar
+                poiId={getaway.id}
+                onCommentClick={() =>
+                  commentsSectionRef.current?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                  })
+                }
+              />
+
               <dl className="getaway-detail-sheet__meta">
                 {(getaway.location || getaway.region) && (
                   <>
@@ -183,7 +211,7 @@ export default function GetawayDetailSheet({
                     <dd>{[getaway.location, getaway.region].filter(Boolean).join(", ")}</dd>
                   </>
                 )}
-                {(getaway.bedrooms != null || getaway.bathrooms != null || getaway.max_guests != null) && (
+                {(getaway.bedrooms != null || getaway.bathrooms != null || getaway.max_guests != null) && isGetaway && (
                   <>
                     <dt>Details</dt>
                     <dd>
@@ -197,7 +225,7 @@ export default function GetawayDetailSheet({
                     </dd>
                   </>
                 )}
-                {(getaway.price != null || getaway.price_currency) && (
+                {(getaway.price != null || getaway.price_currency) && isGetaway && (
                   <>
                     <dt>Price</dt>
                     <dd>
@@ -213,7 +241,7 @@ export default function GetawayDetailSheet({
                 )}
               </dl>
 
-              {getaway.amenities && Array.isArray(getaway.amenities) && getaway.amenities.length > 0 && (
+              {isGetaway && getaway.amenities && Array.isArray(getaway.amenities) && getaway.amenities.length > 0 && (
                 <div className="getaway-detail-sheet__section">
                   <h4>Amenities</h4>
                   <p>{listJoin(getaway.amenities)}</p>
@@ -227,14 +255,14 @@ export default function GetawayDetailSheet({
                 </div>
               )}
 
-              {getaway.caveats && (
+              {isGetaway && getaway.caveats && (
                 <div className="getaway-detail-sheet__section">
                   <h4>Caveats</h4>
                   <p>{getaway.caveats}</p>
                 </div>
               )}
 
-              {getaway.included && Array.isArray(getaway.included) && getaway.included.length > 0 && (
+              {isGetaway && getaway.included && Array.isArray(getaway.included) && getaway.included.length > 0 && (
                 <div className="getaway-detail-sheet__section">
                   <h4>Included</h4>
                   <p>{listJoin(getaway.included)}</p>
