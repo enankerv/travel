@@ -13,7 +13,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import { createPoi, updatePoi } from '@/lib/api'
-import { useListDetailContext } from '@/lib/ListDetailContext'
+import { useBoardContext } from '@/lib/BoardContext'
 import { useBoardPinFocusSync } from '@/hooks/useBoardPinFocusSync'
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls'
 import { presenceColorForUserId } from '@/lib/presenceColors'
@@ -31,6 +31,7 @@ import {
   poiImageSources,
   type BoardCreatablePoiType,
 } from '@/lib/poi'
+import type { BoardPoi } from '@/lib/board'
 import BoardAddItemButton from './BoardAddItemButton'
 import BoardCursorLayer from './BoardCursorLayer'
 
@@ -221,6 +222,12 @@ type DragState = {
   startWx: number
   startWy: number
   pointerId: number
+  /** Cursor − pin center at pointer down (normalized). */
+  grabOffsetWx: number
+  grabOffsetWy: number
+  /** Anchor − pin center at pointer down (normalized). */
+  anchorFromCenterWx: number
+  anchorFromCenterWy: number
 }
 
 type PendingPinPointer = {
@@ -230,6 +237,41 @@ type PendingPinPointer = {
   startClientY: number
   startWx: number
   startWy: number
+  grabOffsetWx: number
+  grabOffsetWy: number
+  anchorFromCenterWx: number
+  anchorFromCenterWy: number
+}
+
+function pinCenterNorm(
+  pinEl: HTMLElement,
+  viewport: HTMLDivElement,
+  camera: BoardCamera,
+): { wx: number; wy: number } | null {
+  const rect = pinEl.getBoundingClientRect()
+  return screenToBoardNorm(
+    viewport,
+    camera,
+    rect.left + rect.width / 2,
+    rect.top + rect.height / 2,
+  )
+}
+
+/** Map cursor position → anchor, keeping pin center fixed relative to the grab. */
+function anchorFromDragPointer(
+  drag: Pick<
+    PendingPinPointer,
+    'grabOffsetWx' | 'grabOffsetWy' | 'anchorFromCenterWx' | 'anchorFromCenterWy'
+  >,
+  cursorWx: number,
+  cursorWy: number,
+): { wx: number; wy: number } {
+  const centerWx = cursorWx - drag.grabOffsetWx
+  const centerWy = cursorWy - drag.grabOffsetWy
+  return {
+    wx: clamp(centerWx + drag.anchorFromCenterWx, 0, 1),
+    wy: clamp(centerWy + drag.anchorFromCenterWy, 0, 1),
+  }
 }
 
 const BoardView = forwardRef<
@@ -253,7 +295,7 @@ const BoardView = forwardRef<
   },
   ref,
 ) {
-  const { pois, setPois, otherViewers, setError, currentUserId } = useListDetailContext()
+  const { pois, setPois, otherViewers, setError, currentUserId } = useBoardContext()
   const [drag, setDrag] = useState<DragState | null>(null)
   const [dragPos, setDragPos] = useState<{ wx: number; wy: number } | null>(null)
   const [pendingPoiId, setPendingPoiId] = useState<string | null>(null)
@@ -459,7 +501,7 @@ const BoardView = forwardRef<
         })
         setPois((prev) => {
           if (prev.some((p) => p.id === poi.id)) return prev
-          return [...prev, poi]
+          return [...prev, { ...poi, comments: [], votes: [] } as BoardPoi]
         })
       } catch {
         setError('Failed to add item')
@@ -627,6 +669,10 @@ const BoardView = forwardRef<
         startWx: pending.startWx,
         startWy: pending.startWy,
         pointerId: pending.pointerId,
+        grabOffsetWx: pending.grabOffsetWx,
+        grabOffsetWy: pending.grabOffsetWy,
+        anchorFromCenterWx: pending.anchorFromCenterWx,
+        anchorFromCenterWy: pending.anchorFromCenterWy,
       }
       dragRef.current = next
       setDrag(next)
@@ -659,10 +705,9 @@ const BoardView = forwardRef<
           if (vp) {
             const norm = screenToBoardNorm(vp, cameraRef.current, e.clientX, e.clientY)
             if (norm) {
-              const wx = clamp(norm.wx, 0, 1)
-              const wy = clamp(norm.wy, 0, 1)
-              setDragPos({ wx, wy })
-              broadcastDragMove(pending.poiId, wx, wy)
+              const pos = anchorFromDragPointer(pending, norm.wx, norm.wy)
+              setDragPos(pos)
+              broadcastDragMove(pending.poiId, pos.wx, pos.wy)
             }
           }
           return
@@ -676,10 +721,9 @@ const BoardView = forwardRef<
         if (!vp) return
         const norm = screenToBoardNorm(vp, cameraRef.current, e.clientX, e.clientY)
         if (!norm) return
-        const wx = clamp(norm.wx, 0, 1)
-        const wy = clamp(norm.wy, 0, 1)
-        setDragPos({ wx, wy })
-        broadcastDragMove(activeDrag.poiId, wx, wy)
+        const pos = anchorFromDragPointer(activeDrag, norm.wx, norm.wy)
+        setDragPos(pos)
+        broadcastDragMove(activeDrag.poiId, pos.wx, pos.wy)
       }
     },
     [scheduleCamera, pingActivity, broadcastDragMove, promotePendingToDrag],
@@ -765,6 +809,23 @@ const BoardView = forwardRef<
       e.currentTarget.setPointerCapture(e.pointerId)
       const wx = poi.board_x ?? 0.5
       const wy = poi.board_y ?? 0.5
+      const vp = viewportRef.current
+      const cursorNorm = vp
+        ? screenToBoardNorm(vp, cameraRef.current, e.clientX, e.clientY)
+        : null
+      const centerNorm = vp
+        ? pinCenterNorm(e.currentTarget, vp, cameraRef.current)
+        : null
+      let grabOffsetWx = 0
+      let grabOffsetWy = 0
+      let anchorFromCenterWx = 0
+      let anchorFromCenterWy = 0
+      if (cursorNorm && centerNorm) {
+        grabOffsetWx = cursorNorm.wx - centerNorm.wx
+        grabOffsetWy = cursorNorm.wy - centerNorm.wy
+        anchorFromCenterWx = wx - centerNorm.wx
+        anchorFromCenterWy = wy - centerNorm.wy
+      }
       pendingPinRef.current = {
         poiId: poi.id,
         pointerId: e.pointerId,
@@ -772,6 +833,10 @@ const BoardView = forwardRef<
         startClientY: e.clientY,
         startWx: wx,
         startWy: wy,
+        grabOffsetWx,
+        grabOffsetWy,
+        anchorFromCenterWx,
+        anchorFromCenterWy,
       }
       setPendingPoiId(poi.id)
       broadcastDragStart(poi.id, wx, wy)

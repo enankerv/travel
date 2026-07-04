@@ -5,29 +5,27 @@ import {
   createComment,
   updateComment,
   deleteComment,
-  type CommentRecord,
 } from "@/lib/api";
-import { useListDetailContext } from "@/lib/ListDetailContext";
+import { usePoiSocial } from "@/hooks/usePoiSocial";
 
 export default function InlineComments({
   getawayId,
 }: {
   getawayId: string;
 }) {
+  const social = usePoiSocial(getawayId);
   const {
-    list,
-    commentsByGetaway,
-    setCommentsByGetaway,
-    currentUserId,
+    source,
+    listId,
+    comments,
     isListMember,
-  } = useListDetailContext();
+    currentUserId,
+  } = social;
 
   const [newCommentBody, setNewCommentBody] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editBody, setEditBody] = useState("");
   const [saving, setSaving] = useState(false);
-
-  const comments = (commentsByGetaway?.[getawayId] || []) as CommentRecord[];
 
   function formatDate(s: string) {
     const d = new Date(s);
@@ -44,7 +42,10 @@ export default function InlineComments({
     if (!body || !isListMember) return;
     setSaving(true);
     try {
-      await createComment(list.id, getawayId, body);
+      const result = await createComment(listId, getawayId, body);
+      if (source === "board" && result?.comment) {
+        social.upsertComment(result.comment);
+      }
       setNewCommentBody("");
     } catch {
       // Error handled by parent
@@ -58,16 +59,20 @@ export default function InlineComments({
     if (!trimmed) return;
     setSaving(true);
     try {
-      const { comment } = await updateComment(list.id, commentId, trimmed);
-      setCommentsByGetaway((prev: Record<string, CommentRecord[]>) => {
-        const next = { ...prev };
-        for (const gid of Object.keys(next)) {
-          next[gid] = next[gid].map((c) =>
-            c.id === commentId ? { ...c, ...comment } : c
-          );
-        }
-        return next;
-      });
+      const { comment } = await updateComment(listId, commentId, trimmed);
+      if (source === "board") {
+        social.upsertComment(comment);
+      } else {
+        social.setCommentsByGetaway((prev) => {
+          const next = { ...prev };
+          for (const gid of Object.keys(next)) {
+            next[gid] = next[gid].map((c) =>
+              c.id === commentId ? { ...c, ...comment } : c,
+            );
+          }
+          return next;
+        });
+      }
       setEditingId(null);
       setEditBody("");
     } catch {
@@ -81,12 +86,16 @@ export default function InlineComments({
     if (!confirm("Delete this comment?")) return;
     setSaving(true);
     try {
-      await deleteComment(list.id, commentId);
-      setCommentsByGetaway((prev: Record<string, CommentRecord[]>) => {
-        const next = { ...prev };
-        next[getawayId] = (next[getawayId] || []).filter((c) => c.id !== commentId);
-        return next;
-      });
+      await deleteComment(listId, commentId);
+      if (source === "board") {
+        social.removeComment(getawayId, commentId);
+      } else {
+        social.setCommentsByGetaway((prev) => {
+          const next = { ...prev };
+          next[getawayId] = (next[getawayId] || []).filter((c) => c.id !== commentId);
+          return next;
+        });
+      }
     } catch {
       // Error handled by parent
     } finally {

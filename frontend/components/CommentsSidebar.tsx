@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   createComment,
   updateComment,
   deleteComment,
   type CommentRecord,
 } from "@/lib/api";
-import { useListDetailContext } from "@/lib/ListDetailContext";
+import { useBoardContextOptional } from "@/lib/BoardContext";
+import { useListDetailContextOptional } from "@/lib/ListDetailContext";
 
-type CommentsByGetaway = Record<string, CommentRecord[]>;
+type CommentsByPoi = Record<string, CommentRecord[]>;
 
 export default function CommentsSidebar({
   isOpen,
@@ -22,18 +23,34 @@ export default function CommentsSidebar({
   focusedGetawayId?: string | null;
   onGetawayClick?: (getawayId: string) => void;
 }) {
-  const {
-    list,
-    getaways,
-    commentsByGetaway,
-    setCommentsByGetaway,
-    currentUserId,
-    isListMember,
-  } = useListDetailContext();
+  const board = useBoardContextOptional();
+  const list = useListDetailContextOptional();
+
+  const listMeta = board?.list ?? list?.list;
+  const isListMember = board?.isListMember ?? list?.isListMember ?? false;
+  const currentUserId = board?.currentUserId ?? list?.currentUserId;
+
+  const pois = useMemo(
+    () =>
+      board
+        ? board.pois.map((p) => ({ id: p.id, title: p.title }))
+        : (list?.getaways ?? []).map((g) => ({ id: g.id, title: g.title })),
+    [board, list],
+  );
+
+  const grouped: CommentsByPoi = useMemo(
+    () =>
+      board
+        ? Object.fromEntries(board.pois.map((p) => [p.id, p.comments ?? []]))
+        : (list?.commentsByGetaway ?? {}),
+    [board, list],
+  );
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editBody, setEditBody] = useState("");
   const [newCommentGetaway, setNewCommentGetaway] = useState<string | null>(null);
+  const [newCommentBody, setNewCommentBody] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const focusedRef = useRef<HTMLDivElement>(null);
 
@@ -48,25 +65,58 @@ export default function CommentsSidebar({
       focusedRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   }, [focusedGetawayId, isOpen]);
-  const [newCommentBody, setNewCommentBody] = useState("");
-  const [saving, setSaving] = useState(false);
+
+  if (!board && !list) {
+    throw new Error(
+      "CommentsSidebar requires BoardProvider or ListDetailProvider",
+    );
+  }
 
   if (!isOpen) return null;
 
-  const grouped = (commentsByGetaway || {}) as CommentsByGetaway;
-  const getawaysWithComments = getaways.filter(
-    (g) => (grouped[g.id]?.length ?? 0) > 0
+  const poisWithComments = pois.filter(
+    (p) => (grouped[p.id]?.length ?? 0) > 0,
   );
-  const getawaysWithoutComments = getaways.filter(
-    (g) => (grouped[g.id]?.length ?? 0) === 0
+  const poisWithoutComments = pois.filter(
+    (p) => (grouped[p.id]?.length ?? 0) === 0,
   );
 
-  async function handleAddComment(getawayId: string) {
+  function syncCommentUpdate(comment: CommentRecord) {
+    if (board) {
+      board.upsertComment(comment);
+      return;
+    }
+    if (!list) return;
+    list.setCommentsByGetaway((prev: CommentsByPoi) => {
+      const next = { ...prev };
+      for (const pid of Object.keys(next)) {
+        next[pid] = next[pid].map((c) =>
+          c.id === comment.id ? { ...c, ...comment } : c,
+        );
+      }
+      return next;
+    });
+  }
+
+  function syncCommentDelete(poiId: string, commentId: string) {
+    if (board) {
+      board.removeComment(poiId, commentId);
+      return;
+    }
+    if (!list) return;
+    list.setCommentsByGetaway((prev: CommentsByPoi) => {
+      const next = { ...prev };
+      next[poiId] = (next[poiId] || []).filter((c) => c.id !== commentId);
+      return next;
+    });
+  }
+
+  async function handleAddComment(poiId: string) {
     const body = newCommentBody.trim();
     if (!body || !isListMember) return;
     setSaving(true);
     try {
-      await createComment(list.id, getawayId, body);
+      await createComment(listMeta!.id, poiId, body);
       setNewCommentBody("");
       setNewCommentGetaway(null);
       // Comment appears via realtime COMMENT_INSERT (avoids duplicate if we also added here)
@@ -82,16 +132,8 @@ export default function CommentsSidebar({
     if (!trimmed) return;
     setSaving(true);
     try {
-      const { comment } = await updateComment(list.id, commentId, trimmed);
-      setCommentsByGetaway((prev: CommentsByGetaway) => {
-        const next = { ...prev };
-        for (const gid of Object.keys(next)) {
-          next[gid] = next[gid].map((c) =>
-            c.id === commentId ? { ...c, ...comment } : c
-          );
-        }
-        return next;
-      });
+      const { comment } = await updateComment(listMeta!.id, commentId, trimmed);
+      syncCommentUpdate(comment);
       setEditingId(null);
       setEditBody("");
     } catch {
@@ -101,16 +143,12 @@ export default function CommentsSidebar({
     }
   }
 
-  async function handleDeleteComment(commentId: string, getawayId: string) {
+  async function handleDeleteComment(commentId: string, poiId: string) {
     if (!confirm("Delete this comment?")) return;
     setSaving(true);
     try {
-      await deleteComment(list.id, commentId);
-      setCommentsByGetaway((prev: CommentsByGetaway) => {
-        const next = { ...prev };
-        next[getawayId] = (next[getawayId] || []).filter((c) => c.id !== commentId);
-        return next;
-      });
+      await deleteComment(listMeta!.id, commentId);
+      syncCommentDelete(poiId, commentId);
     } catch {
       // Error handled by parent
     } finally {
@@ -147,22 +185,22 @@ export default function CommentsSidebar({
           <p className="comments-sidebar__muted">Sign in to view comments.</p>
         ) : (
           <>
-            {getawaysWithComments.map((g) => (
+            {poisWithComments.map((p) => (
               <div
-                key={g.id}
-                ref={focusedGetawayId === g.id ? focusedRef : undefined}
+                key={p.id}
+                ref={focusedGetawayId === p.id ? focusedRef : undefined}
                 className={`comments-sidebar__getaway-group ${
-                  focusedGetawayId === g.id ? "comments-sidebar__getaway-group--focused" : ""
+                  focusedGetawayId === p.id ? "comments-sidebar__getaway-group--focused" : ""
                 }`}
               >
                 <button
                   type="button"
                   className="comments-sidebar__getaway-title"
-                  onClick={() => onGetawayClick?.(g.id)}
+                  onClick={() => onGetawayClick?.(p.id)}
                 >
-                  {g.title || "(Untitled)"}
+                  {p.title || "(Untitled)"}
                 </button>
-                {(grouped[g.id] || []).map((c) => (
+                {(grouped[p.id] || []).map((c) => (
                   <div key={c.id} className="comments-sidebar__comment">
                     <div className="comments-sidebar__comment-header">
                       <span className="comments-sidebar__comment-author">
@@ -208,7 +246,7 @@ export default function CommentsSidebar({
                               <button
                                 type="button"
                                 onClick={() =>
-                                  handleDeleteComment(c.id, g.id)
+                                  handleDeleteComment(c.id, p.id)
                                 }
                                 disabled={saving}
                                 className="comments-sidebar__delete"
@@ -233,7 +271,7 @@ export default function CommentsSidebar({
                     )}
                   </div>
                 ))}
-                {isListMember && newCommentGetaway === g.id && (
+                {isListMember && newCommentGetaway === p.id && (
                   <div className="comments-sidebar__add-form">
                     <textarea
                       value={newCommentBody}
@@ -246,7 +284,7 @@ export default function CommentsSidebar({
                     <div className="comments-sidebar__add-actions">
                       <button
                         type="button"
-                        onClick={() => handleAddComment(g.id)}
+                        onClick={() => handleAddComment(p.id)}
                         disabled={!newCommentBody.trim() || saving}
                       >
                         Add
@@ -266,17 +304,17 @@ export default function CommentsSidebar({
               </div>
             ))}
 
-            {getawaysWithoutComments.map((g) => (
-              <div key={g.id} className="comments-sidebar__getaway-group">
+            {poisWithoutComments.map((p) => (
+              <div key={p.id} className="comments-sidebar__getaway-group">
                 <button
                   type="button"
                   className="comments-sidebar__getaway-title"
-                  onClick={() => onGetawayClick?.(g.id)}
+                  onClick={() => onGetawayClick?.(p.id)}
                 >
-                  {g.title || "(Untitled)"}
+                  {p.title || "(Untitled)"}
                 </button>
                 {isListMember &&
-                  (newCommentGetaway === g.id ? (
+                  (newCommentGetaway === p.id ? (
                     <div className="comments-sidebar__add-form">
                       <textarea
                         value={newCommentBody}
@@ -289,7 +327,7 @@ export default function CommentsSidebar({
                       <div className="comments-sidebar__add-actions">
                         <button
                           type="button"
-                          onClick={() => handleAddComment(g.id)}
+                          onClick={() => handleAddComment(p.id)}
                           disabled={!newCommentBody.trim() || saving}
                         >
                           Add
@@ -309,7 +347,7 @@ export default function CommentsSidebar({
                     <button
                       type="button"
                       className="comments-sidebar__add-link"
-                      onClick={() => setNewCommentGetaway(g.id)}
+                      onClick={() => setNewCommentGetaway(p.id)}
                     >
                       + Add comment
                     </button>
@@ -317,8 +355,10 @@ export default function CommentsSidebar({
               </div>
             ))}
 
-            {getaways.length === 0 && (
-              <p className="comments-sidebar__muted">No getaways yet.</p>
+            {pois.length === 0 && (
+              <p className="comments-sidebar__muted">
+                {board ? "No items yet." : "No getaways yet."}
+              </p>
             )}
           </>
         )}

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useListDetailContext } from "@/lib/ListDetailContext";
+import { useBoardContextOptional } from "@/lib/BoardContext";
+import { useListDetailContextOptional } from "@/lib/ListDetailContext";
 import { formatPerPersonLine } from "@/lib/pricePerPerson";
 import { useSignedImageUrls } from "@/hooks/useSignedImageUrls";
 import { parseAmenitiesInput } from "@/components/AmenitiesCell";
@@ -37,7 +38,9 @@ export default function GetawayDetailSheet({
   onUpdate?: (getawayId: string, updates: any) => void;
   scrollToCommentsOnOpen?: boolean;
 }) {
-  const { partySize } = useListDetailContext();
+  const board = useBoardContextOptional();
+  const listCtx = useListDetailContextOptional();
+  const partySize = board?.partySize ?? listCtx?.partySize ?? 1;
   const signedUrls = useSignedImageUrls(poiImageSources(getaway));
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<any>(() => ({ ...getaway }));

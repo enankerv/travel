@@ -1,6 +1,6 @@
 'use client'
 
-import { useListDetailContext } from '@/lib/ListDetailContext'
+import { usePoiSocial } from '@/hooks/usePoiSocial'
 import { CommentIcon, ThumbsUpIcon } from './icons'
 import VoteFacePile from './VoteFacePile'
 
@@ -12,18 +12,17 @@ export default function PoiVoteBar({
   onCommentClick?: () => void
 }) {
   const {
-    votesByGetaway,
-    commentsByGetaway,
+    comments,
+    voters,
     onVote,
     onUnvote,
     isListMember,
     currentUserId,
-  } = useListDetailContext()
+  } = usePoiSocial(poiId)
 
-  const voters = votesByGetaway[poiId] || []
-  const commentCount = commentsByGetaway[poiId]?.length ?? 0
   const myVote =
     !!currentUserId && voters.some((v) => v.user_id === currentUserId)
+  const commentCount = comments.length
   const voteCount = voters.length
 
   if (!isListMember && voteCount === 0 && commentCount === 0) return null

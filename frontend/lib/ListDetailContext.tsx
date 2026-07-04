@@ -59,3 +59,7 @@ export function useListDetailContext(): ListDetailContextValue {
   }
   return ctx;
 }
+
+export function useListDetailContextOptional(): ListDetailContextValue | null {
+  return useContext(ListDetailContext);
+}

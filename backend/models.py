@@ -21,6 +21,7 @@ class ListMember(BaseModel):
     user_id: str
     role: Literal["admin", "editor", "viewer"]
     joined_at: Optional[str] = None
+    profile: Optional[dict] = None
 
 
 class ListResponse(BaseModel):
@@ -79,6 +80,49 @@ class InviteTokenDetails(BaseModel):
 
 class AcceptInvite(BaseModel):
     token: str
+
+
+# ============================================================================
+# PROFILE MODELS
+# ============================================================================
+
+class Profile(BaseModel):
+    """User display profile (first name + avatar)."""
+
+    id: str
+    first_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+    @classmethod
+    def get(cls, user_id: str, auth_token: str) -> Optional["Profile"]:
+        """Fetch one profile by user id."""
+        return cls.for_user_ids([user_id], auth_token).get(str(user_id))
+
+    @classmethod
+    def for_user_ids(cls, user_ids: list[str], auth_token: str) -> dict[str, "Profile"]:
+        """Batch-fetch profiles. Returns { user_id: Profile }."""
+        from db.profiles import fetch_profiles
+
+        unique = list({str(uid) for uid in user_ids if uid})
+        return {str(r["id"]): cls.model_validate(r) for r in fetch_profiles(unique, auth_token)}
+
+    @classmethod
+    def enrich_rows(
+        cls,
+        rows: list[dict],
+        profiles: dict[str, "Profile"],
+        *,
+        user_id_field: str = "user_id",
+    ) -> None:
+        """Attach ``first_name`` and ``avatar_url`` from a profile map onto row dicts."""
+        for row in rows:
+            p = profiles.get(str(row[user_id_field]))
+            row["first_name"] = p.first_name if p else None
+            row["avatar_url"] = p.avatar_url if p else None
+
+    def member_dict(self) -> dict:
+        """Profile fields embedded on list members (excludes id)."""
+        return {"first_name": self.first_name, "avatar_url": self.avatar_url}
 
 
 # ============================================================================
@@ -433,6 +477,27 @@ class POIUpdate(BaseModel):
     board_z: Optional[int] = None
 
 
+class BoardPoi(POI):
+    """POI snapshot for the cork board, with nested comments and votes."""
+
+    model_config = ConfigDict(extra="allow")
+
+    comments: list[Comment] = Field(default_factory=list)
+    votes: list[Vote] = Field(default_factory=list)
+
+
+class BoardResponse(BaseModel):
+    list: ListResponse
+    members: list[ListMember]
+    pois: list[BoardPoi]
+
+    @classmethod
+    def snapshot(cls, list_id: str, auth_token: str) -> Optional["BoardResponse"]:
+        """Load the full cork-board payload for a list."""
+        from db.board import fetch_board_snapshot
+        return fetch_board_snapshot(list_id, auth_token)
+
+
 # Maps pois.poi_type -> concrete model. POI is the fallback for plain pins.
 _POI_MODELS: dict[str, type[POI]] = {
     "getaway": Getaway,
@@ -451,6 +516,21 @@ def poi_from_row(row: dict, auth_token: str) -> POI:
     obj = model.model_validate(row)
     obj._bind_auth_token(auth_token)
     return obj
+
+
+def board_poi_from_row(
+    spine: dict,
+    comments: list[dict],
+    votes: list[dict],
+    auth_token: str,
+) -> BoardPoi:
+    """Build a board POI from a composed row plus nested comments and votes."""
+    poi = poi_from_row(spine, auth_token)
+    return BoardPoi.model_validate({
+        **poi.model_dump(mode="json"),
+        "comments": comments,
+        "votes": votes,
+    })
 
 
 # ============================================================================

@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls'
-import { useListDetailContext } from '@/lib/ListDetailContext'
+import { useBoardContextOptional } from '@/lib/BoardContext'
+import { useListDetailContextOptional } from '@/lib/ListDetailContext'
 import { formatPerPersonLine } from '@/lib/pricePerPerson'
 import type { Getaway, POIBase } from '@/lib/getaway'
 import type { GetawayUpdate } from '@/lib/getaway'
@@ -53,7 +54,9 @@ export default function PoiDetailSidebar({
   onUpdatePoi?: (poiId: string, updates: POIUpdate) => void
   onDelete?: (poiId: string) => void
 }) {
-  const { partySize } = useListDetailContext()
+  const board = useBoardContextOptional()
+  const listCtx = useListDetailContextOptional()
+  const partySize = board?.partySize ?? listCtx?.partySize ?? 1
   const signedUrls = useSignedImageUrls(poiImageSources(poi))
   const thumbUrl = signedUrls[0]
   const isGetaway = poi.poi_type === 'getaway'

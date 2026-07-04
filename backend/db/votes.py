@@ -2,17 +2,7 @@
 from __future__ import annotations
 
 from db.client import get_supabase_client
-
-
-def _get_profiles(client, user_ids: list[str]) -> dict[str, dict]:
-    """Fetch profiles (first_name, avatar_url). Returns { user_id: { first_name, avatar_url } }."""
-    if not user_ids:
-        return {}
-    try:
-        response = client.table("profiles").select("id, first_name, avatar_url").in_("id", user_ids).execute()
-        return {str(p["id"]): {"first_name": p.get("first_name"), "avatar_url": p.get("avatar_url")} for p in (response.data or [])}
-    except Exception:
-        return {}
+from models import Profile
 
 
 def get_votes_for_list(list_id: str, auth_token: str) -> list[dict]:
@@ -32,11 +22,8 @@ def get_votes_for_list(list_id: str, auth_token: str) -> list[dict]:
     for r in rows:
         r.pop("pois", None)
     user_ids = list({r["user_id"] for r in rows})
-    profiles = _get_profiles(client, user_ids)
-    for r in rows:
-        p = profiles.get(str(r["user_id"])) or {}
-        r["first_name"] = p.get("first_name")
-        r["avatar_url"] = p.get("avatar_url")
+    profiles = Profile.for_user_ids(user_ids, auth_token)
+    Profile.enrich_rows(rows, profiles)
     return rows
 
 
@@ -54,11 +41,8 @@ def get_votes_for_poi(poi_id: str, auth_token: str) -> list[dict]:
     )
     rows = response.data or []
     user_ids = list({r["user_id"] for r in rows})
-    profiles = _get_profiles(client, user_ids)
-    for r in rows:
-        p = profiles.get(str(r["user_id"])) or {}
-        r["first_name"] = p.get("first_name")
-        r["avatar_url"] = p.get("avatar_url")
+    profiles = Profile.for_user_ids(user_ids, auth_token)
+    Profile.enrich_rows(rows, profiles)
     return rows
 
 

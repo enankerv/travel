@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import type { GetawayUpdate, POIBase } from './getaway'
 import type { POICreate, POIUpdate } from './poi'
+import type { BoardSnapshot } from './board'
 
 function normalizeHttpUrl(url: string): string {
   if (url.startsWith('http://') || url.startsWith('https://')) return url
@@ -149,6 +150,21 @@ export async function listPois(listId: string, poiType?: string): Promise<POIBas
   const res = await fetch(`${API_URL}/api/lists/${listId}/pois${qs}`, { headers })
   if (!res.ok) throw new Error('Failed to fetch POIs')
   return res.json()
+}
+
+export async function getBoard(listId: string): Promise<BoardSnapshot> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_URL}/api/lists/${listId}/board`, { headers })
+  if (!res.ok) throw new Error('Failed to fetch board')
+  const data = await res.json()
+  return {
+    ...data,
+    pois: (data.pois || []).map((p: BoardSnapshot['pois'][number]) => ({
+      ...p,
+      comments: p.comments ?? [],
+      votes: p.votes ?? [],
+    })),
+  }
 }
 
 export async function createPoi(listId: string, body: POICreate): Promise<POIBase> {
