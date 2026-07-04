@@ -2867,10 +2867,10 @@ button:focus-visible {
   height: 13px;
   margin-bottom: -5px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 32%, #ef5350, #8b1a1a);
+  background: radial-gradient(circle at 35% 32%, #ffffff, #d4d4d4);
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.45),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.25);
+    inset 0 -1px 2px rgba(0, 0, 0, 0.15);
   flex-shrink: 0;
   z-index: 3;
   pointer-events: none;
