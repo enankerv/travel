@@ -2,14 +2,14 @@
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Header
 
-from models import Getaway, POI
+from models import Getaway
 from utils.geocode import geocode_from_location_region
 from routes.auth import extract_auth_token
 
 router = APIRouter(prefix="/lists", tags=["getaways"])
 
 
-def _apply_geocode_if_location_changed(current: POI, updates: dict) -> None:
+def _apply_geocode_if_location_changed(current: Getaway, updates: dict) -> None:
     """When location or region in `updates` differs from `current`, re-geocode into lat/lng."""
 
     def _strip(s: Optional[str]) -> str:
@@ -51,15 +51,16 @@ async def update_getaway_endpoint(
     """Update getaway fields allowed by the listing editor (extra body keys ignored)."""
     try:
         token = extract_auth_token(authorization)
-        current = Getaway.get(poi_id, token)
-        if not current:
-            raise HTTPException(status_code=404, detail="Getaway not found")
         updates = body.model_dump(exclude_unset=True)
         if not updates:
             raise HTTPException(status_code=400, detail="No fields to update.")
-        _apply_geocode_if_location_changed(current, updates)
+        if "location" in updates or "region" in updates:
+            current = Getaway.get(poi_id, token)
+            if not current:
+                raise HTTPException(status_code=404, detail="Getaway not found")
+            _apply_geocode_if_location_changed(current, updates)
 
-        result = Getaway.update(current, **updates)
+        result = Getaway.update_by_id(poi_id, token, **updates)
         if not result:
             raise HTTPException(status_code=404, detail="Getaway not found")
         return {"ok": True, "getaway": result}
@@ -74,10 +75,8 @@ async def delete_getaway_endpoint(list_id: str, poi_id: str, authorization: Opti
     """Delete a getaway. Only admin or editor can do this."""
     try:
         token = extract_auth_token(authorization)
-        current = Getaway.get(poi_id, token)
-        if not current:
+        if not Getaway.delete_by_id(poi_id, token):
             raise HTTPException(status_code=404, detail="Getaway not found")
-        Getaway.delete(current)
         return {"ok": True}
     except HTTPException:
         raise
