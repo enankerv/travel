@@ -3,7 +3,7 @@
 import { createContext, useContext, type ReactNode } from "react";
 import type { VotesByGetaway } from "./votes";
 import type { CommentRecord } from "./api";
-import type { Getaway } from "./getaway";
+import type { Getaway, POIBase } from "./getaway";
 import type { PresenceUser } from "./realtime";
 
 export type CommentsByGetaway = Record<string, CommentRecord[]>;
@@ -13,6 +13,9 @@ export type ListDetailContextValue = {
   members: any[];
   getaways: Getaway[];
   setGetaways: React.Dispatch<React.SetStateAction<Getaway[]>>;
+  /** All POI spine rows for the cork board (includes getaways). */
+  pois: POIBase[];
+  setPois: React.Dispatch<React.SetStateAction<POIBase[]>>;
   votesByGetaway: VotesByGetaway;
   onVote: (getawayId: string) => Promise<void>;
   onUnvote: (getawayId: string) => Promise<void>;

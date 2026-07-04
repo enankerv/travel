@@ -24,9 +24,13 @@ export type PresenceUser = {
 /** Client broadcast payload for shared-pointer cursors (same channel as list updates). */
 export type ListCursorBroadcastPayload = {
   user_id?: string;
-  surface?: "table" | "map";
+  surface?: "table" | "map" | "board";
+  /** Normalized 0–1 position vs table/map viewport. */
   nx?: number;
   ny?: number;
+  /** Normalized 0–1 position on the cork board world (pan/zoom independent). */
+  wx?: number;
+  wy?: number;
   /** When true, receivers should drop this user's cursor for this surface. */
   leave?: boolean;
 };

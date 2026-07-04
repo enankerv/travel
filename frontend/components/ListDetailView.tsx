@@ -6,13 +6,14 @@ import {
   getListMembers,
   getListVotes,
   getListComments,
+  listPois,
 } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
 import { useListRealtime, useListPresence, PresenceUser } from "@/lib/realtime";
 import { presenceColorForUserId } from "@/lib/presenceColors";
 import { useListVotes } from "@/hooks/useListVotes";
 import { ListDetailProvider } from "@/lib/ListDetailContext";
-import type { Getaway } from "@/lib/getaway";
+import type { Getaway, POIBase } from "@/lib/getaway";
 import ListGetawaysTab from "./ListGetawaysTab";
 import ListMembersTab from "./ListMembersTab";
 import ScoutCredits from "./ScoutCredits";
@@ -37,6 +38,7 @@ export default function ListDetailView({
 
   const [activeTab, setActiveTab] = useState<"places" | "members">("places");
   const [getaways, setGetaways] = useState<Getaway[]>([]);
+  const [pois, setPois] = useState<POIBase[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [commentsByGetaway, setCommentsByGetaway] = useState<
     Record<string, any[]>
@@ -68,14 +70,26 @@ export default function ListDetailView({
     listId: list.id,
     enabled: dataLoaded && !!user,
     onInsert: (row) => {
+      setPois((prev) => {
+        if (prev.some((p) => p.id === row.id)) return prev;
+        return [row as POIBase, ...prev];
+      });
       if (row.poi_type && row.poi_type !== "getaway") return;
       setGetaways((prev) => [row as Getaway, ...prev]);
     },
     onUpdate: (row) => {
+      setPois((prev) =>
+        prev.map((p) => (p.id === row.id ? { ...p, ...row } : p)),
+      );
       if (row.poi_type && row.poi_type !== "getaway") return;
-      setGetaways((prev) => prev.map((g) => (g.id === row.id ? (row as Getaway) : g)));
+      setGetaways((prev) =>
+        prev.map((g) => (g.id === row.id ? ({ ...g, ...row } as Getaway) : g)),
+      );
     },
-    onDelete: (id) => setGetaways((prev) => prev.filter((g) => g.id !== id)),
+    onDelete: (id) => {
+      setPois((prev) => prev.filter((p) => p.id !== id));
+      setGetaways((prev) => prev.filter((g) => g.id !== id));
+    },
     onImagesChange: () => loadData(true),
     onVoteInsert: votes.onVoteInsert,
     onVoteDelete: votes.onVoteDelete,
@@ -119,6 +133,8 @@ export default function ListDetailView({
     members,
     getaways,
     setGetaways,
+    pois,
+    setPois,
     votesByGetaway: votes.votesByGetaway,
     onVote: votes.onVote,
     onUnvote: votes.onUnvote,
@@ -144,14 +160,16 @@ export default function ListDetailView({
   async function loadData(silent = false) {
     if (!silent) setIsLoading(true);
     try {
-      const [getawaysData, membersData, votesData, commentsData] =
+      const [getawaysData, poisData, membersData, votesData, commentsData] =
         await Promise.all([
           getGetaways(list.id),
+          listPois(list.id),
           getListMembers(list.id),
           getListVotes(list.id),
           getListComments(list.id),
         ]);
       setGetaways((getawaysData || []) as Getaway[]);
+      setPois((poisData || []) as POIBase[]);
       const memberRows = membersData?.members || [];
       setMembers(memberRows);
       if (!dataLoaded) {

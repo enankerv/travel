@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
-import type { GetawayUpdate } from './getaway'
+import type { GetawayUpdate, POIBase } from './getaway'
+import type { POICreate, POIUpdate } from './poi'
 
 function normalizeHttpUrl(url: string): string {
   if (url.startsWith('http://') || url.startsWith('https://')) return url
@@ -138,6 +139,52 @@ export async function deleteGetaway(listId: string, poiId: string) {
     headers,
   })
   if (!res.ok) throw new Error('Failed to delete getaway')
+  return res.json()
+}
+
+// POIs (spine — cork board pins, notes, etc.)
+export async function listPois(listId: string, poiType?: string): Promise<POIBase[]> {
+  const headers = await getAuthHeaders()
+  const qs = poiType ? `?poi_type=${encodeURIComponent(poiType)}` : ''
+  const res = await fetch(`${API_URL}/api/lists/${listId}/pois${qs}`, { headers })
+  if (!res.ok) throw new Error('Failed to fetch POIs')
+  return res.json()
+}
+
+export async function createPoi(listId: string, body: POICreate): Promise<POIBase> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_URL}/api/lists/${listId}/pois`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error('Failed to create POI')
+  return res.json()
+}
+
+export async function updatePoi(
+  listId: string,
+  poiId: string,
+  updates: POIUpdate,
+): Promise<POIBase> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_URL}/api/lists/${listId}/pois/${poiId}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(updates),
+  })
+  if (!res.ok) throw new Error('Failed to update POI')
+  const data = await res.json()
+  return data.poi
+}
+
+export async function deletePoi(listId: string, poiId: string) {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_URL}/api/lists/${listId}/pois/${poiId}`, {
+    method: 'DELETE',
+    headers,
+  })
+  if (!res.ok) throw new Error('Failed to delete POI')
   return res.json()
 }
 

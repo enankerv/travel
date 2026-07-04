@@ -345,9 +345,19 @@ export default function ListGetawaysTab({
           <button
             type="button"
             className={`list-villas-tab__view-btn ${viewMode === "map" ? "active" : ""}`}
-            onClick={() => setViewMode("map")}
+            onClick={() => {
+              setViewMode("map");
+              setMapGetawayId(null);
+            }}
           >
             Map
+          </button>
+          <button
+            type="button"
+            className="list-villas-tab__view-btn list-villas-tab__view-btn--board"
+            onClick={() => router.push(`/board/${listId}`)}
+          >
+            Board
           </button>
         </div>
       </div>
