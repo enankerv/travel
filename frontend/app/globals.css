@@ -2661,7 +2661,7 @@ button:focus-visible {
   filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.55));
 }
 
-/* Cork board */
+/* Board surface (kraft paper) */
 .board-view {
   flex: 1;
   min-height: 0;
@@ -2717,7 +2717,7 @@ button:focus-visible {
   overflow: hidden;
   cursor: grab;
   touch-action: none;
-  background: #1a1510;
+  background: #2a241c;
   contain: strict;
   --board-pin-select: #5b8cff;
 }
@@ -2736,25 +2736,29 @@ button:focus-visible {
   top: 0;
   transform-origin: 0 0;
   backface-visibility: hidden;
+  --paper-texture-size: 200px;
 }
 
+/* Kraft paper board surface */
 .board-view__cork {
   position: absolute;
   inset: 0;
   z-index: 0;
-  background-color: #b8956a;
-  background-image:
-    radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.08) 0%, transparent 45%),
-    radial-gradient(circle at 80% 70%, rgba(0, 0, 0, 0.06) 0%, transparent 40%),
-    repeating-linear-gradient(
-      32deg,
-      rgba(0, 0, 0, 0.025) 0,
-      rgba(0, 0, 0, 0.025) 2px,
-      transparent 2px,
-      transparent 6px
-    );
-  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.15);
-  border: 2px solid rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+  background-color: #be9975;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.15'/%3E%3C/svg%3E");
+  background-size: var(--paper-texture-size) var(--paper-texture-size);
+  background-repeat: repeat;
+  box-shadow:
+    inset 0 0 70px rgba(88, 64, 38, 0.1),
+    inset 0 1px 0 rgba(255, 250, 240, 0.22);
+  border: 1px solid rgba(132, 102, 68, 0.36);
+}
+
+/* Lightweight flat fallback when zoomed far out */
+.board-view__world.optimized-macro-view .board-view__cork {
+  background-image: none;
+  background-color: #be9975;
 }
 
 .board-pin {
@@ -2918,7 +2922,7 @@ button:focus-visible {
   min-height: 0;
   border: none;
   border-radius: 0;
-  background: #1a1510;
+  background: #2a241c;
 }
 
 .board-view--fullscreen .board-view__viewport {
@@ -2942,7 +2946,7 @@ body.board-screen-active main {
   z-index: 50;
   display: flex;
   flex-direction: column;
-  background: #1a1510;
+  background: #2a241c;
 }
 
 .board-screen__overlay {

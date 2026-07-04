@@ -12,11 +12,27 @@ export const DEFAULT_BOARD_CAMERA: BoardCamera = { x: 0, y: 0, scale: 0.35 }
 
 export type ViewportSize = { width: number; height: number }
 
+export const PAPER_TEXTURE_BASE_PX = 200
+/** Below this camera scale, skip SVG paper texture for performance. */
+export const PAPER_TEXTURE_MIN_SCALE = 0.5
+
 export function applyCameraToWorld(
   world: HTMLElement | null,
   cam: BoardCamera,
 ) {
-  if (world) world.style.transform = cameraTransform(cam)
+  if (!world) return
+  world.style.transform = cameraTransform(cam)
+
+  const macroView = cam.scale < PAPER_TEXTURE_MIN_SCALE
+  world.classList.toggle('optimized-macro-view', macroView)
+
+  if (!macroView) {
+    // Counter-scale tile size so paper grain stays ~200px on screen as you zoom.
+    world.style.setProperty(
+      '--paper-texture-size',
+      `${PAPER_TEXTURE_BASE_PX / cam.scale}px`,
+    )
+  }
 }
 
 export function readViewportSize(vp: HTMLElement | null): ViewportSize | null {
