@@ -7,7 +7,8 @@ import { useSignedImageUrls } from "@/hooks/useSignedImageUrls";
 import { parseAmenitiesInput } from "@/components/AmenitiesCell";
 import { ExternalLinkIcon, TrashIcon } from "./icons";
 import GetawayEditForm from "./GetawayEditForm";
-import PoiEditForm from "./PoiEditForm";
+import PoiEditForm, { poiEditStateFromPoi } from "./PoiEditForm";
+import { poiEditPayload, poiImageSources, poiDisplayAddress } from "@/lib/poi";
 import PoiVoteBar from "./PoiVoteBar";
 import ImageCarousel from "./ImageCarousel";
 import InlineComments from "./InlineComments";
@@ -37,7 +38,7 @@ export default function GetawayDetailSheet({
   scrollToCommentsOnOpen?: boolean;
 }) {
   const { partySize } = useListDetailContext();
-  const signedUrls = useSignedImageUrls(getaway.images || []);
+  const signedUrls = useSignedImageUrls(poiImageSources(getaway));
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<any>(() => ({ ...getaway }));
   const commentsSectionRef = useRef<HTMLDivElement | null>(null);
@@ -53,11 +54,7 @@ export default function GetawayDetailSheet({
   const handleSave = () => {
     if (!onUpdate) return;
     if (!isGetaway) {
-      onUpdate(getaway.id, {
-        title: editData.title,
-        description: editData.description,
-        location: editData.location,
-      });
+      onUpdate(getaway.id, poiEditPayload(editData));
       setIsEditing(false);
       onClose();
       return;
@@ -82,7 +79,7 @@ export default function GetawayDetailSheet({
   };
 
   const handleCancel = () => {
-    setEditData({ ...getaway });
+    setEditData(isGetaway ? { ...getaway } : poiEditStateFromPoi(getaway));
     setIsEditing(false);
   };
 
@@ -93,7 +90,7 @@ export default function GetawayDetailSheet({
   };
 
   useEffect(() => {
-    setEditData({ ...getaway });
+    setEditData(isGetaway ? { ...getaway } : poiEditStateFromPoi(getaway));
     setIsEditing(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only when switching listing (id), not refetches
   }, [getaway.id]);
@@ -144,7 +141,9 @@ export default function GetawayDetailSheet({
                     type="button"
                     className="getaway-detail-sheet__action-btn"
                     onClick={() => {
-                      setEditData({ ...getaway });
+                      setEditData(
+                        isGetaway ? { ...getaway } : poiEditStateFromPoi(getaway),
+                      );
                       setIsEditing(true);
                     }}
                     aria-label="Edit"
@@ -205,10 +204,18 @@ export default function GetawayDetailSheet({
               />
 
               <dl className="getaway-detail-sheet__meta">
-                {(getaway.location || getaway.region) && (
+                {(isGetaway
+                  ? getaway.location || getaway.address || getaway.region
+                  : poiDisplayAddress(getaway)) && (
                   <>
-                    <dt>Location</dt>
-                    <dd>{[getaway.location, getaway.region].filter(Boolean).join(", ")}</dd>
+                    <dt>{isGetaway ? "Location" : "Address"}</dt>
+                    <dd>
+                      {isGetaway
+                        ? [getaway.location, getaway.address, getaway.region]
+                            .filter(Boolean)
+                            .join(", ")
+                        : poiDisplayAddress(getaway)}
+                    </dd>
                   </>
                 )}
                 {(getaway.bedrooms != null || getaway.bathrooms != null || getaway.max_guests != null) && isGetaway && (
@@ -269,8 +276,8 @@ export default function GetawayDetailSheet({
                 </div>
               )}
 
-              <div className="getaway-detail-sheet__actions">
-                {getaway.source_url && (
+              {getaway.source_url && (
+                <div className="getaway-detail-sheet__actions">
                   <a
                     href={getaway.source_url}
                     target="_blank"
@@ -278,10 +285,10 @@ export default function GetawayDetailSheet({
                     className="getaway-detail-sheet__link"
                   >
                     <ExternalLinkIcon size={16} />
-                    View listing
+                    {isGetaway ? "View listing" : "View source"}
                   </a>
-                )}
-              </div>
+                </div>
+              )}
 
               <div ref={commentsSectionRef} className="getaway-detail-sheet__comments-anchor">
                 <InlineComments getawayId={getaway.id} />

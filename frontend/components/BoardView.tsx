@@ -12,9 +12,10 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
-import { createPoi, resolveImageUrl, updatePoi } from '@/lib/api'
+import { createPoi, updatePoi } from '@/lib/api'
 import { useListDetailContext } from '@/lib/ListDetailContext'
 import { useBoardPinFocusSync } from '@/hooks/useBoardPinFocusSync'
+import { useSignedImageUrls } from '@/hooks/useSignedImageUrls'
 import { presenceColorForUserId } from '@/lib/presenceColors'
 import {
   BOARD_WORLD_H,
@@ -27,6 +28,7 @@ import {
   BOARD_POI_TYPE_OPTIONS,
   defaultTitleForPoiType,
   iconForPoiType,
+  poiImageSources,
   type BoardCreatablePoiType,
 } from '@/lib/poi'
 import BoardAddItemButton from './BoardAddItemButton'
@@ -131,13 +133,6 @@ function cameraTransform(cam: BoardCamera) {
   return `translate3d(${cam.x}px, ${cam.y}px, 0) scale(${cam.scale})`
 }
 
-function pinImage(poi: POIBase): string {
-  const thumb = poi.thumbnail_url ? resolveImageUrl(poi.thumbnail_url) : ''
-  if (thumb) return thumb
-  const first = poi.images?.[0]
-  return first ? resolveImageUrl(first) : ''
-}
-
 function pinLabel(poi: POIBase): string {
   if (poi.title?.trim()) return poi.title.trim()
   const opt = BOARD_POI_TYPE_OPTIONS.find((o) => o.type === poi.poi_type)
@@ -165,7 +160,8 @@ const BoardPin = memo(function BoardPin({
   highlightColor?: string
   onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>, poi: POIBase) => void
 }) {
-  const img = pinImage(poi)
+  const signedUrls = useSignedImageUrls(poiImageSources(poi))
+  const img = signedUrls[0] ?? ''
   const showHighlight = isSelected || !!highlightColor
   return (
     <button

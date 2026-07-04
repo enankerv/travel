@@ -10,11 +10,14 @@ import type { POIUpdate } from '@/lib/poi'
 import {
   BOARD_POI_TYPE_OPTIONS,
   iconForPoiType,
+  poiEditPayload,
+  poiImageSources,
+  poiDisplayAddress,
 } from '@/lib/poi'
 import { parseAmenitiesInput } from '@/components/AmenitiesCell'
 import { ExternalLinkIcon, TrashIcon } from './icons'
 import GetawayEditForm from './GetawayEditForm'
-import PoiEditForm from './PoiEditForm'
+import PoiEditForm, { poiEditStateFromPoi } from './PoiEditForm'
 import PoiVoteBar from './PoiVoteBar'
 import InlineComments from './InlineComments'
 
@@ -51,7 +54,7 @@ export default function PoiDetailSidebar({
   onDelete?: (poiId: string) => void
 }) {
   const { partySize } = useListDetailContext()
-  const signedUrls = useSignedImageUrls(poi.images || [])
+  const signedUrls = useSignedImageUrls(poiImageSources(poi))
   const thumbUrl = signedUrls[0]
   const isGetaway = poi.poi_type === 'getaway'
   const getaway = poi as Getaway
@@ -102,17 +105,13 @@ export default function PoiDetailSidebar({
       } = toSend
       onUpdateGetaway(poi.id, rest)
     } else if (onUpdatePoi) {
-      onUpdatePoi(poi.id, {
-        title: editData.title,
-        description: editData.description,
-        location: editData.location,
-      })
+      onUpdatePoi(poi.id, poiEditPayload(editData))
     }
     setIsEditing(false)
   }
 
   const handleCancel = () => {
-    setEditData({ ...poi })
+    setEditData(isGetaway ? { ...poi } : poiEditStateFromPoi(poi))
     setIsEditing(false)
   }
 
@@ -154,7 +153,9 @@ export default function PoiDetailSidebar({
                   type="button"
                   className="getaway-detail-sheet__action-btn"
                   onClick={() => {
-                    setEditData({ ...poi })
+                    setEditData(
+                      isGetaway ? { ...poi } : poiEditStateFromPoi(poi),
+                    )
                     setIsEditing(true)
                   }}
                   aria-label="Edit"
@@ -222,13 +223,17 @@ export default function PoiDetailSidebar({
                   </dd>
                 </>
               )}
-              {(poi.location || poi.address || getaway.region) && (
+              {(isGetaway
+                ? poi.location || poi.address || getaway.region
+                : poiDisplayAddress(poi)) && (
                 <>
-                  <dt>Location</dt>
+                  <dt>{isGetaway ? 'Location' : 'Address'}</dt>
                   <dd>
-                    {[poi.location, poi.address, getaway.region]
-                      .filter(Boolean)
-                      .join(', ')}
+                    {isGetaway
+                      ? [poi.location, poi.address, getaway.region]
+                          .filter(Boolean)
+                          .join(', ')
+                      : poiDisplayAddress(poi)}
                   </dd>
                 </>
               )}

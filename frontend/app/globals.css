@@ -806,6 +806,23 @@ button:focus-visible {
   min-height: 4rem;
 }
 
+.poi-edit-form__thumb-preview {
+  margin-top: 0.5rem;
+  width: 100%;
+  max-width: 200px;
+  aspect-ratio: 16 / 10;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.poi-edit-form__thumb-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .getaway-detail-sheet__link:hover {
   color: var(--accent-link-hover);
 }

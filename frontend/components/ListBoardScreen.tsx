@@ -134,6 +134,15 @@ export default function ListBoardScreen({ listId }: { listId: string }) {
     }
   }, [listId, votes.setVotesByGetaway])
 
+  const refreshPois = useCallback(async () => {
+    try {
+      const poisData = await listPois(listId)
+      setPois(poisData || [])
+    } catch {
+      /* merge handles most updates; refetch covers image signing edge cases */
+    }
+  }, [listId])
+
   useEffect(() => {
     void loadData()
   }, [loadData])
@@ -157,6 +166,9 @@ export default function ListBoardScreen({ listId }: { listId: string }) {
     onDelete: (id) => {
       setPois((prev) => prev.filter((p) => p.id !== id))
       setSelectedPoiId((prev) => (prev === id ? null : prev))
+    },
+    onImagesChange: () => {
+      void refreshPois()
     },
     onCommentInsert: (c) =>
       setCommentsByGetaway((prev) => {
@@ -381,12 +393,7 @@ export default function ListBoardScreen({ listId }: { listId: string }) {
             onUpdate={
               selectedPoi.poi_type === 'getaway'
                 ? (id, updates) => void handleUpdateGetaway(id, updates)
-                : (id, updates) =>
-                    void handleUpdatePoi(id, {
-                      title: updates.title,
-                      description: updates.description,
-                      location: updates.location,
-                    })
+                : (id, updates) => void handleUpdatePoi(id, updates)
             }
             onDelete={(id) => void handleDeletePoi(id)}
           />
