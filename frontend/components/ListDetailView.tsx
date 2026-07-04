@@ -14,6 +14,7 @@ import { presenceColorForUserId } from "@/lib/presenceColors";
 import { useListVotes } from "@/hooks/useListVotes";
 import { ListDetailProvider } from "@/lib/ListDetailContext";
 import type { Getaway, POIBase } from "@/lib/getaway";
+import { mergePoiFromRealtime } from "@/lib/poi";
 import ListGetawaysTab from "./ListGetawaysTab";
 import ListMembersTab from "./ListMembersTab";
 import ScoutCredits from "./ScoutCredits";
@@ -79,11 +80,17 @@ export default function ListDetailView({
     },
     onUpdate: (row) => {
       setPois((prev) =>
-        prev.map((p) => (p.id === row.id ? { ...p, ...row } : p)),
+        prev.map((p) =>
+          p.id === row.id ? mergePoiFromRealtime(p, row as POIBase) : p,
+        ),
       );
       if (row.poi_type && row.poi_type !== "getaway") return;
       setGetaways((prev) =>
-        prev.map((g) => (g.id === row.id ? ({ ...g, ...row } as Getaway) : g)),
+        prev.map((g) =>
+          g.id === row.id
+            ? (mergePoiFromRealtime(g, row as POIBase) as Getaway)
+            : g,
+        ),
       );
     },
     onDelete: (id) => {

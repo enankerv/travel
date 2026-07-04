@@ -8,6 +8,7 @@ import { useListRealtime, useListPresence, type PresenceUser } from '@/lib/realt
 import { presenceColorForUserId } from '@/lib/presenceColors'
 import { ListDetailProvider } from '@/lib/ListDetailContext'
 import type { POIBase } from '@/lib/getaway'
+import { mergePoiFromRealtime } from '@/lib/poi'
 import BoardView, { type BoardViewHandle } from './BoardView'
 import ScoutCredits from './ScoutCredits'
 import LoadingView from './LoadingView'
@@ -83,7 +84,9 @@ export default function ListBoardScreen({ listId }: { listId: string }) {
     },
     onUpdate: (row) => {
       setPois((prev) =>
-        prev.map((p) => (p.id === row.id ? { ...p, ...row } : p)),
+        prev.map((p) =>
+          p.id === row.id ? mergePoiFromRealtime(p, row as POIBase) : p,
+        ),
       )
     },
     onDelete: (id) => setPois((prev) => prev.filter((p) => p.id !== id)),
