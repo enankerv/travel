@@ -81,7 +81,7 @@ export default function ListScreenChrome({
                 .map((u) => u.first_name || u.user_id.slice(0, 8))
                 .join(', ')}
             >
-              {variant === 'page' && <span>Viewing with</span>}
+              <span>Viewing with</span>
               <div className="list-screen-chrome__presence-avatars">
                 {otherViewers.slice(0, 5).map((u) => (
                   <div
@@ -115,7 +115,6 @@ export default function ListScreenChrome({
         <ListViewToggle
           listId={listId}
           activeView={activeView}
-          variant={variant === 'overlay' ? 'overlay' : 'default'}
           onNavigate={onViewNavigate}
         />
         {subheaderRight && (
