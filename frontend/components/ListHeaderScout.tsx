@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useListScreenShell } from '@/lib/ListScreenShellContext'
 import { useScoutUrl } from '@/hooks/useScoutUrl'
 import DropZone from './DropZone'
+import ScoutBookmarkletInfo from './ScoutBookmarkletInfo'
 
 export default function ListHeaderScout() {
   const { listId } = useListScreenShell()
@@ -12,11 +13,14 @@ export default function ListHeaderScout() {
 
   return (
     <div className="list-header-scout">
-      <DropZone
-        onUrlSubmit={handleScoutUrl}
-        onError={setError}
-        isLoading={scoutLoading}
-      />
+      <div className="list-header-scout__bar">
+        <DropZone
+          onUrlSubmit={handleScoutUrl}
+          onError={setError}
+          isLoading={scoutLoading}
+        />
+        <ScoutBookmarkletInfo listId={listId} />
+      </div>
       {error && (
         <p className="list-header-scout__error" role="alert">
           {error}

@@ -22,15 +22,9 @@ interface DropZoneProps {
   onUrlSubmit: (url: string) => void
   onError?: (message: string) => void
   isLoading: boolean
-  compact?: boolean
 }
 
-export default function DropZone({
-  onUrlSubmit,
-  onError,
-  isLoading,
-  compact = false,
-}: DropZoneProps) {
+export default function DropZone({ onUrlSubmit, onError, isLoading }: DropZoneProps) {
   const [url, setUrl] = useState('')
   const [isDragOver, setIsDragOver] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
@@ -75,7 +69,7 @@ export default function DropZone({
 
   return (
     <form
-      className={`dropzone${compact ? ' dropzone--compact' : ''}${isDragOver ? ' drag-over' : ''}${isFocused ? ' focused' : ''}`}
+      className={`dropzone${isDragOver ? ' drag-over' : ''}${isFocused ? ' focused' : ''}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -84,7 +78,7 @@ export default function DropZone({
     >
       <div className="dropzone__input-wrap">
         <span className="dropzone__icon" aria-hidden>
-          <LinkIcon size={compact ? 14 : 20} />
+          <LinkIcon size={20} />
         </span>
         <input
           ref={inputRef}
@@ -95,13 +89,13 @@ export default function DropZone({
           onChange={(e) => setUrl(e.target.value)}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
-          placeholder={compact ? 'Paste listing URL…' : 'Paste a listing URL...'}
+          placeholder="Paste a listing URL..."
           disabled={isLoading}
           className="dropzone__input"
           aria-label="Listing URL"
         />
       </div>
-      {!compact && <ScoutCreditCost />}
+      <ScoutCreditCost />
       <button
         type="submit"
         disabled={isLoading || !url.trim()}
@@ -111,11 +105,11 @@ export default function DropZone({
         {isLoading ? (
           <span className="dropzone__submit-text">
             <span className="dropzone__spinner" aria-hidden />
-            {compact ? '…' : 'Scouting...'}
+            Scouting...
           </span>
         ) : (
           <>
-            <ScoutIcon size={compact ? 14 : 18} />
+            <ScoutIcon size={18} />
             <span>Scout</span>
           </>
         )}
