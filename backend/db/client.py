@@ -13,6 +13,9 @@ SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 if not SUPABASE_URL or not SUPABASE_ANON_KEY:
     raise ValueError("Missing Supabase credentials in .env")
 
+if not SUPABASE_SERVICE_ROLE_KEY:
+    raise ValueError("Missing SUPABASE_SERVICE_ROLE_KEY in .env")
+
 
 def get_supabase_client(auth_token: str | None = None) -> Client:
     """Build a Supabase client.
@@ -35,8 +38,6 @@ def get_supabase_client(auth_token: str | None = None) -> Client:
     )
 
 
-def get_service_client() -> Client | None:
-    """Get a Supabase client with service role key. Bypasses RLS. Returns None if key not set."""
-    if not SUPABASE_SERVICE_ROLE_KEY:
-        return None
+def get_service_client() -> Client:
+    """Get a Supabase client with service role key. Bypasses RLS."""
     return create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)

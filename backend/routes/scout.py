@@ -7,7 +7,6 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Header
 
 from models import ScoutRequest, ScoutPasteRequest, ScoutResponse, Getaway
-from db.client import get_service_client
 from db.scout_quota import get_quota_status
 from scout import (
     ScoutExtractionBundle,
@@ -61,10 +60,7 @@ def _preflight_scout_quota_or_raise(user_id: str) -> None:
     """
     Fast 402 when user has no credits (read-only). Actual charge runs in background
     inside scout (``execute_scout_bundle_to_getaway`` / paste pipeline).
-    No-op without service role (dev).
     """
-    if not get_service_client():
-        return
     if not get_quota_status(user_id).get("can_scout"):
         raise HTTPException(
             status_code=402,

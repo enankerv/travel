@@ -167,6 +167,32 @@ export async function getBoard(listId: string): Promise<BoardSnapshot> {
   }
 }
 
+export type BoardChatMessage = {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export async function sendBoardChatMessage(
+  listId: string,
+  message: string,
+  history: BoardChatMessage[],
+): Promise<{ reply: string }> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_URL}/api/lists/${listId}/board/chat`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      message,
+      history: history.map(({ role, content }) => ({ role, content })),
+    }),
+  })
+  if (!res.ok) {
+    const msg = await scoutErrorFromResponse(res, 'Failed to send chat message')
+    throw new ApiRequestError(msg, res.status)
+  }
+  return res.json()
+}
+
 export async function createPoi(listId: string, body: POICreate): Promise<POIBase> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_URL}/api/lists/${listId}/pois`, {
@@ -222,6 +248,16 @@ export async function deletePoi(listId: string, poiId: string) {
   })
   if (!res.ok) throw new Error('Failed to delete POI')
   return res.json()
+}
+
+export class ApiRequestError extends Error {
+  status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ApiRequestError'
+    this.status = status
+  }
 }
 
 async function scoutErrorFromResponse(res: Response, fallback: string): Promise<string> {

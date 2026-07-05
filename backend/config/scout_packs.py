@@ -4,15 +4,22 @@ SCOUT_PACKS = [
     {
         "id": "trip",
         "credits": 100,
-        "price_usd": 20,
+        "price_usd": 15,
         "name": "Single Trip Pass",
         "description": "100 scouts — perfect for one trip.",
     },
     {
+        "id": "explorer",
+        "credits": 240,
+        "price_usd": 30,
+        "name": "Explorer Pass",
+        "description": "240 scouts — ~17% cheaper per scout than Trip Pass.",
+    },
+    {
         "id": "pro",
-        "credits": 1000,
-        "price_usd": 99,
+        "credits": 525,
+        "price_usd": 60,
         "name": "Pro Traveler",
-        "description": "1,000 scouts — for power users and frequent travelers.",
+        "description": "525 scouts — ~24% cheaper per scout than Trip Pass.",
     },
 ]

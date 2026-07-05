@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { LinkIcon, ScoutIcon } from '@/components/icons'
+import ScoutCreditCost from '@/components/ScoutCreditCost'
 
 function looksLikeUrl(text: string): boolean {
   const t = text.trim()
@@ -94,6 +95,7 @@ export default function DropZone({ onUrlSubmit, onError, isLoading }: DropZonePr
           aria-label="Listing URL"
         />
       </div>
+      <ScoutCreditCost />
       <button
         type="submit"
         disabled={isLoading || !url.trim()}

@@ -492,6 +492,26 @@ class BulkPoiPositionsResponse(BaseModel):
     updated: int
 
 
+class BoardChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1)
+
+
+class BoardChatRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=4000)
+    history: list[BoardChatMessage] = Field(default_factory=list, max_length=50)
+
+
+class BoardChatSource(BaseModel):
+    title: str
+    uri: str
+
+
+class BoardChatResponse(BaseModel):
+    reply: str
+    sources: list[BoardChatSource] = Field(default_factory=list)
+
+
 class BoardPoi(POI):
     """POI snapshot for the cork board, with nested comments and votes."""
 

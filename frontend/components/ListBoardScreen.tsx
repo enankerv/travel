@@ -11,6 +11,7 @@ import PoiDetailSidebar from './PoiDetailSidebar'
 import GetawayDetailSheet from './GetawayDetailSheet'
 import CommentsSidebar from './CommentsSidebar'
 import ImageGallery from './ImageGallery'
+import BoardChatPanel from './BoardChatPanel'
 import { useIsMobile } from '@/hooks/useIsMobile'
 
 const IDLE_MS = 1000
@@ -196,6 +197,8 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
           onClose={() => setGalleryImages(null)}
         />
       )}
+
+      <BoardChatPanel listId={listId} />
     </div>
   )
 }

@@ -36,7 +36,7 @@ export default function TermsPage() {
           invited users. The Service includes features such as voting on getaways and lists (e.g., to indicate
           preferences or rankings) and note taking on lists and individual getaways. The Service may use automated
           tools to extract and structure getaway information. Certain features, such as scouting villa listings from
-          URLs or pasted content, consume scout credits. New users receive a limited number of free credits; additional
+          URLs or pasted content, consume scout credits. Board chat uses 1 scout credit per message. New users receive a limited number of free credits; additional
           credits may be purchased. We reserve the right to modify, suspend, or discontinue any part of the Service
           at any time.
         </p>
