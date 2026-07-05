@@ -1355,16 +1355,17 @@ button:focus-visible {
 
 /* Rank # — minimal width; col + cell padding override .sheet defaults */
 .sheet col.col-rank {
-  width: 1.5rem;
+  width: 2.25rem;
 }
 
 .sheet thead th.col-rank,
 .sheet td.col-rank {
-  width: 1.5rem;
-  min-width: 1.5rem;
-  max-width: 1.75rem;
-  padding-left: 0.1rem;
-  padding-right: 0.1rem;
+  width: 2.25rem;
+  min-width: 2.25rem;
+  max-width: 2.5rem;
+  padding-left: 0.35rem;
+  padding-right: 0.35rem;
+  text-align: center;
   box-sizing: border-box;
 }
 
