@@ -2990,12 +2990,14 @@ body.board-screen-active main {
 }
 
 .board-screen__header,
-.board-screen__tools {
+.board-screen__tools,
+.board-screen__sort-actions {
   pointer-events: auto;
 }
 
 .board-screen__overlay--hidden .board-screen__header,
-.board-screen__overlay--hidden .board-screen__tools {
+.board-screen__overlay--hidden .board-screen__tools,
+.board-screen__overlay--hidden .board-screen__sort-actions {
   pointer-events: none;
 }
 
@@ -3025,6 +3027,39 @@ body.board-screen-active main {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+}
+
+.board-screen__sort-actions {
+  position: absolute;
+  top: 50%;
+  right: 4%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.board-screen__header-btn {
+  padding: 0.45rem 0.85rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--light);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.board-screen__header-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.board-screen__header-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .board-screen__chat-btn {

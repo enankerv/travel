@@ -7,6 +7,7 @@ import type { BoardCreatablePoiType } from '@/lib/poi'
 import BoardView, { type BoardViewHandle } from './BoardView'
 import BoardScreenChrome from './BoardScreenChrome'
 import BoardScreenToolbar from './BoardScreenToolbar'
+import BoardScreenSortActions from './BoardScreenSortActions'
 import PoiDetailSidebar from './PoiDetailSidebar'
 import GetawayDetailSheet from './GetawayDetailSheet'
 import CommentsSidebar from './CommentsSidebar'
@@ -131,12 +132,16 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
           chatOpen={chatOpen}
           onChatToggle={() => setChatOpen((open) => !open)}
         />
+        <BoardScreenSortActions
+          creating={creating}
+          sorting={sorting}
+          onSort={(mode) => void handleSort(mode)}
+        />
         <BoardScreenToolbar
           creating={creating}
           sorting={sorting}
           onFitCamera={handleFitCamera}
           onAddItem={handleAddItem}
-          onSort={handleSort}
         />
       </div>
 
