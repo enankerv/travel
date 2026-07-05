@@ -5,6 +5,7 @@ import { presenceColorForUserId } from '@/lib/presenceColors'
 import type { PresenceUser } from '@/lib/realtime'
 import ScoutCredits from './ScoutCredits'
 import ScoutCreditCost from './ScoutCreditCost'
+import ListViewToggle from './ListViewToggle'
 
 export default function BoardScreenChrome({
   listId,
@@ -69,29 +70,7 @@ export default function BoardScreenChrome({
       </header>
 
       <div className="board-screen__subheader">
-        <div className="board-screen__view-nav">
-          <button
-            type="button"
-            className="board-screen__view-btn"
-            onClick={() => router.push(`/?list=${listId}`)}
-          >
-            List
-          </button>
-          <button
-            type="button"
-            className="board-screen__view-btn"
-            onClick={() => router.push(`/?list=${listId}&view=map`)}
-          >
-            Map
-          </button>
-          <button
-            type="button"
-            className="board-screen__view-btn board-screen__view-btn--active"
-            aria-current="page"
-          >
-            Board
-          </button>
-        </div>
+        <ListViewToggle listId={listId} activeView="board" variant="overlay" />
         <div className="board-screen__subheader-right">
           <button
             type="button"

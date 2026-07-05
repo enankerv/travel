@@ -16,6 +16,7 @@ import GetawayListView from "./GetawayListView";
 import ListCursorSurface from "./ListCursorSurface";
 import ScoutBookmarklet from "./ScoutBookmarklet";
 import { dispatchScoutOptimisticDecrement, dispatchScoutOptimisticRefund } from "@/components/ScoutCredits";
+import ListViewToggle from "./ListViewToggle";
 
 const GetawayMap = dynamic(() => import("./GetawayMap"), { ssr: false });
 
@@ -73,9 +74,7 @@ export default function ListGetawaysTab({
   const [pasteGetaway, setPasteGetaway] = useState<any>(null);
   const [galleryImages, setGalleryImages] = useState<string[] | null>(null);
   const [galleryIndex, setGalleryIndex] = useState(0);
-  const [viewMode, setViewMode] = useState<"table" | "map">(
-    viewParam === "map" ? "map" : "table",
-  );
+  const viewMode = viewParam === "map" ? "map" : "table";
   const [mapGetawayId, setMapGetawayId] = useState<string | null>(null);
   const [scoutPanelExpanded, setScoutPanelExpanded] = useState(true);
 
@@ -83,10 +82,6 @@ export default function ListGetawaysTab({
     () => (mapGetawayId ? getaways.find((g: any) => g.id === mapGetawayId) : undefined),
     [mapGetawayId, getaways],
   );
-
-  useEffect(() => {
-    setViewMode(viewParam === "map" ? "map" : "table");
-  }, [viewParam]);
 
   useEffect(() => {
     if (viewMode !== "map" || dataLoaded || isLoading) return;
@@ -344,35 +339,14 @@ export default function ListGetawaysTab({
           </div>
         )}
 
-        <div className="list-villas-tab__view-toolbar">
-          <button
-            type="button"
-            className={`list-villas-tab__view-btn ${viewMode === "table" ? "active" : ""}`}
-            onClick={() => {
-              setViewMode("table");
-              setMapGetawayId(null);
-            }}
-          >
-            Table
-          </button>
-          <button
-            type="button"
-            className={`list-villas-tab__view-btn ${viewMode === "map" ? "active" : ""}`}
-            onClick={() => {
-              setViewMode("map");
-              setMapGetawayId(null);
-            }}
-          >
-            Map
-          </button>
-          <button
-            type="button"
-            className="list-villas-tab__view-btn list-villas-tab__view-btn--board"
-            onClick={() => router.push(`/board/${listId}`)}
-          >
-            Board
-          </button>
-        </div>
+        <ListViewToggle
+          listId={listId}
+          activeView={viewMode === "map" ? "map" : "list"}
+          className="list-villas-tab__view-toolbar"
+          onNavigate={(view) => {
+            if (view !== "map") setMapGetawayId(null);
+          }}
+        />
       </div>
     ),
     [scoutLoading, error, showRetry, viewMode, scoutPanelExpanded],
