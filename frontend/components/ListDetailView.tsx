@@ -15,9 +15,8 @@ import { ListDetailProvider } from "@/lib/ListDetailContext";
 import type { Getaway, POIBase } from "@/lib/getaway";
 import { mergePoiFromRealtime } from "@/lib/poi";
 import ListGetawaysTab from "./ListGetawaysTab";
-import ListMembersTab from "./ListMembersTab";
+import ListMembersModal from "./ListMembersModal";
 import ListScreenChrome from "./ListScreenChrome";
-import ListScreenTabs from "./ListScreenTabs";
 import type { ListView } from "./ListViewToggle";
 
 function defaultPartySizeFromList(list: { member_count?: number }): number {
@@ -38,7 +37,7 @@ export default function ListDetailView({
 }) {
   const { user } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<"places" | "members">("places");
+  const [membersOpen, setMembersOpen] = useState(false);
   const [getaways, setGetaways] = useState<Getaway[]>([]);
   const [pois, setPois] = useState<POIBase[]>([]);
   const [members, setMembers] = useState<any[]>([]);
@@ -225,15 +224,10 @@ export default function ListDetailView({
           otherViewers={otherViewers}
           activeView={(searchParams?.view === "map" ? "map" : "list") as ListView}
           onBack={onBack}
-          tabs={
-            <ListScreenTabs
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-              membersCount={members.length}
-            />
-          }
+          memberCount={members.length}
+          onMembersClick={() => setMembersOpen(true)}
         >
-          {activeTab === "places" && placesStickyContent}
+          {placesStickyContent}
         </ListScreenChrome>
 
         {error && (
@@ -252,28 +246,25 @@ export default function ListDetailView({
             </button>
           </div>
         )}
-        {activeTab === "places" && (
-          <ListGetawaysTab
-            pasteParam={searchParams?.paste}
-            urlParam={searchParams?.url}
-            commentsOpen={commentsOpen}
-            onCommentsOpenChange={setCommentsOpen}
-            focusedGetawayId={focusedGetawayId}
-            onFocusedGetawayChange={setFocusedGetawayId}
-            onStickyContent={setPlacesStickyContent}
-          />
-        )}
+        <ListGetawaysTab
+          pasteParam={searchParams?.paste}
+          urlParam={searchParams?.url}
+          commentsOpen={commentsOpen}
+          onCommentsOpenChange={setCommentsOpen}
+          focusedGetawayId={focusedGetawayId}
+          onFocusedGetawayChange={setFocusedGetawayId}
+          onStickyContent={setPlacesStickyContent}
+        />
 
-        {activeTab === "members" && (
-          <ListMembersTab
-            listId={list.id}
-            members={members}
-            currentUserId={user?.id}
-            onBack={onBack}
-            onError={setError}
-            onMembersChanged={() => loadData(true)}
-          />
-        )}
+        <ListMembersModal
+          isOpen={membersOpen}
+          onClose={() => setMembersOpen(false)}
+          listId={list.id}
+          currentUserId={user?.id}
+          onLeaveList={onBack}
+          onError={setError}
+          onMembersUpdated={setMembers}
+        />
       </div>
     </ListDetailProvider>
   );

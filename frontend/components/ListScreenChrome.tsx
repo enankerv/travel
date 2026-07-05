@@ -15,7 +15,8 @@ export default function ListScreenChrome({
   onBack,
   variant = 'page',
   onViewNavigate,
-  tabs,
+  memberCount,
+  onMembersClick,
   subheaderRight,
   children,
 }: {
@@ -26,7 +27,8 @@ export default function ListScreenChrome({
   onBack: () => void
   variant?: 'page' | 'overlay'
   onViewNavigate?: (view: ListView) => void
-  tabs?: ReactNode
+  memberCount?: number
+  onMembersClick?: () => void
   subheaderRight?: ReactNode
   children?: ReactNode
 }) {
@@ -43,6 +45,34 @@ export default function ListScreenChrome({
             ←
           </button>
           <h1 className="list-screen-chrome__title">{listName}</h1>
+          {onMembersClick != null && memberCount != null && (
+            <button
+              type="button"
+              className="list-screen-chrome__members-btn"
+              onClick={onMembersClick}
+              aria-label={`Members (${memberCount})`}
+              title={`Members (${memberCount})`}
+            >
+              <svg
+                className="list-screen-chrome__members-icon"
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+              <span className="list-screen-chrome__members-count">{memberCount}</span>
+            </button>
+          )}
           {otherViewers.length > 0 && (
             <div
               className="list-screen-chrome__presence"
@@ -92,7 +122,6 @@ export default function ListScreenChrome({
         )}
       </div>
 
-      {tabs}
       {children}
     </div>
   )

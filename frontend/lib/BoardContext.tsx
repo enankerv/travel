@@ -16,6 +16,7 @@ import {
   deleteGetaway,
   deletePoi,
   getBoard,
+  getListMembers,
   updateGetaway,
   updatePoi,
   type CommentRecord,
@@ -49,6 +50,8 @@ export type BoardContextValue = {
   error: string
   setError: (msg: string) => void
   reload: () => Promise<void>
+  updateMembers: (members: BoardContextValue['members']) => void
+  refreshMembers: () => Promise<void>
   isListMember: boolean
   currentUserId: string | undefined
   currentUserProfile: { first_name?: string; avatar_url?: string } | undefined
@@ -118,6 +121,19 @@ export function BoardProvider({
       /* refetch covers image signing edge cases */
     }
   }, [listId])
+
+  const refreshMembers = useCallback(async () => {
+    try {
+      const data = await getListMembers(listId)
+      setMembers(data?.members || [])
+    } catch {
+      /* modal surfaces fetch errors */
+    }
+  }, [listId])
+
+  const updateMembers = useCallback((next: BoardContextValue['members']) => {
+    setMembers(next)
+  }, [])
 
   useEffect(() => {
     void loadBoard()
@@ -294,6 +310,8 @@ export function BoardProvider({
     error,
     setError,
     reload: loadBoard,
+    updateMembers,
+    refreshMembers,
     isListMember,
     currentUserId: user?.id,
     currentUserProfile,

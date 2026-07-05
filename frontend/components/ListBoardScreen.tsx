@@ -14,6 +14,7 @@ import GetawayDetailSheet from './GetawayDetailSheet'
 import CommentsSidebar from './CommentsSidebar'
 import ImageGallery from './ImageGallery'
 import BoardChatPanel from './BoardChatPanel'
+import ListMembersModal from './ListMembersModal'
 import { useIsMobile } from '@/hooks/useIsMobile'
 
 const IDLE_MS = 1000
@@ -34,9 +35,12 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
   const {
     list,
     pois,
+    members,
     error,
     setError,
     otherViewers,
+    currentUserId,
+    updateMembers,
     handleUpdateGetaway,
     handleUpdatePoi,
     handleDeletePoi,
@@ -48,6 +52,7 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
   const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null)
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
+  const [membersOpen, setMembersOpen] = useState(false)
   const [focusedGetawayId, setFocusedGetawayId] = useState<string | null>(null)
   const [galleryImages, setGalleryImages] = useState<string[] | null>(null)
   const [galleryIndex, setGalleryIndex] = useState(0)
@@ -129,6 +134,8 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
           activeView="board"
           variant="overlay"
           onBack={() => router.push(`/?list=${listId}`)}
+          memberCount={members.length}
+          onMembersClick={() => setMembersOpen(true)}
           subheaderRight={
             <ListScreenChatButton
               chatOpen={chatOpen}
@@ -219,6 +226,16 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
         listId={listId}
         isOpen={chatOpen}
         onClose={() => setChatOpen(false)}
+      />
+
+      <ListMembersModal
+        isOpen={membersOpen}
+        onClose={() => setMembersOpen(false)}
+        listId={listId}
+        currentUserId={currentUserId}
+        onLeaveList={() => router.push('/')}
+        onError={setError}
+        onMembersUpdated={updateMembers}
       />
     </div>
   )

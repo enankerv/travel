@@ -3188,6 +3188,78 @@ body.board-screen-active main {
   padding: 0 1.75rem 2.5rem;
 }
 
+.list-screen-chrome__members-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  padding: 0.25rem 0.6rem 0.25rem 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.list-screen-chrome--overlay .list-screen-chrome__members-btn {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.list-screen-chrome__members-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.list-screen-chrome__members-icon {
+  display: block;
+}
+
+.list-screen-chrome__members-count {
+  line-height: 1;
+}
+
+.list-members-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.list-members-modal__title {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.list-members-modal__close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.15rem 0.35rem;
+}
+
+.list-members-modal__close:hover {
+  color: var(--light);
+}
+
+.list-members-modal__loading {
+  margin: 0;
+  padding: 1rem 0 0.5rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.list-members-modal .list-members-tab {
+  padding: 0;
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
+}
+
 .list-screen-chrome__subheader-right {
   display: flex;
   align-items: center;

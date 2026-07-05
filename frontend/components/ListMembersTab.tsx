@@ -79,7 +79,6 @@ export default function ListMembersTab({
       {isOwner && <InviteLinkSection listId={listId} onError={onError} />}
 
       <div>
-        <h3 className="list-members-tab__title">Members ({members.length})</h3>
         <div className="list-members-tab__list">
           {sortedMembers.map((member: any) => {
             const displayLabel =
