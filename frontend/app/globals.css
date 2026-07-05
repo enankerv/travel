@@ -4693,6 +4693,10 @@ main {
   border-radius: 7px;
 }
 
+.board-screen--side-panel-open {
+  z-index: 120;
+}
+
 /* Board chat — full-height left sidebar column */
 .board-chat-sidebar {
   position: fixed;

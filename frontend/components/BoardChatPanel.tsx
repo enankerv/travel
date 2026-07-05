@@ -46,10 +46,12 @@ export default function BoardChatPanel({
   listId,
   isOpen,
   onClose,
+  onSendingChange,
 }: {
   listId: string
   isOpen: boolean
   onClose: () => void
+  onSendingChange?: (sending: boolean) => void
 }) {
   const { setPois, setError } = useBoardContext()
   const [messages, setMessages] = useState<BoardChatMessage[]>([])
@@ -98,6 +100,14 @@ export default function BoardChatPanel({
     },
     [listId, setPois, setError],
   )
+
+  useEffect(() => {
+    onSendingChange?.(sending)
+  }, [sending, onSendingChange])
+
+  useEffect(() => {
+    if (!isOpen) onSendingChange?.(false)
+  }, [isOpen, onSendingChange])
 
   const send = useCallback(async () => {
     const text = draft.trim()

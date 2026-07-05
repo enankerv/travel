@@ -32,6 +32,7 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
     useListScreenShell()
   const boardRef = useRef<BoardViewHandle>(null)
   const idleTimerRef = useRef<number>()
+  const sidePanelOpenRef = useRef(false)
   const {
     pois,
     members,
@@ -49,6 +50,7 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
   const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null)
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
+  const [chatSending, setChatSending] = useState(false)
   const [focusedGetawayId, setFocusedGetawayId] = useState<string | null>(null)
   const [galleryImages, setGalleryImages] = useState<string[] | null>(null)
   const [galleryIndex, setGalleryIndex] = useState(0)
@@ -58,16 +60,30 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
     [selectedPoiId, pois],
   )
 
+  const sidePanelOpen =
+    chatOpen ||
+    chatSending ||
+    commentsOpen ||
+    selectedPoiId != null ||
+    galleryImages != null
+
+  sidePanelOpenRef.current = sidePanelOpen
+
+  const scheduleChromeReveal = useCallback(() => {
+    window.clearTimeout(idleTimerRef.current)
+    idleTimerRef.current = window.setTimeout(() => {
+      if (!sidePanelOpenRef.current) setChromeVisible(true)
+    }, IDLE_MS)
+  }, [])
+
   const hideChromeOnActivity = useCallback(() => {
     setChromeVisible(false)
-    window.clearTimeout(idleTimerRef.current)
-    idleTimerRef.current = window.setTimeout(() => setChromeVisible(true), IDLE_MS)
-  }, [])
+    scheduleChromeReveal()
+  }, [scheduleChromeReveal])
 
   const revealChrome = useCallback(() => {
     setChromeVisible(true)
     window.clearTimeout(idleTimerRef.current)
-    idleTimerRef.current = window.setTimeout(() => setChromeVisible(true), IDLE_MS)
   }, [])
 
   useEffect(() => {
@@ -86,8 +102,17 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
   }, [chatOpen, setChromeSubheaderRight])
 
   useEffect(() => {
-    setChromeOverlayHidden(!chromeVisible)
-  }, [chromeVisible, setChromeOverlayHidden])
+    if (sidePanelOpen) {
+      setChromeVisible(false)
+      window.clearTimeout(idleTimerRef.current)
+      return
+    }
+    setChromeVisible(true)
+  }, [sidePanelOpen])
+
+  useEffect(() => {
+    setChromeOverlayHidden(!chromeVisible || sidePanelOpen)
+  }, [chromeVisible, sidePanelOpen, setChromeOverlayHidden])
 
   useEffect(() => {
     return () => {
@@ -132,7 +157,7 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
   )
 
   return (
-    <div className="board-screen">
+    <div className={`board-screen${sidePanelOpen ? ' board-screen--side-panel-open' : ''}`}>
       <div
         className={`board-screen__overlay${chromeVisible ? '' : ' board-screen__overlay--hidden'}`}
       >
@@ -219,6 +244,7 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
         listId={listId}
         isOpen={chatOpen}
         onClose={() => setChatOpen(false)}
+        onSendingChange={setChatSending}
       />
     </div>
   )
