@@ -34,6 +34,21 @@ def test_get_board(auth_patches):
             "updated_at": "2026-01-01T00:00:00Z",
         },
         "members": [{"user_id": "user-1", "role": "admin"}],
+        "subgroups": [
+            {
+                "id": "sg-1",
+                "list_id": LIST_ID,
+                "parent_subgroup_id": None,
+                "name": "Day 1",
+                "board_x": 0.35,
+                "board_y": 0.35,
+                "board_w": 0.3,
+                "board_h": 0.25,
+                "board_z": 0,
+                "created_at": "2026-01-01T00:00:00Z",
+                "updated_at": "2026-01-01T00:00:00Z",
+            }
+        ],
         "pois": [
             {
                 "id": "poi-1",
@@ -63,6 +78,7 @@ def test_get_board(auth_patches):
         assert r.status_code == 200
         data = r.json()
         assert data["list"]["name"] == "Trip"
+        assert data["subgroups"][0]["name"] == "Day 1"
         assert data["pois"][0]["comments"][0]["body"] == "Nice spot"
         assert data["pois"][0]["votes"][0]["user_id"] == "user-1"
 

@@ -173,6 +173,7 @@ class POIBase(BaseModel):
     board_x: float = 0.5
     board_y: float = 0.5
     board_z: int = 0
+    subgroup_id: Optional[str] = None
 
 
 class POI(POIBase):
@@ -482,6 +483,7 @@ class POICreate(BaseModel):
     board_x: Optional[float] = None
     board_y: Optional[float] = None
     board_z: Optional[int] = None
+    subgroup_id: Optional[str] = None
 
 
 class POIUpdate(BaseModel):
@@ -500,6 +502,7 @@ class POIUpdate(BaseModel):
     board_x: Optional[float] = None
     board_y: Optional[float] = None
     board_z: Optional[int] = None
+    subgroup_id: Optional[str] = None
 
 
 class PoiBoardPosition(BaseModel):
@@ -562,6 +565,7 @@ class BoardPoi(POI):
 class BoardResponse(BaseModel):
     list: ListResponse
     members: list[ListMember]
+    subgroups: list["BoardSubgroup"] = Field(default_factory=list)
     pois: list[BoardPoi]
 
     @classmethod
@@ -569,6 +573,52 @@ class BoardResponse(BaseModel):
         """Load the full cork-board payload for a list."""
         from db.board import fetch_board_snapshot
         return fetch_board_snapshot(list_id, auth_token)
+
+
+# ============================================================================
+# BOARD SUBGROUP MODELS
+# ============================================================================
+
+class BoardSubgroup(BaseModel):
+    """Nested frame on the cork board."""
+
+    id: str
+    list_id: str
+    parent_subgroup_id: Optional[str] = None
+    name: str
+    board_x: float = Field(ge=0, le=1)
+    board_y: float = Field(ge=0, le=1)
+    board_w: float = Field(gt=0, le=1)
+    board_h: float = Field(gt=0, le=1)
+    board_z: int = 0
+    created_at: str
+    updated_at: str
+
+
+class BoardSubgroupCreate(BaseModel):
+    name: str = Field(min_length=1)
+    parent_subgroup_id: Optional[str] = None
+    board_x: float = Field(default=0.35, ge=0, le=1)
+    board_y: float = Field(default=0.35, ge=0, le=1)
+    board_w: float = Field(default=0.3, gt=0, le=1)
+    board_h: float = Field(default=0.25, gt=0, le=1)
+    board_z: int = 0
+
+
+class BoardSubgroupUpdate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    name: Optional[str] = Field(default=None, min_length=1)
+    parent_subgroup_id: Optional[str] = None
+    board_x: Optional[float] = Field(default=None, ge=0, le=1)
+    board_y: Optional[float] = Field(default=None, ge=0, le=1)
+    board_w: Optional[float] = Field(default=None, gt=0, le=1)
+    board_h: Optional[float] = Field(default=None, gt=0, le=1)
+    board_z: Optional[int] = None
+
+
+class BoardSubgroupDeleteResponse(BaseModel):
+    ok: bool = True
 
 
 # Maps pois.poi_type -> concrete model. POI is the fallback for plain pins.

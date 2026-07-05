@@ -2,6 +2,12 @@ import { supabase } from './supabase'
 import type { GetawayUpdate, POIBase } from './getaway'
 import type { POICreate, POIUpdate } from './poi'
 import type { BoardSnapshot } from './board'
+import type {
+  BoardSubgroup,
+  BoardSubgroupCreate,
+  BoardSubgroupDeleteResponse,
+  BoardSubgroupUpdate,
+} from './subgroup'
 
 function normalizeHttpUrl(url: string): string {
   if (url.startsWith('http://') || url.startsWith('https://')) return url
@@ -159,12 +165,62 @@ export async function getBoard(listId: string): Promise<BoardSnapshot> {
   const data = await res.json()
   return {
     ...data,
+    subgroups: data.subgroups ?? [],
     pois: (data.pois || []).map((p: BoardSnapshot['pois'][number]) => ({
       ...p,
       comments: p.comments ?? [],
       votes: p.votes ?? [],
     })),
   }
+}
+
+export async function listSubgroups(listId: string): Promise<BoardSubgroup[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_URL}/api/lists/${listId}/subgroups`, { headers })
+  if (!res.ok) throw new Error('Failed to fetch subgroups')
+  return res.json()
+}
+
+export async function createSubgroup(
+  listId: string,
+  body: BoardSubgroupCreate,
+): Promise<BoardSubgroup> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_URL}/api/lists/${listId}/subgroups`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error('Failed to create subgroup')
+  return res.json()
+}
+
+export async function updateSubgroup(
+  listId: string,
+  subgroupId: string,
+  updates: BoardSubgroupUpdate,
+): Promise<BoardSubgroup> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_URL}/api/lists/${listId}/subgroups/${subgroupId}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(updates),
+  })
+  if (!res.ok) throw new Error('Failed to update subgroup')
+  return res.json()
+}
+
+export async function deleteSubgroup(
+  listId: string,
+  subgroupId: string,
+): Promise<BoardSubgroupDeleteResponse> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_URL}/api/lists/${listId}/subgroups/${subgroupId}`, {
+    method: 'DELETE',
+    headers,
+  })
+  if (!res.ok) throw new Error('Failed to delete subgroup')
+  return res.json()
 }
 
 import type { BoardChatPoiSuggestion } from './boardChat'

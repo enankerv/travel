@@ -71,6 +71,7 @@ export type POICreate = {
   board_x?: number
   board_y?: number
   board_z?: number
+  subgroup_id?: string | null
 }
 
 export type POIUpdate = {
@@ -85,6 +86,7 @@ export type POIUpdate = {
   board_x?: number
   board_y?: number
   board_z?: number
+  subgroup_id?: string | null
 }
 
 /** Image sources for a POI: explicit thumbnail first, then gallery images. */

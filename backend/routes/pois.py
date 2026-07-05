@@ -31,6 +31,14 @@ def _reject_subtyped_poi_type(poi_type: str) -> None:
         )
 
 
+def _validate_subgroup_id(list_id: str, subgroup_id: str | None, token: str) -> None:
+    if subgroup_id is None:
+        return
+    from db.subgroups import subgroup_belongs_to_list
+    if not subgroup_belongs_to_list(subgroup_id, list_id, token):
+        raise HTTPException(status_code=400, detail="Invalid subgroup_id for this list")
+
+
 @router.get("/{list_id}/pois", response_model=list[POI])
 async def list_pois_endpoint(
     list_id: str,
@@ -99,6 +107,7 @@ async def create_poi_endpoint(
         user_id = extract_user_id_from_token(token)
         _reject_subtyped_poi_type(body.poi_type)
         fields = body.model_dump(exclude_unset=True)
+        _validate_subgroup_id(list_id, fields.get("subgroup_id"), token)
         poi = POI.new(list_id, token, user_id=user_id, **fields)
         if not poi:
             raise HTTPException(status_code=500, detail="Failed to create POI")
@@ -123,6 +132,8 @@ async def update_poi_endpoint(
         if not updates:
             raise HTTPException(status_code=400, detail="No fields to update.")
         _require_poi_in_list(POI.get(poi_id, token), list_id)
+        if "subgroup_id" in updates:
+            _validate_subgroup_id(list_id, updates.get("subgroup_id"), token)
 
         result = POI.update_by_id(poi_id, token, **updates)
         if not result:

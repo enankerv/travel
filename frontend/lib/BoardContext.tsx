@@ -34,6 +34,7 @@ import {
   updateCommentOnBoardPoi,
   type BoardPoi,
 } from '@/lib/board'
+import type { BoardSubgroup } from '@/lib/subgroup'
 
 export type BoardContextValue = {
   listId: string
@@ -45,6 +46,8 @@ export type BoardContextValue = {
   }>
   pois: BoardPoi[]
   setPois: React.Dispatch<React.SetStateAction<BoardPoi[]>>
+  subgroups: BoardSubgroup[]
+  setSubgroups: React.Dispatch<React.SetStateAction<BoardSubgroup[]>>
   otherViewers: PresenceUser[]
   isLoading: boolean
   error: string
@@ -78,6 +81,7 @@ export function BoardProvider({
   const [list, setList] = useState<{ id: string; name: string } | null>(null)
   const [members, setMembers] = useState<BoardContextValue['members']>([])
   const [pois, setPois] = useState<BoardPoi[]>([])
+  const [subgroups, setSubgroups] = useState<BoardSubgroup[]>([])
   const [viewingUsers, setViewingUsers] = useState<PresenceUser[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
@@ -104,6 +108,7 @@ export function BoardProvider({
       const data = await getBoard(listId)
       setList(data.list)
       setMembers(data.members || [])
+      setSubgroups(data.subgroups || [])
       setPois(data.pois || [])
       setError('')
     } catch {
@@ -305,6 +310,8 @@ export function BoardProvider({
     members,
     pois,
     setPois,
+    subgroups,
+    setSubgroups,
     otherViewers,
     isLoading,
     error,

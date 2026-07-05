@@ -5,7 +5,8 @@ from pydantic import BaseModel
 
 from db.client import get_supabase_client
 from db.pois import _SELECT_WITH_DETAILS, compose_poi_row
-from models import BoardPoi, BoardResponse, Comment, ListMember, Profile, Vote, board_poi_from_row
+from db.subgroups import get_subgroups_for_list
+from models import BoardPoi, BoardResponse, BoardSubgroup, Comment, ListMember, Profile, Vote, board_poi_from_row
 from utils.storage_urls import sign_images
 
 # Enriched on fetch, not stored columns — omit from PostgREST embeds.
@@ -83,8 +84,11 @@ def fetch_board_snapshot(list_id: str, auth_token: str) -> BoardResponse | None:
     list_data["member_count"] = len(members)
     list_data["getaway_count"] = sum(1 for p in poi_payloads if p.poi_type == "getaway")
 
+    subgroups = [BoardSubgroup.model_validate(r) for r in get_subgroups_for_list(list_id, auth_token)]
+
     return BoardResponse.model_validate({
         "list": list_data,
         "members": members,
+        "subgroups": subgroups,
         "pois": poi_payloads,
     })

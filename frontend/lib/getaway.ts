@@ -15,6 +15,7 @@ export type POIBase = {
   board_x?: number
   board_y?: number
   board_z?: number
+  subgroup_id?: string | null
   images: string[]
   created_at: string
   updated_at: string

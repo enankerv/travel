@@ -233,6 +233,28 @@ CREATE POLICY "Editors can delete pois from lists"
   ON pois FOR DELETE
   USING (user_has_verified_terms_and_age() AND is_list_owner_or_editor(pois.list_id, auth.uid()));
 
+-- Board subgroups -------------------------------------------------------------
+
+DROP POLICY IF EXISTS "Users can view board subgroups in their lists" ON board_subgroups;
+CREATE POLICY "Users can view board subgroups in their lists"
+  ON board_subgroups FOR SELECT
+  USING (user_has_verified_terms_and_age() AND is_list_owner_or_member(board_subgroups.list_id, auth.uid()));
+
+DROP POLICY IF EXISTS "Editors can add board subgroups" ON board_subgroups;
+CREATE POLICY "Editors can add board subgroups"
+  ON board_subgroups FOR INSERT
+  WITH CHECK (user_has_verified_terms_and_age() AND is_list_owner_or_editor(board_subgroups.list_id, auth.uid()));
+
+DROP POLICY IF EXISTS "Editors can update board subgroups" ON board_subgroups;
+CREATE POLICY "Editors can update board subgroups"
+  ON board_subgroups FOR UPDATE
+  USING (user_has_verified_terms_and_age() AND is_list_owner_or_editor(board_subgroups.list_id, auth.uid()));
+
+DROP POLICY IF EXISTS "Editors can delete board subgroups" ON board_subgroups;
+CREATE POLICY "Editors can delete board subgroups"
+  ON board_subgroups FOR DELETE
+  USING (user_has_verified_terms_and_age() AND is_list_owner_or_editor(board_subgroups.list_id, auth.uid()));
+
 -- Getaways (accommodation subtype) — delegates to parent poi -----------------
 
 DROP POLICY IF EXISTS "Users can view getaways in their lists" ON getaways;

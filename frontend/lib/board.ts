@@ -1,6 +1,7 @@
 /** Cork board types and POI-local comment/vote helpers. */
 import type { CommentRecord, VoteRecord } from './api'
 import type { Getaway, POIBase } from './getaway'
+import type { BoardSubgroup } from './subgroup'
 import { mergePoiFromRealtime } from './poi'
 
 export type BoardPoi = POIBase &
@@ -16,6 +17,7 @@ export type BoardSnapshot = {
     role?: string
     profile?: { first_name?: string; avatar_url?: string }
   }>
+  subgroups: BoardSubgroup[]
   pois: BoardPoi[]
 }
 
