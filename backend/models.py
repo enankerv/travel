@@ -250,12 +250,27 @@ class POI(POIBase):
         cls, poi_id: str, auth_token: str, model_cls: type["POI"], changes: dict,
     ) -> Optional["POI"]:
         from db.pois import update_poi_row, update_subtype_row
-        from utils.geocode import apply_geocode_if_location_changed
+        from routes.auth import extract_user_id_from_token
+        from utils.geocode import geocode, location_query_if_changed
 
-        if "location" in changes or "region" in changes:
+        user_id: str | None = None
+        try:
+            user_id = extract_user_id_from_token(auth_token)
+        except Exception:
+            pass
+
+        if user_id and ("location" in changes or "region" in changes):
             current = model_cls.get(poi_id, auth_token)
             if current:
-                apply_geocode_if_location_changed(current, changes)
+                q = location_query_if_changed(
+                    current_location=current.location,
+                    current_region=getattr(current, "region", None),
+                    changes=changes,
+                )
+                if q:
+                    lat, lng = geocode(q, user_id=user_id)
+                    changes["lat"] = lat
+                    changes["lng"] = lng
 
         spine, sub = model_cls._split_writable(changes)
         if spine:
@@ -296,9 +311,19 @@ class POI(POIBase):
     def new(cls, list_id: str, auth_token: str, *, user_id: Optional[str] = None, **fields) -> Optional["POI"]:
         """Create a POI (+ subtype row). Token is stored on the returned instance."""
         from db.pois import insert_poi_row, insert_subtype_row
-        from utils.geocode import apply_geocode_on_create
+        from utils.geocode import geocode, location_query
 
-        apply_geocode_on_create(fields)
+        if (
+            user_id
+            and fields.get("lat") is None
+            and fields.get("lng") is None
+        ):
+            q = location_query(fields.get("location"))
+            if q:
+                lat, lng = geocode(q, user_id=user_id)
+                if lat is not None and lng is not None:
+                    fields["lat"] = lat
+                    fields["lng"] = lng
         spine, sub = cls._split_writable(fields)
         if cls._SUBTYPE_TABLE is not None:
             spine["poi_type"] = cls.model_fields["poi_type"].default

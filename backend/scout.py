@@ -26,7 +26,7 @@ from utils.scout_limits import (
     truncate_for_extraction,
     truncate_for_extraction_preserving_images,
 )
-from utils.geocode import geocode_from_location_region
+from utils.geocode import geocode, location_query
 from db.scout_quota import check_and_use_quota
 from models import Getaway
 
@@ -102,6 +102,7 @@ async def execute_scout_bundle_to_getaway(
     """Sign-in + scout quota, then LLM extraction + DB update from a bundle."""
     if early := _early_return_unless_user_and_quota(poi_id, auth_token, user_id):
         return early
+    assert user_id is not None  # quota gate requires a signed-in user
     return await _llm_extract_and_persist_from_md(
         bundle.extraction_md,
         source_url=bundle.source_url,
@@ -111,6 +112,7 @@ async def execute_scout_bundle_to_getaway(
         name_if_no_villa=bundle.name_if_no_villa,
         poi_id=poi_id,
         auth_token=auth_token,
+        user_id=user_id,
     )
 
 
@@ -186,14 +188,16 @@ def _display_title_for_listing(
     return name_if_no_villa
 
 
-def _geocode_listing(listing: VillaListing) -> tuple[float | None, float | None]:
-    lat, lng = geocode_from_location_region(listing.location, listing.region)
+def _geocode_listing(
+    listing: VillaListing,
+    *,
+    user_id: str,
+) -> tuple[float | None, float | None]:
+    q = location_query(listing.location, listing.region)
+    if not q:
+        return (None, None)
+    lat, lng = geocode(q, user_id=user_id)
     if lat is not None:
-        q = ", ".join(
-            p
-            for p in [(listing.location or "").strip(), (listing.region or "").strip()]
-            if p
-        )
         log.info("geocoded %r -> %.4f, %.4f", q, lat, lng)
     return lat, lng
 
@@ -207,10 +211,12 @@ async def persist_listing_to_getaway(
     image_candidate_urls: list[str],
     poi_id: str,
     auth_token: str,
+    user_id: str,
 ) -> dict:
     """
     Upload candidate images, geocode, map listing to row, update poi + getaway + images.
-    Shared by URL scout and paste flows after LLM extraction.
+
+    Caller must have already consumed scout quota for ``user_id``.
     """
     image_urls: list[str] = []
     if image_candidate_urls:
@@ -218,7 +224,7 @@ async def persist_listing_to_getaway(
     if image_urls:
         print(f"[IMG] Uploaded {len(image_urls)} images to Supabase")
 
-    lat, lng = _geocode_listing(listing)
+    lat, lng = _geocode_listing(listing, user_id=user_id)
     row = _listing_to_getaway_row(
         listing, source_url=source_url, name=name,
         raw_text=raw_text_for_price, lat=lat, lng=lng,
@@ -272,6 +278,7 @@ async def _llm_extract_and_persist_from_md(
     name_if_no_villa: str,
     poi_id: str,
     auth_token: str,
+    user_id: str,
 ) -> dict:
     """Run two-pass LLM extraction on markdown, derive title, persist row + images."""
     listing = await extract_villa_two_pass(extraction_md)
@@ -286,6 +293,7 @@ async def _llm_extract_and_persist_from_md(
         image_candidate_urls=image_candidate_urls or [],
         poi_id=poi_id,
         auth_token=auth_token,
+        user_id=user_id,
     )
 
 
