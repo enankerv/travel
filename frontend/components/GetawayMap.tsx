@@ -36,9 +36,11 @@ function FitBounds({ points }: { points: [number, number][] }) {
 
 export default function GetawayMap({
   getaways,
+  isLoading = false,
   onGetawayClick,
 }: {
   getaways: Getaway[];
+  isLoading?: boolean;
   onGetawayClick?: (getawayId: string) => void;
 }) {
   const withCoords = useMemo(
@@ -54,6 +56,14 @@ export default function GetawayMap({
     () => withCoords.map((g) => [g.lat, g.lng] as [number, number]),
     [withCoords]
   );
+
+  if (isLoading) {
+    return (
+      <div className="getaway-map getaway-map--loading">
+        <p>Loading getaways…</p>
+      </div>
+    );
+  }
 
   if (withCoords.length === 0) {
     return (

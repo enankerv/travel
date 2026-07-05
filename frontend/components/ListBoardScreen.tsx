@@ -46,11 +46,6 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
   const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null)
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
-
-  useEffect(() => {
-    const mq = window.matchMedia('(min-width: 640px)')
-    setChatOpen(mq.matches)
-  }, [])
   const [focusedGetawayId, setFocusedGetawayId] = useState<string | null>(null)
   const [galleryImages, setGalleryImages] = useState<string[] | null>(null)
   const [galleryIndex, setGalleryIndex] = useState(0)

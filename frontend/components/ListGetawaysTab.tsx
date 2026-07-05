@@ -52,11 +52,13 @@ export default function ListGetawaysTab({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const viewParam = searchParams.get("view");
   const {
     list,
     getaways,
     setGetaways,
     isLoading,
+    dataLoaded,
     onRefresh,
     commentsByGetaway,
     otherViewers,
@@ -71,7 +73,9 @@ export default function ListGetawaysTab({
   const [pasteGetaway, setPasteGetaway] = useState<any>(null);
   const [galleryImages, setGalleryImages] = useState<string[] | null>(null);
   const [galleryIndex, setGalleryIndex] = useState(0);
-  const [viewMode, setViewMode] = useState<"table" | "map">("table");
+  const [viewMode, setViewMode] = useState<"table" | "map">(
+    viewParam === "map" ? "map" : "table",
+  );
   const [mapGetawayId, setMapGetawayId] = useState<string | null>(null);
   const [scoutPanelExpanded, setScoutPanelExpanded] = useState(true);
 
@@ -79,6 +83,15 @@ export default function ListGetawaysTab({
     () => (mapGetawayId ? getaways.find((g: any) => g.id === mapGetawayId) : undefined),
     [mapGetawayId, getaways],
   );
+
+  useEffect(() => {
+    setViewMode(viewParam === "map" ? "map" : "table");
+  }, [viewParam]);
+
+  useEffect(() => {
+    if (viewMode !== "map" || dataLoaded || isLoading) return;
+    void onRefresh();
+  }, [viewMode, dataLoaded, isLoading, onRefresh]);
 
   useEffect(() => {
     if (mapGetawayId && !getaways.some((g: any) => g.id === mapGetawayId)) {
@@ -398,6 +411,7 @@ export default function ListGetawaysTab({
           ) : (
             <GetawayMap
               getaways={getaways}
+              isLoading={isLoading || !dataLoaded}
               onGetawayClick={(id) => setMapGetawayId(id)}
             />
           )}

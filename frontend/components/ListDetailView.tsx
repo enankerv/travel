@@ -151,6 +151,7 @@ export default function ListDetailView({
     commentsByGetaway,
     setCommentsByGetaway,
     isLoading,
+    dataLoaded,
     error,
     setError,
     onRefresh: () => loadData(true),

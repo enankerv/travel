@@ -25,6 +25,7 @@ export type ListDetailContextValue = {
   commentsByGetaway: CommentsByGetaway;
   setCommentsByGetaway: React.Dispatch<React.SetStateAction<CommentsByGetaway>>;
   isLoading: boolean;
+  dataLoaded: boolean;
   error: string;
   setError: (msg: string) => void;
   onRefresh: () => Promise<void>;

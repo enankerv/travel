@@ -2990,15 +2990,26 @@ body.board-screen-active main {
 }
 
 .board-screen__header,
+.board-screen__chrome,
 .board-screen__tools,
 .board-screen__sort-actions {
   pointer-events: auto;
 }
 
 .board-screen__overlay--hidden .board-screen__header,
+.board-screen__overlay--hidden .board-screen__chrome,
 .board-screen__overlay--hidden .board-screen__tools,
 .board-screen__overlay--hidden .board-screen__sort-actions {
   pointer-events: none;
+}
+
+.board-screen__chrome {
+  background: linear-gradient(
+    to bottom,
+    rgba(13, 13, 13, 0.94) 0%,
+    rgba(13, 13, 13, 0.55) 70%,
+    transparent 100%
+  );
 }
 
 .board-screen__header {
@@ -3006,13 +3017,15 @@ body.board-screen-active main {
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1.25rem 1.75rem 3rem;
-  background: linear-gradient(
-    to bottom,
-    rgba(13, 13, 13, 0.94) 0%,
-    rgba(13, 13, 13, 0.55) 55%,
-    transparent 100%
-  );
+  padding: 1.25rem 1.75rem 0.75rem;
+}
+
+.board-screen__subheader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0 1.75rem 2.5rem;
 }
 
 .board-screen__header-left {
@@ -3024,6 +3037,41 @@ body.board-screen-active main {
 
 .board-screen__header-right {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.board-screen__view-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.board-screen__view-btn {
+  padding: 0.4rem 0.85rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.board-screen__view-btn:hover:not(.board-screen__view-btn--active) {
+  color: var(--light);
+  border-color: var(--accent);
+}
+
+.board-screen__view-btn--active {
+  background: rgba(232, 168, 56, 0.12);
+  color: var(--accent);
+  border-color: var(--accent);
+  cursor: default;
+}
+
+.board-screen__subheader-right {
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -3297,7 +3345,8 @@ body.board-screen-active main {
   width: 100%;
 }
 
-.getaway-map--empty {
+.getaway-map--empty,
+.getaway-map--loading {
   display: flex;
   flex-direction: column;
   align-items: center;
