@@ -42,9 +42,16 @@ function historyForApi(messages: BoardChatMessage[]) {
   return messages.map(({ role, content }) => ({ role, content }))
 }
 
-export default function BoardChatPanel({ listId }: { listId: string }) {
+export default function BoardChatPanel({
+  listId,
+  isOpen,
+  onClose,
+}: {
+  listId: string
+  isOpen: boolean
+  onClose: () => void
+}) {
   const { setPois, setError } = useBoardContext()
-  const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<BoardChatMessage[]>([])
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
@@ -54,15 +61,15 @@ export default function BoardChatPanel({ listId }: { listId: string }) {
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    if (!open) return
+    if (!isOpen) return
     inputRef.current?.focus()
-  }, [open])
+  }, [isOpen])
 
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
     el.scrollTop = el.scrollHeight
-  }, [messages, sending, open])
+  }, [messages, sending, isOpen])
 
   const saveSuggestion = useCallback(
     async (messageIndex: number, suggestionIndex: number, suggestion: BoardChatPoiSuggestion) => {
@@ -142,118 +149,106 @@ export default function BoardChatPanel({ listId }: { listId: string }) {
     }
   }
 
+  if (!isOpen) return null
+
   return (
-    <div className={`board-chat${open ? ' board-chat--open' : ''}`}>
-      {open ? (
-        <div className="board-chat__panel" role="dialog" aria-label="Board chat">
-          <div className="board-chat__header">
-            <h3 className="board-chat__title">Chat</h3>
-            <button
-              type="button"
-              className="board-chat__close"
-              onClick={() => setOpen(false)}
-              aria-label="Close chat"
-            >
-              ×
-            </button>
-          </div>
-
-          <div ref={scrollRef} className="board-chat__messages">
-            {messages.length === 0 && !sending && (
-              <p className="board-chat__empty">
-                Ask about this trip — activities, logistics, ideas. Suggested places
-                appear as polaroids you can add to the board. History clears when you
-                leave.
-              </p>
-            )}
-            {messages.map((msg, i) => (
-              <div
-                key={`${msg.role}-${i}`}
-                className={`board-chat__message board-chat__message--${msg.role}`}
-              >
-                <span className="board-chat__message-label">
-                  {msg.role === 'user' ? 'You' : 'Assistant'}
-                </span>
-                {msg.role === 'user' ? (
-                  <div className="board-chat__message-body">{msg.content}</div>
-                ) : (
-                  <>
-                    <ChatMessageBody content={msg.content} />
-                    {msg.suggestions && msg.suggestions.length > 0 && (
-                      <div className="board-chat__suggestions">
-                        {msg.suggestions.map((suggestion, suggestionIndex) => {
-                          const saved = msg.savedSuggestionIndexes?.includes(suggestionIndex)
-                          const key = `${i}:${suggestionIndex}`
-                          return (
-                            <ChatPoiSuggestionCard
-                              key={key}
-                              suggestion={suggestion}
-                              saved={saved}
-                              saving={savingKey === key}
-                              onSave={() =>
-                                void saveSuggestion(i, suggestionIndex, suggestion)
-                              }
-                            />
-                          )
-                        })}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            ))}
-            {sending && (
-              <div className="board-chat__message board-chat__message--assistant">
-                <span className="board-chat__message-label">Assistant</span>
-                <div className="board-chat__message-body board-chat__message-body--pending">
-                  …
-                </div>
-              </div>
-            )}
-          </div>
-
-          {chatError && <p className="board-chat__error">{chatError}</p>}
-
-          <form
-            className="board-chat__composer"
-            onSubmit={(e) => {
-              e.preventDefault()
-              void send()
-            }}
-          >
-            <div className="board-chat__composer-bar">
-              <textarea
-                ref={inputRef}
-                className="board-chat__input"
-                rows={2}
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={onKeyDown}
-                placeholder="Message…"
-                disabled={sending}
-              />
-              <ScoutCreditCost />
-              <button
-                type="submit"
-                className="board-chat__send"
-                disabled={sending || !draft.trim()}
-              >
-                {sending ? 'Sending…' : 'Send'}
-              </button>
-            </div>
-          </form>
-        </div>
-      ) : (
+    <div className="board-chat-sidebar" role="dialog" aria-label="Board chat">
+      <div className="board-chat-sidebar__header">
+        <h3 className="board-chat-sidebar__title">Chat</h3>
         <button
           type="button"
-          className="board-chat__toggle"
-          onClick={() => setOpen(true)}
-          aria-label="Open chat (1 scout credit per message)"
+          className="board-chat-sidebar__close"
+          onClick={onClose}
+          aria-label="Close chat"
         >
-          <span>Chat</span>
-          <ScoutCreditCost />
+          ×
         </button>
-      )}
+      </div>
+
+      <div ref={scrollRef} className="board-chat-sidebar__messages">
+        {messages.length === 0 && !sending && (
+          <p className="board-chat__empty">
+            Ask about this trip — activities, logistics, ideas. Suggested places
+            appear as polaroids you can add to the board. History clears when you
+            leave.
+          </p>
+        )}
+        {messages.map((msg, i) => (
+          <div
+            key={`${msg.role}-${i}`}
+            className={`board-chat__message board-chat__message--${msg.role}`}
+          >
+            <span className="board-chat__message-label">
+              {msg.role === 'user' ? 'You' : 'Assistant'}
+            </span>
+            {msg.role === 'user' ? (
+              <div className="board-chat__message-body">{msg.content}</div>
+            ) : (
+              <>
+                <ChatMessageBody content={msg.content} />
+                {msg.suggestions && msg.suggestions.length > 0 && (
+                  <div className="board-chat__suggestions">
+                    {msg.suggestions.map((suggestion, suggestionIndex) => {
+                      const saved = msg.savedSuggestionIndexes?.includes(suggestionIndex)
+                      const key = `${i}:${suggestionIndex}`
+                      return (
+                        <ChatPoiSuggestionCard
+                          key={key}
+                          suggestion={suggestion}
+                          saved={saved}
+                          saving={savingKey === key}
+                          onSave={() =>
+                            void saveSuggestion(i, suggestionIndex, suggestion)
+                          }
+                        />
+                      )
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        ))}
+        {sending && (
+          <div className="board-chat__message board-chat__message--assistant">
+            <span className="board-chat__message-label">Assistant</span>
+            <div className="board-chat__message-body board-chat__message-body--pending">
+              …
+            </div>
+          </div>
+        )}
+      </div>
+
+      {chatError && <p className="board-chat__error">{chatError}</p>}
+
+      <form
+        className="board-chat-sidebar__composer"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void send()
+        }}
+      >
+        <div className="board-chat__composer-bar">
+          <textarea
+            ref={inputRef}
+            className="board-chat__input"
+            rows={3}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder="Message…"
+            disabled={sending}
+          />
+          <ScoutCreditCost />
+          <button
+            type="submit"
+            className="board-chat__send"
+            disabled={sending || !draft.trim()}
+          >
+            {sending ? 'Sending…' : 'Send'}
+          </button>
+        </div>
+      </form>
     </div>
   )
 }

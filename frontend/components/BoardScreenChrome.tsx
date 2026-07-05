@@ -4,15 +4,20 @@ import { useRouter } from 'next/navigation'
 import { presenceColorForUserId } from '@/lib/presenceColors'
 import type { PresenceUser } from '@/lib/realtime'
 import ScoutCredits from './ScoutCredits'
+import ScoutCreditCost from './ScoutCreditCost'
 
 export default function BoardScreenChrome({
   listId,
   listName,
   otherViewers,
+  chatOpen,
+  onChatToggle,
 }: {
   listId: string
   listName: string
   otherViewers: PresenceUser[]
+  chatOpen: boolean
+  onChatToggle: () => void
 }) {
   const router = useRouter()
 
@@ -58,6 +63,16 @@ export default function BoardScreenChrome({
         )}
       </div>
       <div className="board-screen__header-right">
+        <button
+          type="button"
+          className={`board-screen__chat-btn${chatOpen ? ' board-screen__chat-btn--active' : ''}`}
+          onClick={onChatToggle}
+          aria-label="Toggle chat (1 scout credit per message)"
+          aria-pressed={chatOpen}
+        >
+          <span>Chat</span>
+          <ScoutCreditCost />
+        </button>
         <ScoutCredits />
       </div>
     </header>
