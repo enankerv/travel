@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
-import { scoutPaste, deleteGetaway, updateGetaway } from "@/lib/api";
+import { scoutPaste, deleteGetaway, updateGetaway, updatePoi, deletePoi } from "@/lib/api";
+import { mergePoiFromRealtime, type POIUpdate } from "@/lib/poi";
 import { useListDetailContext } from "@/lib/ListDetailContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useScoutUrl } from "@/hooks/useScoutUrl";
@@ -11,7 +12,7 @@ import { tryShowScoutNotification } from "@/lib/scoutNotifications";
 import PasteModal from "./PasteModal";
 import ImageGallery from "./ImageGallery";
 import CommentsSidebar from "./CommentsSidebar";
-import MapGetawaySidebar from "./MapGetawaySidebar";
+import PoiDetailSidebar from "./PoiDetailSidebar";
 import GetawayDetailSheet from "./GetawayDetailSheet";
 import GetawayListView from "./GetawayListView";
 import ListCursorSurface from "./ListCursorSurface";
@@ -46,10 +47,11 @@ export default function ListGetawaysTab({
     list,
     getaways,
     setGetaways,
+    pois,
+    setPois,
     isLoading,
     dataLoaded,
     onRefresh,
-    commentsByGetaway,
     otherViewers,
   } = useListDetailContext();
   const isMobile = useIsMobile();
@@ -75,11 +77,11 @@ export default function ListGetawaysTab({
   const [pasteGetaway, setPasteGetaway] = useState<any>(null);
   const [galleryImages, setGalleryImages] = useState<string[] | null>(null);
   const [galleryIndex, setGalleryIndex] = useState(0);
-  const [mapGetawayId, setMapGetawayId] = useState<string | null>(null);
+  const [mapPoiId, setMapPoiId] = useState<string | null>(null);
 
-  const mapGetaway = useMemo(
-    () => (mapGetawayId ? getaways.find((g: any) => g.id === mapGetawayId) : undefined),
-    [mapGetawayId, getaways],
+  const mapPoi = useMemo(
+    () => (mapPoiId ? pois.find((p) => p.id === mapPoiId) : undefined),
+    [mapPoiId, pois],
   );
 
   useEffect(() => {
@@ -88,14 +90,14 @@ export default function ListGetawaysTab({
   }, [viewMode, dataLoaded, isLoading, onRefresh]);
 
   useEffect(() => {
-    if (viewMode !== 'map') setMapGetawayId(null);
+    if (viewMode !== 'map') setMapPoiId(null);
   }, [viewMode]);
 
   useEffect(() => {
-    if (mapGetawayId && !getaways.some((g: any) => g.id === mapGetawayId)) {
-      setMapGetawayId(null);
+    if (mapPoiId && !pois.some((p) => p.id === mapPoiId)) {
+      setMapPoiId(null);
     }
-  }, [mapGetawayId, getaways]);
+  }, [mapPoiId, pois]);
 
   useEffect(() => {
     try {
@@ -207,6 +209,45 @@ export default function ListGetawaysTab({
     }
   }
 
+  async function handleUpdatePoi(poiId: string, updates: POIUpdate) {
+    try {
+      const updated = await updatePoi(listId, poiId, updates);
+      setPois((prev) =>
+        prev.map((p) =>
+          p.id === poiId ? mergePoiFromRealtime(p, updated) : p,
+        ),
+      );
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to update item");
+    }
+  }
+
+  async function handleDeletePoi(poiId: string) {
+    const poi = pois.find((p) => p.id === poiId);
+    if (!poi || !confirm("Delete this item?")) return;
+    try {
+      if (poi.poi_type === "getaway") {
+        await deleteGetaway(listId, poiId);
+        setGetaways((prev) => prev.filter((g) => g.id !== poiId));
+      } else {
+        await deletePoi(listId, poiId);
+      }
+      setPois((prev) => prev.filter((p) => p.id !== poiId));
+      if (mapPoiId === poiId) setMapPoiId(null);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to delete item");
+    }
+  }
+
+  function handleMapPoiUpdate(poiId: string, updates: POIUpdate | Record<string, unknown>) {
+    const poi = pois.find((p) => p.id === poiId);
+    if (poi?.poi_type === "getaway") {
+      void handleUpdateGetaway(poiId, updates);
+    } else {
+      void handleUpdatePoi(poiId, updates as POIUpdate);
+    }
+  }
+
   function handleImageClick(images: string[], index: number) {
     setGalleryImages(images);
     setGalleryIndex(index);
@@ -273,41 +314,31 @@ export default function ListGetawaysTab({
             </ListCursorSurface>
           ) : (
             <GetawayMap
-              getaways={getaways}
+              pois={pois}
               isLoading={isLoading || !dataLoaded}
-              onGetawayClick={(id) => setMapGetawayId(id)}
+              onPoiClick={(id) => setMapPoiId(id)}
             />
           )}
         </div>
       </div>
 
       {viewMode === "map" &&
-        mapGetaway &&
+        mapPoi &&
         (isMobile ? (
           <GetawayDetailSheet
-            getaway={mapGetaway}
-            onClose={() => setMapGetawayId(null)}
-            onDelete={handleDeleteGetaway}
-            onUpdate={handleUpdateGetaway}
+            getaway={mapPoi}
+            onClose={() => setMapPoiId(null)}
+            onDelete={(id) => void handleDeletePoi(id)}
+            onUpdate={handleMapPoiUpdate}
           />
         ) : (
-          <MapGetawaySidebar
-            getaway={mapGetaway}
-            onClose={() => setMapGetawayId(null)}
+          <PoiDetailSidebar
+            poi={mapPoi}
+            onClose={() => setMapPoiId(null)}
             onImageClick={handleImageClick}
-            onCommentClick={
-              mapGetawayId
-                ? () => {
-                    onCommentsOpenChange?.(true);
-                    onFocusedGetawayChange?.(mapGetawayId);
-                  }
-                : undefined
-            }
-            commentsCount={
-              mapGetawayId
-                ? (commentsByGetaway?.[mapGetawayId]?.length ?? 0)
-                : 0
-            }
+            onUpdateGetaway={handleUpdateGetaway}
+            onUpdatePoi={handleUpdatePoi}
+            onDelete={(id) => void handleDeletePoi(id)}
           />
         ))}
 

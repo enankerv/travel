@@ -4,7 +4,8 @@ import { useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import type { Getaway } from "@/lib/getaway";
+import type { POIBase } from "@/lib/getaway";
+import { iconForPoiType } from "@/lib/poi";
 
 const MapContainer = dynamic(
   () => import("react-leaflet").then((m) => m.MapContainer),
@@ -23,6 +24,60 @@ const Popup = dynamic(
   { ssr: false }
 );
 
+const MARKER_COLORS: Record<string, string> = {
+  getaway: "var(--accent)",
+  activity: "#34d399",
+  restaurant: "#fbbf24",
+  flight: "#60a5fa",
+  poi: "#a78bfa",
+  note: "#9ca3af",
+};
+
+function poiLabel(poi: POIBase): string {
+  if (poi.title?.trim()) return poi.title.trim();
+  if (poi.poi_type === "getaway") return "Getaway";
+  return iconForPoiType(poi.poi_type) + " " + poi.poi_type;
+}
+
+function createMarkerIcon(poiType: string, L: typeof import("leaflet")) {
+  if (poiType === "getaway") {
+    return L.divIcon({
+      className: "map-marker-accent",
+      html: `<div style="
+          width: 20px;
+          height: 20px;
+          background: var(--accent);
+          border: 2px solid rgba(255,255,255,0.9);
+          border-radius: 50%;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        "></div>`,
+      iconSize: [20, 20],
+      iconAnchor: [10, 10],
+    });
+  }
+
+  const color = MARKER_COLORS[poiType] ?? MARKER_COLORS.poi;
+  const emoji = iconForPoiType(poiType);
+  return L.divIcon({
+    className: "map-marker-poi",
+    html: `<div style="
+        width: 26px;
+        height: 26px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: ${color};
+        border: 2px solid rgba(255,255,255,0.9);
+        border-radius: 50%;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        font-size: 13px;
+        line-height: 1;
+      ">${emoji}</div>`,
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+  });
+}
+
 function FitBounds({ points }: { points: [number, number][] }) {
   const map = useMap();
   useEffect(() => {
@@ -35,32 +90,32 @@ function FitBounds({ points }: { points: [number, number][] }) {
 }
 
 export default function GetawayMap({
-  getaways,
+  pois,
   isLoading = false,
-  onGetawayClick,
+  onPoiClick,
 }: {
-  getaways: Getaway[];
+  pois: POIBase[];
   isLoading?: boolean;
-  onGetawayClick?: (getawayId: string) => void;
+  onPoiClick?: (poiId: string) => void;
 }) {
   const withCoords = useMemo(
     () =>
-      getaways.filter(
-        (g): g is Getaway & { lat: number; lng: number } =>
-          g.lat != null && g.lng != null
+      pois.filter(
+        (p): p is POIBase & { lat: number; lng: number } =>
+          p.lat != null && p.lng != null
       ),
-    [getaways]
+    [pois]
   );
 
   const points = useMemo(
-    () => withCoords.map((g) => [g.lat, g.lng] as [number, number]),
+    () => withCoords.map((p) => [p.lat, p.lng] as [number, number]),
     [withCoords]
   );
 
   if (isLoading) {
     return (
       <div className="getaway-map getaway-map--loading">
-        <p>Loading getaways…</p>
+        <p>Loading map…</p>
       </div>
     );
   }
@@ -68,28 +123,16 @@ export default function GetawayMap({
   if (withCoords.length === 0) {
     return (
       <div className="getaway-map getaway-map--empty">
-        <p>No getaways with location data yet. Paste listings to geocode them.</p>
-        <p className="getaway-map__hint">Geocoding runs when you paste listing text.</p>
+        <p>No items with location data yet.</p>
+        <p className="getaway-map__hint">
+          Scout listings to geocode getaways, or add pins on the board with a
+          location.
+        </p>
       </div>
     );
   }
 
   const L = typeof window !== "undefined" ? require("leaflet") : null;
-  const AccentIcon = L
-    ? L.divIcon({
-        className: "map-marker-accent",
-        html: `<div style="
-          width: 20px;
-          height: 20px;
-          background: var(--accent);
-          border: 2px solid rgba(255,255,255,0.9);
-          border-radius: 50%;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-        "></div>`,
-        iconSize: [20, 20],
-        iconAnchor: [10, 10],
-      })
-    : null;
 
   return (
     <div className="getaway-map">
@@ -103,20 +146,26 @@ export default function GetawayMap({
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
         {points.length > 0 && <FitBounds points={points} />}
-        {withCoords.map((g) => (
+        {withCoords.map((poi) => (
           <Marker
-            key={g.id}
-            position={[g.lat, g.lng]}
-            icon={AccentIcon ?? undefined}
+            key={poi.id}
+            position={[poi.lat, poi.lng]}
+            icon={L ? createMarkerIcon(poi.poi_type, L) : undefined}
             eventHandlers={{
-              click: () => onGetawayClick?.(g.id),
+              click: () => onPoiClick?.(poi.id),
             }}
           >
             <Popup>
-              <strong>{g.title || "Getaway"}</strong>
-              {(g.location || g.region) && (
-                <p style={{ margin: "0.25rem 0 0", fontSize: "0.85em", color: "var(--muted)" }}>
-                  {[g.location, g.region].filter(Boolean).join(", ")}
+              <strong>{poiLabel(poi)}</strong>
+              {(poi.location || poi.address) && (
+                <p
+                  style={{
+                    margin: "0.25rem 0 0",
+                    fontSize: "0.85em",
+                    color: "var(--muted)",
+                  }}
+                >
+                  {[poi.location, poi.address].filter(Boolean).join(", ")}
                 </p>
               )}
             </Popup>
