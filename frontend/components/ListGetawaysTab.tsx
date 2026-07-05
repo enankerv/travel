@@ -16,7 +16,6 @@ import GetawayListView from "./GetawayListView";
 import ListCursorSurface from "./ListCursorSurface";
 import ScoutBookmarklet from "./ScoutBookmarklet";
 import { dispatchScoutOptimisticDecrement, dispatchScoutOptimisticRefund } from "@/components/ScoutCredits";
-import ListViewToggle from "./ListViewToggle";
 
 const GetawayMap = dynamic(() => import("./GetawayMap"), { ssr: false });
 
@@ -87,6 +86,10 @@ export default function ListGetawaysTab({
     if (viewMode !== "map" || dataLoaded || isLoading) return;
     void onRefresh();
   }, [viewMode, dataLoaded, isLoading, onRefresh]);
+
+  useEffect(() => {
+    if (viewParam !== "map") setMapGetawayId(null);
+  }, [viewParam]);
 
   useEffect(() => {
     if (mapGetawayId && !getaways.some((g: any) => g.id === mapGetawayId)) {
@@ -339,17 +342,9 @@ export default function ListGetawaysTab({
           </div>
         )}
 
-        <ListViewToggle
-          listId={listId}
-          activeView={viewMode === "map" ? "map" : "list"}
-          className="list-villas-tab__view-toolbar"
-          onNavigate={(view) => {
-            if (view !== "map") setMapGetawayId(null);
-          }}
-        />
       </div>
     ),
-    [scoutLoading, error, showRetry, viewMode, scoutPanelExpanded],
+    [scoutLoading, error, showRetry, scoutPanelExpanded],
   );
 
   useEffect(() => {

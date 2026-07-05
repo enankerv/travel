@@ -4,8 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BoardProvider, useBoardContext } from '@/lib/BoardContext'
 import type { BoardLayoutMode } from '@/lib/boardLayout'
 import type { BoardCreatablePoiType } from '@/lib/poi'
+import { useRouter } from 'next/navigation'
 import BoardView, { type BoardViewHandle } from './BoardView'
-import BoardScreenChrome from './BoardScreenChrome'
+import ListScreenChrome, { ListScreenChatButton } from './ListScreenChrome'
 import BoardScreenToolbar from './BoardScreenToolbar'
 import BoardScreenSortActions from './BoardScreenSortActions'
 import PoiDetailSidebar from './PoiDetailSidebar'
@@ -26,6 +27,7 @@ export default function ListBoardScreen({ listId }: { listId: string }) {
 }
 
 function ListBoardScreenInner({ listId }: { listId: string }) {
+  const router = useRouter()
   const isMobile = useIsMobile()
   const boardRef = useRef<BoardViewHandle>(null)
   const idleTimerRef = useRef<number>()
@@ -120,12 +122,19 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
       <div
         className={`board-screen__overlay${chromeVisible ? '' : ' board-screen__overlay--hidden'}`}
       >
-        <BoardScreenChrome
+        <ListScreenChrome
           listId={listId}
           listName={list.name}
           otherViewers={otherViewers}
-          chatOpen={chatOpen}
-          onChatToggle={() => setChatOpen((open) => !open)}
+          activeView="board"
+          variant="overlay"
+          onBack={() => router.push(`/?list=${listId}`)}
+          subheaderRight={
+            <ListScreenChatButton
+              chatOpen={chatOpen}
+              onToggle={() => setChatOpen((open) => !open)}
+            />
+          }
         />
         <BoardScreenSortActions
           creating={creating}

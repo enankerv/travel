@@ -10,14 +10,15 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
 import { useListRealtime, useListPresence, PresenceUser } from "@/lib/realtime";
-import { presenceColorForUserId } from "@/lib/presenceColors";
 import { useListVotes } from "@/hooks/useListVotes";
 import { ListDetailProvider } from "@/lib/ListDetailContext";
 import type { Getaway, POIBase } from "@/lib/getaway";
 import { mergePoiFromRealtime } from "@/lib/poi";
 import ListGetawaysTab from "./ListGetawaysTab";
 import ListMembersTab from "./ListMembersTab";
-import ScoutCredits from "./ScoutCredits";
+import ListScreenChrome from "./ListScreenChrome";
+import ListScreenTabs from "./ListScreenTabs";
+import type { ListView } from "./ListViewToggle";
 
 function defaultPartySizeFromList(list: { member_count?: number }): number {
   const n = Number(list?.member_count);
@@ -218,79 +219,22 @@ export default function ListDetailView({
   return (
     <ListDetailProvider value={contextValue}>
       <div className="list-detail-scroll">
-        <div className="list-detail-chrome">
-          <header className="list-detail-header">
-            <div className="list-detail-header__left">
-              <button
-                type="button"
-                onClick={onBack}
-                className="list-detail-header__back"
-                aria-label="Back"
-              >
-                ←
-              </button>
-              <h1 className="list-detail-header__title">{list.name}</h1>
-              {otherViewers.length > 0 && (
-                <div
-                  className="list-detail-presence"
-                  title={otherViewers
-                    .map((u) => u.first_name || u.user_id.slice(0, 8))
-                    .join(", ")}
-                >
-                  <span>Viewing with</span>
-                  <div className="list-detail-presence__avatars">
-                    {otherViewers.slice(0, 5).map((u) => (
-                      <div
-                        key={u.user_id}
-                        className="list-detail-presence__avatar"
-                        title={u.first_name || u.user_id.slice(0, 8)}
-                        style={{
-                          borderColor:
-                            u.cursor_color || presenceColorForUserId(u.user_id),
-                        }}
-                      >
-                        {u.avatar_url ? (
-                          <img
-                            src={u.avatar_url}
-                            alt=""
-                            referrerPolicy="no-referrer"
-                          />
-                        ) : (
-                          <div className="list-detail-presence__avatar-fallback">
-                            {(u.first_name || u.user_id)
-                              .charAt(0)
-                              .toUpperCase()}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="list-detail-header__right">
-              <ScoutCredits />
-            </div>
-          </header>
-
-          <div className="list-detail-tabs">
-            <button
-              type="button"
-              onClick={() => setActiveTab("places")}
-              className={`list-detail-tabs__tab ${activeTab === "places" ? "list-detail-tabs__tab--active" : ""}`}
-            >
-              Places
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("members")}
-              className={`list-detail-tabs__tab ${activeTab === "members" ? "list-detail-tabs__tab--active" : ""}`}
-            >
-              Members ({members.length})
-            </button>
-          </div>
+        <ListScreenChrome
+          listId={list.id}
+          listName={list.name}
+          otherViewers={otherViewers}
+          activeView={(searchParams?.view === "map" ? "map" : "list") as ListView}
+          onBack={onBack}
+          tabs={
+            <ListScreenTabs
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              membersCount={members.length}
+            />
+          }
+        >
           {activeTab === "places" && placesStickyContent}
-        </div>
+        </ListScreenChrome>
 
         {error && (
           <div
