@@ -2,23 +2,24 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
-import { sendBoardChatMessage, ApiRequestError, type BoardChatMessage } from '@/lib/api'
+import { createPoi, sendBoardChatMessage, ApiRequestError } from '@/lib/api'
+import { useBoardContext } from '@/lib/BoardContext'
+import {
+  type BoardChatMessage,
+  type BoardChatPoiSuggestion,
+  randomBoardDropPosition,
+  suggestionToPoiCreate,
+} from '@/lib/boardChat'
+import type { BoardPoi } from '@/lib/board'
 import {
   dispatchScoutOptimisticDecrement,
   dispatchScoutOptimisticRefund,
 } from './ScoutCredits'
 import ScoutCreditCost from './ScoutCreditCost'
+import ChatPoiSuggestionCard from './ChatPoiSuggestionCard'
 
-function ChatMessageBody({
-  role,
-  content,
-}: {
-  role: BoardChatMessage['role']
-  content: string
-}) {
-  if (role === 'user') {
-    return <div className="board-chat__message-body">{content}</div>
-  }
+function ChatMessageBody({ content }: { content: string }) {
+  if (!content.trim()) return null
 
   return (
     <div className="board-chat__message-body board-chat__markdown">
@@ -37,12 +38,18 @@ function ChatMessageBody({
   )
 }
 
+function historyForApi(messages: BoardChatMessage[]) {
+  return messages.map(({ role, content }) => ({ role, content }))
+}
+
 export default function BoardChatPanel({ listId }: { listId: string }) {
+  const { setPois, setError } = useBoardContext()
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<BoardChatMessage[]>([])
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
-  const [error, setError] = useState('')
+  const [chatError, setChatError] = useState('')
+  const [savingKey, setSavingKey] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -57,6 +64,34 @@ export default function BoardChatPanel({ listId }: { listId: string }) {
     el.scrollTop = el.scrollHeight
   }, [messages, sending, open])
 
+  const saveSuggestion = useCallback(
+    async (messageIndex: number, suggestionIndex: number, suggestion: BoardChatPoiSuggestion) => {
+      const key = `${messageIndex}:${suggestionIndex}`
+      setSavingKey(key)
+      const { board_x, board_y } = randomBoardDropPosition()
+      try {
+        const poi = await createPoi(listId, suggestionToPoiCreate(suggestion, board_x, board_y))
+        setPois((prev) => {
+          if (prev.some((p) => p.id === poi.id)) return prev
+          return [...prev, { ...poi, comments: [], votes: [] } as BoardPoi]
+        })
+        setMessages((prev) =>
+          prev.map((msg, i) => {
+            if (i !== messageIndex || msg.role !== 'assistant') return msg
+            const saved = new Set(msg.savedSuggestionIndexes ?? [])
+            saved.add(suggestionIndex)
+            return { ...msg, savedSuggestionIndexes: [...saved] }
+          }),
+        )
+      } catch {
+        setError('Failed to add suggestion to board')
+      } finally {
+        setSavingKey(null)
+      }
+    },
+    [listId, setPois, setError],
+  )
+
   const send = useCallback(async () => {
     const text = draft.trim()
     if (!text || sending) return
@@ -64,20 +99,32 @@ export default function BoardChatPanel({ listId }: { listId: string }) {
     const userMessage: BoardChatMessage = { role: 'user', content: text }
     const history = messages
     setDraft('')
-    setError('')
+    setChatError('')
     setMessages((prev) => [...prev, userMessage])
     setSending(true)
     dispatchScoutOptimisticDecrement()
 
     try {
-      const { reply } = await sendBoardChatMessage(listId, text, history)
-      setMessages((prev) => [...prev, { role: 'assistant', content: reply }])
+      const { reply, suggestions } = await sendBoardChatMessage(
+        listId,
+        text,
+        historyForApi(history),
+      )
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: reply,
+          suggestions: suggestions.length > 0 ? suggestions : undefined,
+          savedSuggestionIndexes: [],
+        },
+      ])
     } catch (err) {
       if (err instanceof ApiRequestError && err.status === 402) {
         dispatchScoutOptimisticRefund()
-        setError(err.message)
+        setChatError(err.message)
       } else {
-        setError(
+        setChatError(
           err instanceof Error ? err.message : 'Failed to send message',
         )
       }
@@ -114,8 +161,9 @@ export default function BoardChatPanel({ listId }: { listId: string }) {
           <div ref={scrollRef} className="board-chat__messages">
             {messages.length === 0 && !sending && (
               <p className="board-chat__empty">
-                Ask about this trip — activities, logistics, ideas. History clears when
-                you leave the board.
+                Ask about this trip — activities, logistics, ideas. Suggested places
+                appear as polaroids you can add to the board. History clears when you
+                leave.
               </p>
             )}
             {messages.map((msg, i) => (
@@ -126,7 +174,32 @@ export default function BoardChatPanel({ listId }: { listId: string }) {
                 <span className="board-chat__message-label">
                   {msg.role === 'user' ? 'You' : 'Assistant'}
                 </span>
-                <ChatMessageBody role={msg.role} content={msg.content} />
+                {msg.role === 'user' ? (
+                  <div className="board-chat__message-body">{msg.content}</div>
+                ) : (
+                  <>
+                    <ChatMessageBody content={msg.content} />
+                    {msg.suggestions && msg.suggestions.length > 0 && (
+                      <div className="board-chat__suggestions">
+                        {msg.suggestions.map((suggestion, suggestionIndex) => {
+                          const saved = msg.savedSuggestionIndexes?.includes(suggestionIndex)
+                          const key = `${i}:${suggestionIndex}`
+                          return (
+                            <ChatPoiSuggestionCard
+                              key={key}
+                              suggestion={suggestion}
+                              saved={saved}
+                              saving={savingKey === key}
+                              onSave={() =>
+                                void saveSuggestion(i, suggestionIndex, suggestion)
+                              }
+                            />
+                          )
+                        })}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             ))}
             {sending && (
@@ -139,7 +212,7 @@ export default function BoardChatPanel({ listId }: { listId: string }) {
             )}
           </div>
 
-          {error && <p className="board-chat__error">{error}</p>}
+          {chatError && <p className="board-chat__error">{chatError}</p>}
 
           <form
             className="board-chat__composer"

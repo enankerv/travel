@@ -51,7 +51,7 @@ async def board_chat_endpoint(
             )
 
         pin_rows = [board_pin_context_from_poi(p) for p in snapshot.pois]
-        result = board_chat_reply(
+        result = await board_chat_reply(
             message=body.message,
             history=[m.model_dump() for m in body.history],
             list_name=snapshot.list.name,
@@ -60,6 +60,20 @@ async def board_chat_endpoint(
         return BoardChatResponse(
             reply=result.reply,
             sources=[{"title": s.title, "uri": s.uri} for s in result.sources],
+            suggestions=[
+                {
+                    "poi_type": s.poi_type,
+                    "title": s.title,
+                    "description": s.description,
+                    "location": s.location,
+                    "address": s.address,
+                    "lat": s.lat,
+                    "lng": s.lng,
+                    "source_url": s.source_url,
+                    "thumbnail_url": s.thumbnail_url,
+                }
+                for s in result.suggestions
+            ],
         )
     except HTTPException:
         raise

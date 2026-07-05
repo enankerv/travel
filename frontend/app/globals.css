@@ -4558,6 +4558,133 @@ body.board-screen-active main {
   cursor: not-allowed;
 }
 
+.board-chat__suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-top: 0.65rem;
+}
+
+.board-chat__suggestion {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.65rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.22);
+  cursor: grab;
+}
+
+.board-chat__suggestion:active {
+  cursor: grabbing;
+}
+
+.board-chat__suggestion--saved {
+  opacity: 0.72;
+  cursor: default;
+}
+
+.board-chat__suggestion-polaroid {
+  display: flex;
+  flex-direction: column;
+  align-self: flex-start;
+  width: 92px;
+  background: #fafafa;
+  padding: 6px 6px 0;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.12),
+    0 4px 12px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  transform: rotate(-1.5deg);
+}
+
+.board-chat__suggestion-photo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 1;
+  background: linear-gradient(145deg, #ececec, #f8f8f8);
+  font-size: 1.75rem;
+  overflow: hidden;
+}
+
+.board-chat__suggestion-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.board-chat__suggestion-caption {
+  display: block;
+  padding: 0.35rem 0.15rem 0.45rem;
+  font-size: 0.68rem;
+  line-height: 1.25;
+  color: #222;
+  text-align: center;
+  font-weight: 600;
+}
+
+.board-chat__suggestion-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.board-chat__suggestion-type {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.board-chat__suggestion-location {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.board-chat__suggestion-desc {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--light);
+}
+
+.board-chat__suggestion-link {
+  font-size: 0.75rem;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.board-chat__suggestion-link:hover {
+  text-decoration: underline;
+}
+
+.board-chat__suggestion-save {
+  align-self: flex-start;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--light);
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.board-chat__suggestion-save:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.board-chat__suggestion-save:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
 @media (max-width: 420px) {
   .board-chat__composer-bar {
     flex-wrap: wrap;

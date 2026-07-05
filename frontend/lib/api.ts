@@ -167,16 +167,15 @@ export async function getBoard(listId: string): Promise<BoardSnapshot> {
   }
 }
 
-export type BoardChatMessage = {
-  role: 'user' | 'assistant'
-  content: string
-}
+import type { BoardChatPoiSuggestion } from './boardChat'
+
+export type { BoardChatMessage, BoardChatPoiSuggestion } from './boardChat'
 
 export async function sendBoardChatMessage(
   listId: string,
   message: string,
-  history: BoardChatMessage[],
-): Promise<{ reply: string }> {
+  history: Array<{ role: 'user' | 'assistant'; content: string }>,
+): Promise<{ reply: string; suggestions: BoardChatPoiSuggestion[] }> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_URL}/api/lists/${listId}/board/chat`, {
     method: 'POST',
@@ -190,7 +189,11 @@ export async function sendBoardChatMessage(
     const msg = await scoutErrorFromResponse(res, 'Failed to send chat message')
     throw new ApiRequestError(msg, res.status)
   }
-  return res.json()
+  const data = await res.json()
+  return {
+    reply: data.reply,
+    suggestions: data.suggestions ?? [],
+  }
 }
 
 export async function createPoi(listId: string, body: POICreate): Promise<POIBase> {

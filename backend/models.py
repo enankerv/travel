@@ -507,9 +507,22 @@ class BoardChatSource(BaseModel):
     uri: str
 
 
+class BoardChatPoiSuggestion(BaseModel):
+    poi_type: Literal["activity", "restaurant", "flight", "poi"] = "poi"
+    title: str = Field(min_length=1, max_length=200)
+    description: Optional[str] = None
+    location: Optional[str] = None
+    address: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    source_url: str = Field(min_length=1)
+    thumbnail_url: Optional[str] = None
+
+
 class BoardChatResponse(BaseModel):
     reply: str
     sources: list[BoardChatSource] = Field(default_factory=list)
+    suggestions: list[BoardChatPoiSuggestion] = Field(default_factory=list)
 
 
 class BoardPoi(POI):

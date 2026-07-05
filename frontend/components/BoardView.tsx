@@ -18,7 +18,12 @@ import { useBoardPinDrag } from '@/hooks/useBoardPinDrag'
 import { useBoardPinPresence } from '@/hooks/useBoardPinPresence'
 import { useBoardViewport } from '@/hooks/useBoardViewport'
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls'
-import { BOARD_WORLD_H, BOARD_WORLD_W } from '@/lib/boardCoords'
+import { BOARD_WORLD_H, BOARD_WORLD_W, screenToBoardNorm } from '@/lib/boardCoords'
+import {
+  BOARD_CHAT_POI_DRAG_MIME,
+  parseSuggestionDragPayload,
+  suggestionToPoiCreate,
+} from '@/lib/boardChat'
 import { isLockedByPeer, pinLabel, pinStackZIndex, pinTiltDeg, type PinHoldState } from '@/lib/boardPin'
 import type { POIBase } from '@/lib/getaway'
 import {
@@ -229,6 +234,48 @@ const BoardView = forwardRef<
     [listId, setPois, setError],
   )
 
+  const addSuggestionAt = useCallback(
+    async (wx: number, wy: number, raw: string) => {
+      const suggestion = parseSuggestionDragPayload(raw)
+      if (!suggestion) return
+      try {
+        const poi = await createPoi(
+          listId,
+          suggestionToPoiCreate(suggestion, wx, wy),
+        )
+        setPois((prev) => {
+          if (prev.some((p) => p.id === poi.id)) return prev
+          return [...prev, { ...poi, comments: [], votes: [] } as BoardPoi]
+        })
+        onSelectPoi?.(poi.id)
+      } catch {
+        setError('Failed to add suggestion to board')
+      }
+    },
+    [listId, setPois, setError, onSelectPoi],
+  )
+
+  const onViewportDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    if (e.dataTransfer.types.includes(BOARD_CHAT_POI_DRAG_MIME)) {
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'copy'
+    }
+  }, [])
+
+  const onViewportDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      const raw = e.dataTransfer.getData(BOARD_CHAT_POI_DRAG_MIME)
+      if (!raw) return
+      e.preventDefault()
+      const vp = viewportRef.current
+      if (!vp) return
+      const norm = screenToBoardNorm(vp, cameraRef.current, e.clientX, e.clientY)
+      if (!norm) return
+      void addSuggestionAt(norm.wx, norm.wy, raw)
+    },
+    [addSuggestionAt, cameraRef, viewportRef],
+  )
+
   useImperativeHandle(
     ref,
     () => ({
@@ -271,6 +318,8 @@ const BoardView = forwardRef<
         onPointerMove={onViewportPointerMove}
         onPointerUp={onViewportPointerUp}
         onPointerCancel={onViewportPointerUp}
+        onDragOver={onViewportDragOver}
+        onDrop={onViewportDrop}
         onContextMenu={(e) => e.preventDefault()}
       >
         <div

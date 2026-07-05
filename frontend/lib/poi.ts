@@ -59,11 +59,13 @@ export function mergePoiFromRealtime(
 }
 
 export type POICreate = {
-  poi_type?: 'poi' | 'activity' | 'restaurant' | 'flight'
+  poi_type?: 'poi' | 'activity' | 'restaurant' | 'flight' | 'note'
   title?: string | null
   description?: string | null
   location?: string | null
   address?: string | null
+  lat?: number | null
+  lng?: number | null
   source_url?: string | null
   thumbnail_url?: string | null
   board_x?: number
@@ -76,6 +78,8 @@ export type POIUpdate = {
   description?: string | null
   location?: string | null
   address?: string | null
+  lat?: number | null
+  lng?: number | null
   source_url?: string | null
   thumbnail_url?: string | null
   board_x?: number
