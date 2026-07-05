@@ -209,22 +209,34 @@ function hasGeo(poi: POIBase): poi is POIBase & { lat: number; lng: number } {
   return poi.lat != null && poi.lng != null
 }
 
+/** Disjoint-set with path compression and union by size (negative roots). */
 class UnionFind {
+  /** Negative at roots = component size; non-roots point to parent index. */
   parent: number[]
 
   constructor(size: number) {
-    this.parent = Array.from({ length: size }, (_, i) => i)
+    this.parent = Array.from({ length: size }, () => -1)
   }
 
   find(i: number): number {
-    if (this.parent[i] !== i) this.parent[i] = this.find(this.parent[i])
+    if (this.parent[i] < 0) return i
+    this.parent[i] = this.find(this.parent[i])
     return this.parent[i]
   }
 
   union(a: number, b: number) {
-    const ra = this.find(a)
-    const rb = this.find(b)
-    if (ra !== rb) this.parent[rb] = ra
+    let ra = this.find(a)
+    let rb = this.find(b)
+    if (ra === rb) return
+
+    // More negative root holds the larger component (|parent[root]| = size).
+    if (this.parent[ra] > this.parent[rb]) {
+      const tmp = ra
+      ra = rb
+      rb = tmp
+    }
+    this.parent[ra] += this.parent[rb]
+    this.parent[rb] = ra
   }
 }
 
