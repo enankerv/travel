@@ -285,25 +285,90 @@ function tripSpreadKm(pois: GeoPoi[]): number {
   return Math.max(2 * p90Radius, 0.5)
 }
 
-function nearestNeighborKm(pois: GeoPoi[], index: number): number {
-  let min = Infinity
-  for (let j = 0; j < pois.length; j++) {
-    if (j === index) continue
-    min = Math.min(
-      min,
-      haversineKm(
-        pois[index].lat,
-        pois[index].lng,
-        pois[j].lat,
-        pois[j].lng,
-      ),
-    )
-  }
-  return min
+/** Cell width for spatial queries — ~spread/√n keeps O(1) pins per bucket on average. */
+function queryCellSizeKm(pois: GeoPoi[]): number {
+  const spread = tripSpreadKm(pois)
+  return Math.max(spread / Math.max(1, Math.sqrt(pois.length)), 0.5)
 }
 
-function nearestNeighborDistances(pois: GeoPoi[]): number[] {
-  return pois.map((_, i) => nearestNeighborKm(pois, i))
+function minCellWidthKm(grid: LatLngGrid, refLat: number): number {
+  const latKm = grid.cellLatDeg * KM_PER_DEG_LAT
+  const lngKm =
+    grid.cellLngDeg * KM_PER_DEG_LAT * Math.cos((refLat * Math.PI) / 180)
+  return Math.min(latKm, lngKm)
+}
+
+function maxGridRing(
+  grid: LatLngGrid,
+  row: number,
+  col: number,
+): number {
+  let maxRing = 0
+  for (const key of grid.buckets.keys()) {
+    const [r, c] = key.split(',').map(Number)
+    maxRing = Math.max(maxRing, Math.abs(r - row), Math.abs(c - col))
+  }
+  return maxRing
+}
+
+/** Nearest peer via expanding grid rings — avoids comparing all n² pairs. */
+function nearestNeighborKmInGrid(
+  pois: GeoPoi[],
+  grid: LatLngGrid,
+  index: number,
+): number {
+  if (pois.length < 2) return Infinity
+
+  const { row, col } = cellCoords(
+    pois[index],
+    grid.minLat,
+    grid.minLng,
+    grid.cellLatDeg,
+    grid.cellLngDeg,
+  )
+  const minCellKm = minCellWidthKm(grid, pois[index].lat)
+  const maxRing = maxGridRing(grid, row, col)
+  let best = Infinity
+
+  for (let ring = 0; ring <= maxRing; ring++) {
+    for (let dr = -ring; dr <= ring; dr++) {
+      for (let dc = -ring; dc <= ring; dc++) {
+        if (ring === 0) {
+          if (dr !== 0 || dc !== 0) continue
+        } else if (Math.max(Math.abs(dr), Math.abs(dc)) !== ring) {
+          continue
+        }
+
+        const bucket = grid.buckets.get(cellKey(row + dr, col + dc))
+        if (!bucket) continue
+        for (const j of bucket) {
+          if (j === index) continue
+          best = Math.min(
+            best,
+            haversineKm(
+              pois[index].lat,
+              pois[index].lng,
+              pois[j].lat,
+              pois[j].lng,
+            ),
+          )
+        }
+      }
+    }
+
+    if (best !== Infinity && (ring === 0 || best <= ring * minCellKm)) break
+  }
+
+  return best
+}
+
+function nearestNeighborDistances(
+  pois: GeoPoi[],
+  cellSizeKm = queryCellSizeKm(pois),
+): number[] {
+  if (pois.length < 2) return pois.map(() => Infinity)
+  const grid = buildLatLngGrid(pois, cellSizeKm)
+  return pois.map((_, i) => nearestNeighborKmInGrid(pois, grid, i))
 }
 
 /** Pins far from the trip's main cluster become solo layout groups. */
@@ -447,6 +512,9 @@ function clusterByLatLngGrid(
  *
  * Uses outlier removal, median nearest-neighbor spacing for cluster thresholds,
  * then clusters core POIs via a sparse lat/lng grid + union-find.
+ *
+ * NN queries and clustering both use the same grid (expanding rings for NN,
+ * 3×3 neighbors for unions) — typically O(n log n + e), not O(n²).
  */
 export function layoutByProximity(pois: POIBase[]): BoardLayoutResult {
   if (pois.length === 0) return new Map()
