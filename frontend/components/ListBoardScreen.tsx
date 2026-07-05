@@ -28,7 +28,7 @@ export default function ListBoardScreen({ listId }: { listId: string }) {
 
 function ListBoardScreenInner({ listId }: { listId: string }) {
   const isMobile = useIsMobile()
-  const { setChromeSubheaderRight, setChromeOverlayHidden, updateMemberCount } =
+  const { setChromeBoardRow, setChromeOverlayHidden, updateMemberCount } =
     useListScreenShell()
   const boardRef = useRef<BoardViewHandle>(null)
   const idleTimerRef = useRef<number>()
@@ -92,14 +92,14 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
   }, [members, boardLoading, updateMemberCount])
 
   useEffect(() => {
-    setChromeSubheaderRight(
+    setChromeBoardRow(
       <ListScreenChatButton
         chatOpen={chatOpen}
         onToggle={() => setChatOpen((open) => !open)}
       />,
     )
-    return () => setChromeSubheaderRight(null)
-  }, [chatOpen, setChromeSubheaderRight])
+    return () => setChromeBoardRow(null)
+  }, [chatOpen, setChromeBoardRow])
 
   useEffect(() => {
     if (sidePanelOpen) {

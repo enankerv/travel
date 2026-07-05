@@ -14,7 +14,7 @@ export function dispatchScoutOptimisticRefund() {
   window.dispatchEvent(new CustomEvent(SCOUT_OPTIMISTIC_REFUND));
 }
 
-export default function ScoutCredits() {
+export default function ScoutCredits({ className }: { className?: string }) {
   const { user } = useAuth();
   const [credits, setCredits] = useState<number | null>(null);
   const [showBuyModal, setShowBuyModal] = useState(false);
@@ -61,7 +61,7 @@ export default function ScoutCredits() {
     <>
       <button
         type="button"
-        className="scout-credits"
+        className={className ? `scout-credits ${className}` : 'scout-credits'}
         onClick={() => setShowBuyModal(true)}
         title="Scout credits remaining — click to buy more"
         style={{

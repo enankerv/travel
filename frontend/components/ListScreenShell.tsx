@@ -29,7 +29,7 @@ export default function ListScreenShell({
   const [memberCount, setMemberCount] = useState(0)
   const [membersOpen, setMembersOpen] = useState(false)
   const [viewingUsers, setViewingUsers] = useState<PresenceUser[]>([])
-  const [chromeSubheaderRight, setChromeSubheaderRight] = useState<ReactNode>(null)
+  const [chromeBoardRow, setChromeBoardRow] = useState<ReactNode>(null)
   const [chromeOverlayHidden, setChromeOverlayHidden] = useState(false)
   const [listLoading, setListLoading] = useState(true)
   const [listError, setListError] = useState('')
@@ -58,7 +58,7 @@ export default function ListScreenShell({
 
   useEffect(() => {
     if (!isBoard) {
-      setChromeSubheaderRight(null)
+      setChromeBoardRow(null)
       setChromeOverlayHidden(false)
     }
   }, [isBoard])
@@ -106,8 +106,8 @@ export default function ListScreenShell({
     memberCount,
     updateMemberCount,
     openMembers: () => setMembersOpen(true),
-    chromeSubheaderRight,
-    setChromeSubheaderRight,
+    chromeBoardRow,
+    setChromeBoardRow,
     chromeOverlayHidden,
     setChromeOverlayHidden,
     onBack,
@@ -116,10 +116,29 @@ export default function ListScreenShell({
   const chromeWrapClass = [
     'list-screen-chrome-wrap',
     isBoard ? 'list-screen-chrome-wrap--overlay' : 'list-screen-chrome-wrap--page',
-    isBoard && chromeOverlayHidden ? 'list-screen-chrome-wrap--hidden' : '',
+    !isBoard && chromeOverlayHidden ? 'list-screen-chrome-wrap--hidden' : '',
   ]
     .filter(Boolean)
     .join(' ')
+
+  const boardTopClass = [
+    'list-board-top',
+    isBoard && chromeOverlayHidden ? 'list-board-top--hidden' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  const chrome = (
+    <ListScreenChrome
+      listId={listId}
+      listName={listName}
+      activeView={activeView}
+      variant={isBoard ? 'overlay' : 'page'}
+      onBack={onBack}
+      memberCount={memberCount}
+      onMembersClick={() => setMembersOpen(true)}
+    />
+  )
 
   return (
     <ListScreenShellProvider value={shellValue}>
@@ -131,19 +150,16 @@ export default function ListScreenShell({
               : `list-detail-scroll${activeView === 'map' ? ' list-detail-scroll--map' : ''}`
           }
         >
-          <div className={chromeWrapClass}>
-            <ListScreenChrome
-              listId={listId}
-              listName={listName}
-              otherViewers={otherViewers}
-              activeView={activeView}
-              variant={isBoard ? 'overlay' : 'page'}
-              onBack={onBack}
-              memberCount={memberCount}
-              onMembersClick={() => setMembersOpen(true)}
-              subheaderRight={chromeSubheaderRight}
-            />
-          </div>
+          {isBoard ? (
+            <div className={boardTopClass}>
+              <div className={chromeWrapClass}>{chrome}</div>
+              {chromeBoardRow != null && (
+                <div className="list-board-top__row">{chromeBoardRow}</div>
+              )}
+            </div>
+          ) : (
+            <div className={chromeWrapClass}>{chrome}</div>
+          )}
           {children}
         </div>
       </ListPlacesProvider>
