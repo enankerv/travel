@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useListDetailContext } from '@/lib/ListDetailContext'
-import { useListScreenShell } from '@/lib/ListScreenShellContext'
 import ListGetawaysTab from './ListGetawaysTab'
 
 export default function ListPlacesView({
@@ -13,7 +12,6 @@ export default function ListPlacesView({
 }) {
   const searchParams = useSearchParams()
   const { setError, error } = useListDetailContext()
-  const { setChromeFooter } = useListScreenShell()
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [focusedGetawayId, setFocusedGetawayId] = useState<string | null>(null)
 
@@ -43,7 +41,6 @@ export default function ListPlacesView({
         onCommentsOpenChange={setCommentsOpen}
         focusedGetawayId={focusedGetawayId}
         onFocusedGetawayChange={setFocusedGetawayId}
-        onStickyContent={setChromeFooter}
       />
     </>
   )

@@ -6,6 +6,7 @@ import type { PresenceUser } from '@/lib/realtime'
 import ScoutCredits from './ScoutCredits'
 import ScoutCreditCost from './ScoutCreditCost'
 import ListViewToggle from './ListViewToggle'
+import ListHeaderScout from './ListHeaderScout'
 import { type ListView } from '@/lib/listRoutes'
 
 export default function ListScreenChrome({
@@ -112,14 +113,17 @@ export default function ListScreenChrome({
       </header>
 
       <div className="list-screen-chrome__subheader">
-        <ListViewToggle
-          listId={listId}
-          activeView={activeView}
-          onNavigate={onViewNavigate}
-        />
-        {subheaderRight && (
-          <div className="list-screen-chrome__subheader-right">{subheaderRight}</div>
-        )}
+        <div className="list-screen-chrome__subheader-nav">
+          <ListViewToggle
+            listId={listId}
+            activeView={activeView}
+            onNavigate={onViewNavigate}
+          />
+        </div>
+        <ListHeaderScout />
+        <div className="list-screen-chrome__subheader-right">
+          {subheaderRight}
+        </div>
       </div>
 
       {children}

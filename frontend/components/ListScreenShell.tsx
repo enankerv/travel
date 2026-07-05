@@ -29,7 +29,6 @@ export default function ListScreenShell({
   const [memberCount, setMemberCount] = useState(0)
   const [membersOpen, setMembersOpen] = useState(false)
   const [viewingUsers, setViewingUsers] = useState<PresenceUser[]>([])
-  const [chromeFooter, setChromeFooter] = useState<ReactNode>(null)
   const [chromeSubheaderRight, setChromeSubheaderRight] = useState<ReactNode>(null)
   const [chromeOverlayHidden, setChromeOverlayHidden] = useState(false)
   const [listLoading, setListLoading] = useState(true)
@@ -107,8 +106,6 @@ export default function ListScreenShell({
     memberCount,
     updateMemberCount,
     openMembers: () => setMembersOpen(true),
-    chromeFooter,
-    setChromeFooter,
     chromeSubheaderRight,
     setChromeSubheaderRight,
     chromeOverlayHidden,
@@ -129,7 +126,9 @@ export default function ListScreenShell({
       <ListPlacesProvider listId={listId} listName={listName}>
         <div
           className={
-            isBoard ? 'list-screen-shell list-screen-shell--board' : 'list-detail-scroll'
+            isBoard
+              ? 'list-screen-shell list-screen-shell--board'
+              : `list-detail-scroll${activeView === 'map' ? ' list-detail-scroll--map' : ''}`
           }
         >
           <div className={chromeWrapClass}>
@@ -143,9 +142,7 @@ export default function ListScreenShell({
               memberCount={memberCount}
               onMembersClick={() => setMembersOpen(true)}
               subheaderRight={chromeSubheaderRight}
-            >
-              {!isBoard ? chromeFooter : null}
-            </ListScreenChrome>
+            />
           </div>
           {children}
         </div>

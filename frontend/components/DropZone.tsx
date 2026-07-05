@@ -22,9 +22,15 @@ interface DropZoneProps {
   onUrlSubmit: (url: string) => void
   onError?: (message: string) => void
   isLoading: boolean
+  compact?: boolean
 }
 
-export default function DropZone({ onUrlSubmit, onError, isLoading }: DropZoneProps) {
+export default function DropZone({
+  onUrlSubmit,
+  onError,
+  isLoading,
+  compact = false,
+}: DropZoneProps) {
   const [url, setUrl] = useState('')
   const [isDragOver, setIsDragOver] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
@@ -69,7 +75,7 @@ export default function DropZone({ onUrlSubmit, onError, isLoading }: DropZonePr
 
   return (
     <form
-      className={`dropzone ${isDragOver ? 'drag-over' : ''} ${isFocused ? 'focused' : ''}`}
+      className={`dropzone${compact ? ' dropzone--compact' : ''}${isDragOver ? ' drag-over' : ''}${isFocused ? ' focused' : ''}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -78,7 +84,7 @@ export default function DropZone({ onUrlSubmit, onError, isLoading }: DropZonePr
     >
       <div className="dropzone__input-wrap">
         <span className="dropzone__icon" aria-hidden>
-          <LinkIcon size={20} />
+          <LinkIcon size={compact ? 14 : 20} />
         </span>
         <input
           ref={inputRef}
@@ -89,13 +95,13 @@ export default function DropZone({ onUrlSubmit, onError, isLoading }: DropZonePr
           onChange={(e) => setUrl(e.target.value)}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
-          placeholder="Paste a listing URL..."
+          placeholder={compact ? 'Paste listing URL…' : 'Paste a listing URL...'}
           disabled={isLoading}
           className="dropzone__input"
           aria-label="Listing URL"
         />
       </div>
-      <ScoutCreditCost />
+      {!compact && <ScoutCreditCost />}
       <button
         type="submit"
         disabled={isLoading || !url.trim()}
@@ -105,11 +111,11 @@ export default function DropZone({ onUrlSubmit, onError, isLoading }: DropZonePr
         {isLoading ? (
           <span className="dropzone__submit-text">
             <span className="dropzone__spinner" aria-hidden />
-            Scouting...
+            {compact ? '…' : 'Scouting...'}
           </span>
         ) : (
           <>
-            <ScoutIcon size={18} />
+            <ScoutIcon size={compact ? 14 : 18} />
             <span>Scout</span>
           </>
         )}

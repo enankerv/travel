@@ -2341,11 +2341,11 @@ button:focus-visible {
   flex-direction: column;
 }
 
-/* Map/board fill remaining list detail height (flex chain from .app-detail-view). */
+/* Map/board fill remaining list detail height. */
 .list-villas-tab--map,
 .list-villas-tab--board {
   flex: 1 1 0;
-  min-height: 400px;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -2639,6 +2639,7 @@ button:focus-visible {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  padding-bottom: 0.5rem;
 }
 
 .list-villas-tab--board .list-villas-tab__table-wrap {
@@ -3164,11 +3165,148 @@ body.board-screen-active main {
 }
 
 .list-screen-chrome__subheader {
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 40rem) 1fr;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 2rem 0.4rem;
+}
+
+.list-screen-chrome__subheader-nav {
+  justify-self: start;
+}
+
+.list-header-scout {
+  position: relative;
+  justify-self: center;
+  width: 100%;
+  max-width: 40rem;
+}
+
+.list-header-scout .dropzone {
+  width: 100%;
+  gap: 0.5rem;
+  padding: 0.25rem 0.35rem 0.25rem 0.65rem;
+  border-radius: 10px;
+}
+
+.list-header-scout .dropzone__input-wrap {
+  gap: 0.5rem;
+}
+
+.list-header-scout .dropzone__icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.list-header-scout .dropzone__submit svg {
+  width: 15px;
+  height: 15px;
+}
+
+.list-header-scout .dropzone__input {
+  font-size: 0.875rem;
+  padding: 0.3rem 0;
+}
+
+.list-header-scout .dropzone__submit {
+  padding: 0.4rem 0.85rem;
+  font-size: 0.8125rem;
+  border-radius: 8px;
+  gap: 0.35rem;
+}
+
+.list-header-scout .scout-credit-cost {
+  padding: 0.25rem 0.45rem;
+  font-size: 0.75rem;
+}
+
+.list-header-scout .dropzone__spinner {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.list-header-scout__error {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.8rem;
+  color: var(--red);
+  background: var(--red-soft);
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 0.75rem 2rem 0.5rem;
+  gap: 0.5rem;
+  z-index: 2;
+}
+
+.list-header-scout__error-dismiss {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0;
+}
+
+.dropzone--compact {
+  gap: 0.35rem;
+  padding: 0.15rem 0.2rem 0.15rem 0.45rem;
+  border-radius: 8px;
+}
+
+.dropzone--compact .dropzone__input-wrap {
+  gap: 0.35rem;
+}
+
+.dropzone--compact .dropzone__input {
+  font-size: 0.8rem;
+  padding: 0.2rem 0;
+}
+
+.dropzone--compact .dropzone__submit {
+  padding: 0.3rem 0.55rem;
+  font-size: 0.75rem;
+  border-radius: 6px;
+  gap: 0.25rem;
+}
+
+.dropzone--compact .dropzone__spinner {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.list-villas-tab__error--inline {
+  margin: 0 2rem 0.75rem;
+}
+
+@media (max-width: 768px) {
+  .list-screen-chrome__subheader {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+  }
+
+  .list-screen-chrome__subheader-nav {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .list-screen-chrome__subheader-right {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+  }
+
+  .list-header-scout {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    max-width: none;
+  }
 }
 
 .list-screen-chrome--overlay .list-screen-chrome__subheader {
@@ -3247,6 +3385,7 @@ body.board-screen-active main {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  justify-self: end;
 }
 
 .list-screen-chrome__tabs {
@@ -3461,6 +3600,7 @@ body.board-screen-active main {
 .getaway-map {
   flex: 1;
   min-height: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
   border-radius: 8px;
@@ -3747,10 +3887,46 @@ body.board-screen-active main {
   border-bottom-color: var(--accent);
 }
 
+main {
+  min-height: 0;
+}
+
 .list-detail-scroll {
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+.list-detail-scroll--map {
+  flex: 1 1 0;
+  overflow: hidden;
+}
+
+.list-detail-scroll--map .list-villas-tab--map {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+@media (min-width: 640px) {
+  .list-detail-scroll {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .list-detail-scroll:not(.list-detail-scroll--map) {
+    overflow-x: visible;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .list-detail-scroll--map {
+    overflow: hidden;
+  }
+
+  .list-detail-scroll--map .list-villas-tab--map {
+    flex: 1 1 0;
+    min-height: 0;
+  }
 }
 
 /* List title, tabs, scout — scrolls with the page; not sticky (table toolbar/thead stick instead). */

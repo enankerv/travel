@@ -11,8 +11,6 @@ export type ListScreenShellContextValue = {
   memberCount: number
   updateMemberCount: (members: any[]) => void
   openMembers: () => void
-  chromeFooter: ReactNode
-  setChromeFooter: (node: ReactNode) => void
   chromeSubheaderRight: ReactNode
   setChromeSubheaderRight: (node: ReactNode) => void
   chromeOverlayHidden: boolean

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
-import { scoutUrl, scoutPaste, deleteGetaway, updateGetaway } from "@/lib/api";
+import { scoutPaste, deleteGetaway, updateGetaway } from "@/lib/api";
 import { useListDetailContext } from "@/lib/ListDetailContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import DropZone from "./DropZone";
+import { useScoutUrl } from "@/hooks/useScoutUrl";
+import { tryShowScoutNotification } from "@/lib/scoutNotifications";
 import PasteModal from "./PasteModal";
 import ImageGallery from "./ImageGallery";
 import CommentsSidebar from "./CommentsSidebar";
@@ -14,24 +15,12 @@ import MapGetawaySidebar from "./MapGetawaySidebar";
 import GetawayDetailSheet from "./GetawayDetailSheet";
 import GetawayListView from "./GetawayListView";
 import ListCursorSurface from "./ListCursorSurface";
-import ScoutBookmarklet from "./ScoutBookmarklet";
-import { dispatchScoutOptimisticDecrement, dispatchScoutOptimisticRefund } from "@/components/ScoutCredits";
+import {
+  dispatchScoutOptimisticDecrement,
+  dispatchScoutOptimisticRefund,
+} from "@/components/ScoutCredits";
 
 const GetawayMap = dynamic(() => import("./GetawayMap"), { ssr: false });
-
-/** Safely show a notification; no-op when Notification API is unavailable (e.g. mobile). */
-function tryShowNotification(
-  title: string,
-  options?: NotificationOptions,
-): void {
-  try {
-    if (typeof window === "undefined" || !("Notification" in window)) return;
-    if (Notification.permission !== "granted") return;
-    new Notification(title, options);
-  } catch {
-    // Notifications not supported (e.g. mobile) - silently ignore
-  }
-}
 
 export default function ListGetawaysTab({
   viewMode,
@@ -41,7 +30,6 @@ export default function ListGetawaysTab({
   onCommentsOpenChange,
   focusedGetawayId = null,
   onFocusedGetawayChange,
-  onStickyContent,
 }: {
   viewMode: 'table' | 'map'
   pasteParam?: string | null;
@@ -50,7 +38,6 @@ export default function ListGetawaysTab({
   onCommentsOpenChange?: (open: boolean) => void;
   focusedGetawayId?: string | null;
   onFocusedGetawayChange?: (id: string | null) => void;
-  onStickyContent?: (content: React.ReactNode) => void;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -68,15 +55,27 @@ export default function ListGetawaysTab({
   const isMobile = useIsMobile();
   const listId = list.id;
   const [error, setError] = useState("");
-  const [scoutLoading, setScoutLoading] = useState(false);
-  const [lastFailedUrl, setLastFailedUrl] = useState("");
+  const [pasteScoutLoading, setPasteScoutLoading] = useState(false);
+  const onGetawayLoading = useCallback(
+    (getawayId: string) => {
+      setGetaways((prev) =>
+        prev.map((g) =>
+          g.id === getawayId ? { ...g, import_status: "loading" } : g,
+        ),
+      );
+    },
+    [setGetaways],
+  );
+  const { lastFailedUrl, setLastFailedUrl, handleScoutUrl } = useScoutUrl(
+    listId,
+    { setError, onGetawayLoading },
+  );
   const [lastFailedPaste, setLastFailedPaste] = useState("");
   const [showPasteModal, setShowPasteModal] = useState(false);
   const [pasteGetaway, setPasteGetaway] = useState<any>(null);
   const [galleryImages, setGalleryImages] = useState<string[] | null>(null);
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [mapGetawayId, setMapGetawayId] = useState<string | null>(null);
-  const [scoutPanelExpanded, setScoutPanelExpanded] = useState(true);
 
   const mapGetaway = useMemo(
     () => (mapGetawayId ? getaways.find((g: any) => g.id === mapGetawayId) : undefined),
@@ -115,58 +114,11 @@ export default function ListGetawaysTab({
     }
   }, [pasteParam, urlParam]);
 
-  async function handleScoutUrl(url: string, getawayId?: string) {
-    setError("");
-    setLastFailedUrl("");
-    setScoutLoading(true);
-    dispatchScoutOptimisticDecrement();
-    try {
-      const result = await scoutUrl(url, listId, getawayId);
-      if (result.ok) {
-        if (result.thin_scrape) {
-          dispatchScoutOptimisticRefund();
-          tryShowNotification("Credit refunded", {
-            body: "Credit refunded for thin scrape.",
-            icon: "↩️",
-          });
-        }
-        if (getawayId) {
-          setGetaways((prev) =>
-            prev.map((g) =>
-              g.id === getawayId ? { ...g, import_status: "loading" } : g,
-            ),
-          );
-        }
-        tryShowNotification("Scouting...", {
-          body: "Processing listing...",
-          icon: "⏳",
-        });
-      } else {
-        setLastFailedUrl(url);
-        setError(result.error || "Failed to scout getaway");
-        tryShowNotification("Scouting Failed", {
-          body: result.error || "Failed to scout getaway",
-          icon: "✕",
-        });
-      }
-    } catch (err: any) {
-      dispatchScoutOptimisticRefund();
-      setLastFailedUrl(url);
-      setError(err.message || "Failed to scout getaway");
-      tryShowNotification("Error", {
-        body: err.message || "Failed to scout getaway",
-        icon: "✕",
-      });
-    } finally {
-      setScoutLoading(false);
-    }
-  }
-
   async function handleScoutPaste(text: string) {
     setError("");
     setLastFailedPaste("");
     setShowPasteModal(false);
-    setScoutLoading(true);
+    setPasteScoutLoading(true);
     dispatchScoutOptimisticDecrement();
     const getawayId = pasteGetaway?.id ?? undefined;
     const originalUrl = pasteGetaway?.source_url ?? urlParam ?? undefined;
@@ -175,13 +127,9 @@ export default function ListGetawaysTab({
       if (result.ok) {
         setPasteGetaway(null);
         if (getawayId) {
-          setGetaways((prev) =>
-            prev.map((g) =>
-              g.id === getawayId ? { ...g, import_status: "loading" } : g,
-            ),
-          );
+          onGetawayLoading(getawayId);
         }
-        tryShowNotification("Processing Paste...", {
+        tryShowScoutNotification("Processing Paste...", {
           body: result.truncated
             ? "Text was truncated for length limits. Extracting getaway details..."
             : "Extracting getaway details...",
@@ -192,30 +140,33 @@ export default function ListGetawaysTab({
         setLastFailedPaste(text);
         setError(result.error || "Failed to process paste");
         setShowPasteModal(true);
-        tryShowNotification("Error", {
+        tryShowScoutNotification("Error", {
           body: result.error || "Failed to process paste",
           icon: "✕",
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       dispatchScoutOptimisticRefund();
       setLastFailedPaste(text);
-      setError(err.message || "Failed to process paste");
+      const message =
+        err instanceof Error ? err.message : "Failed to process paste";
+      setError(message);
       setShowPasteModal(true);
-      tryShowNotification("Error", {
-        body: err.message || "Failed to process paste",
+      tryShowScoutNotification("Error", {
+        body: message,
         icon: "✕",
       });
     } finally {
-      setScoutLoading(false);
+      setPasteScoutLoading(false);
     }
   }
 
   function handleRetryError() {
     if (lastFailedUrl) {
+      const url = lastFailedUrl;
       setLastFailedUrl("");
       setError("");
-      handleScoutUrl(lastFailedUrl);
+      void handleScoutUrl(url);
     } else if (lastFailedPaste) {
       setShowPasteModal(true);
       setError("");
@@ -226,8 +177,8 @@ export default function ListGetawaysTab({
     if (!getaway?.source_url) return;
     try {
       await handleScoutUrl(getaway.source_url, getaway.id);
-    } catch (err: any) {
-      setError(err.message || "Failed to retry");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to retry");
     }
   }
 
@@ -269,55 +220,13 @@ export default function ListGetawaysTab({
 
   const showRetry = !!(lastFailedUrl || lastFailedPaste);
 
-  const stickyContent = useMemo(
-    () => (
-      <div className="list-villas-tab__sticky">
-        <div
-          className={`list-villas-tab__scout-panel${
-            scoutPanelExpanded ? " list-villas-tab__scout-panel--open" : ""
-          }`}
-        >
-          <div className="list-villas-tab__scout-drop-clip">
-            <div
-              className="list-villas-tab__scout-drop-inner"
-              inert={scoutPanelExpanded ? undefined : true}
-            >
-              <div className="list-villas-tab__drop">
-                <DropZone
-                  onUrlSubmit={handleScoutUrl}
-                  onError={(msg) => setError(msg)}
-                  isLoading={scoutLoading}
-                />
-                <ScoutBookmarklet />
-              </div>
-            </div>
-          </div>
-          <button
-            type="button"
-            className="list-villas-tab__scout-toggle"
-            onClick={() => setScoutPanelExpanded((open) => !open)}
-            title={scoutPanelExpanded ? "Hide scout bar" : "Show scout bar"}
-            aria-label={scoutPanelExpanded ? "Hide scout bar" : "Show scout bar"}
-            aria-expanded={scoutPanelExpanded}
-          >
-            <svg
-              className="list-villas-tab__scout-toggle-chevron"
-              viewBox="0 0 12 12"
-              width="12"
-              height="12"
-              aria-hidden
-            >
-              {scoutPanelExpanded ? (
-                <path fill="currentColor" d="M6 3l4 5H2z" />
-              ) : (
-                <path fill="currentColor" d="M6 9l4-5H2z" />
-              )}
-            </svg>
-          </button>
-        </div>
-
+  return (
+    <>
+      <div
+        className={`list-villas-tab${viewMode === "map" ? " list-villas-tab--map" : ""}`}
+      >
         {error && (
-          <div className="list-villas-tab__error">
+          <div className="list-villas-tab__error list-villas-tab__error--inline">
             <span>{error}</span>
             <div
               style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
@@ -342,22 +251,6 @@ export default function ListGetawaysTab({
             </div>
           </div>
         )}
-
-      </div>
-    ),
-    [scoutLoading, error, showRetry, scoutPanelExpanded],
-  );
-
-  useEffect(() => {
-    onStickyContent?.(stickyContent);
-    return () => onStickyContent?.(null);
-  }, [onStickyContent, stickyContent]);
-
-  return (
-    <>
-      <div
-        className={`list-villas-tab${viewMode === "map" ? " list-villas-tab--map" : ""}`}
-      >
         <div className="list-villas-tab__table-wrap">
           {viewMode === "table" ? (
             <ListCursorSurface
@@ -451,7 +344,7 @@ export default function ListGetawaysTab({
           }
         }}
         onSubmit={handleScoutPaste}
-        isLoading={false}
+        isLoading={pasteScoutLoading}
         initialText={lastFailedPaste}
         listingUrl={pasteGetaway?.source_url ?? urlParam ?? undefined}
         fromBookmarklet={!pasteGetaway}
