@@ -302,12 +302,16 @@ function nearestNeighborKm(pois: GeoPoi[], index: number): number {
   return min
 }
 
+function nearestNeighborDistances(pois: GeoPoi[]): number[] {
+  return pois.map((_, i) => nearestNeighborKm(pois, i))
+}
+
 /** Pins far from the trip's main cluster become solo layout groups. */
 function splitOutliers(pois: GeoPoi[]): { core: GeoPoi[]; outliers: GeoPoi[] } {
   if (pois.length < 3) return { core: [...pois], outliers: [] }
 
+  const nn = nearestNeighborDistances(pois)
   const spread = tripSpreadKm(pois)
-  const nn = pois.map((_, i) => nearestNeighborKm(pois, i))
   const cutoff = Math.max(median(nn) * 4, spread * 0.3)
 
   const core: GeoPoi[] = []
@@ -321,12 +325,22 @@ function splitOutliers(pois: GeoPoi[]): { core: GeoPoi[]; outliers: GeoPoi[] } {
   return { core, outliers }
 }
 
-/** "Nearby" radius scales with trip size — city vs cross-country. */
-function clusterThresholdFromSpread(spreadKm: number): number {
+/**
+ * Cluster radius from how tightly core POIs pack together (median NN distance),
+ * with spread-derived bounds so multi-city trips don't chain across regions.
+ */
+function clusterThresholdFromNeighborDistances(
+  neighborKm: number[],
+  spreadKm: number,
+): number {
+  if (neighborKm.length <= 1) return Math.max(0.5, spreadKm * 0.15)
+
+  const med = median(neighborKm)
+  const p75 = percentile(neighborKm, 75)
+  const fromNeighbors = med * 1.75
   const minKm = Math.max(0.5, spreadKm * 0.02)
-  const maxKm = spreadKm * 0.25
-  const fraction = spreadKm < 30 ? 0.15 : spreadKm < 400 ? 0.12 : 0.08
-  return Math.min(maxKm, Math.max(minKm, spreadKm * fraction))
+  const maxKm = Math.max(p75 * 2.5, spreadKm * 0.25)
+  return Math.min(maxKm, Math.max(minKm, fromNeighbors))
 }
 
 type LatLngGrid = {
@@ -431,7 +445,7 @@ function clusterByLatLngGrid(
  * Cluster geocoded POIs by real-world proximity; pins without lat/lng
  * always share one group (never clustered by current board position).
  *
- * Uses trip spread for adaptive thresholds, drops geographic outliers,
+ * Uses outlier removal, median nearest-neighbor spacing for cluster thresholds,
  * then clusters core POIs via a sparse lat/lng grid + union-find.
  */
 export function layoutByProximity(pois: POIBase[]): BoardLayoutResult {
@@ -448,7 +462,11 @@ export function layoutByProximity(pois: POIBase[]): BoardLayoutResult {
 
     if (core.length >= 2) {
       const spread = tripSpreadKm(core)
-      const threshold = clusterThresholdFromSpread(spread)
+      const coreNeighborKm = nearestNeighborDistances(core)
+      const threshold = clusterThresholdFromNeighborDistances(
+        coreNeighborKm,
+        spread,
+      )
       let clusterId = 0
       for (const group of clusterByLatLngGrid(core, threshold).values()) {
         clusters.set(clusterId++, group)
