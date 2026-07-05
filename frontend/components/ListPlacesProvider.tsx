@@ -26,7 +26,7 @@ export default function ListPlacesProvider({
   children: ReactNode
 }) {
   const { user } = useAuth()
-  const { otherViewers } = useListScreenShell()
+  const { otherViewers, updateMemberCount } = useListScreenShell()
   const [getaways, setGetaways] = useState<Getaway[]>([])
   const [pois, setPois] = useState<POIBase[]>([])
   const [members, setMembers] = useState<any[]>([])
@@ -50,6 +50,11 @@ export default function ListPlacesProvider({
   useEffect(() => {
     if (!dataLoaded) void loadData()
   }, [])
+
+  useEffect(() => {
+    if (!dataLoaded) return
+    updateMemberCount(members)
+  }, [members, dataLoaded, updateMemberCount])
 
   useListRealtime({
     listId,

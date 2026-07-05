@@ -5,8 +5,8 @@ import { BoardProvider, useBoardContext } from '@/lib/BoardContext'
 import type { BoardLayoutMode } from '@/lib/boardLayout'
 import type { BoardCreatablePoiType } from '@/lib/poi'
 import BoardView, { type BoardViewHandle } from './BoardView'
-import { ListScreenHeader } from './ListScreenShell'
 import { ListScreenChatButton } from './ListScreenChrome'
+import { useListScreenShell } from '@/lib/ListScreenShellContext'
 import BoardScreenToolbar from './BoardScreenToolbar'
 import BoardScreenSortActions from './BoardScreenSortActions'
 import PoiDetailSidebar from './PoiDetailSidebar'
@@ -28,10 +28,14 @@ export default function ListBoardScreen({ listId }: { listId: string }) {
 
 function ListBoardScreenInner({ listId }: { listId: string }) {
   const isMobile = useIsMobile()
+  const { setChromeSubheaderRight, setChromeOverlayHidden, updateMemberCount } =
+    useListScreenShell()
   const boardRef = useRef<BoardViewHandle>(null)
   const idleTimerRef = useRef<number>()
   const {
     pois,
+    members,
+    isLoading: boardLoading,
     error,
     setError,
     handleUpdateGetaway,
@@ -67,9 +71,26 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
   }, [])
 
   useEffect(() => {
-    document.body.classList.add('board-screen-active')
+    if (boardLoading) return
+    updateMemberCount(members)
+  }, [members, boardLoading, updateMemberCount])
+
+  useEffect(() => {
+    setChromeSubheaderRight(
+      <ListScreenChatButton
+        chatOpen={chatOpen}
+        onToggle={() => setChatOpen((open) => !open)}
+      />,
+    )
+    return () => setChromeSubheaderRight(null)
+  }, [chatOpen, setChromeSubheaderRight])
+
+  useEffect(() => {
+    setChromeOverlayHidden(!chromeVisible)
+  }, [chromeVisible, setChromeOverlayHidden])
+
+  useEffect(() => {
     return () => {
-      document.body.classList.remove('board-screen-active')
       window.clearTimeout(idleTimerRef.current)
     }
   }, [])
@@ -115,15 +136,6 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
       <div
         className={`board-screen__overlay${chromeVisible ? '' : ' board-screen__overlay--hidden'}`}
       >
-        <ListScreenHeader
-          variant="overlay"
-          subheaderRight={
-            <ListScreenChatButton
-              chatOpen={chatOpen}
-              onToggle={() => setChatOpen((open) => !open)}
-            />
-          }
-        />
         <BoardScreenSortActions
           creating={creating}
           sorting={sorting}

@@ -3010,15 +3010,45 @@ body.board-screen-active main {
   opacity: 0;
 }
 
-.board-screen__overlay .list-screen-chrome,
-.board-screen__tools,
-.board-screen__sort-actions {
+.board-screen__overlay .board-screen__tools,
+.board-screen__overlay .board-screen__sort-actions {
   pointer-events: auto;
 }
 
-.board-screen__overlay--hidden .list-screen-chrome,
 .board-screen__overlay--hidden .board-screen__tools,
 .board-screen__overlay--hidden .board-screen__sort-actions {
+  pointer-events: none;
+}
+
+.list-screen-shell--board {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.list-screen-chrome-wrap--page {
+  flex-shrink: 0;
+}
+
+.list-screen-chrome-wrap--overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 110;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.4s ease;
+}
+
+.list-screen-chrome-wrap--overlay .list-screen-chrome {
+  pointer-events: auto;
+}
+
+.list-screen-chrome-wrap--overlay.list-screen-chrome-wrap--hidden {
+  opacity: 0;
+}
+
+.list-screen-chrome-wrap--overlay.list-screen-chrome-wrap--hidden .list-screen-chrome {
   pointer-events: none;
 }
 

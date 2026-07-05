@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { getList } from '@/lib/api'
+import { getList, getListMembers } from '@/lib/api'
 import { useAuth } from '@/lib/AuthContext'
 import { useListPresence, type PresenceUser } from '@/lib/realtime'
 import { activeViewFromPathname } from '@/lib/listRoutes'
-import { ListScreenShellProvider, useListScreenShell } from '@/lib/ListScreenShellContext'
+import { ListScreenShellProvider } from '@/lib/ListScreenShellContext'
 import ListScreenChrome from './ListScreenChrome'
 import ListMembersModal from './ListMembersModal'
 import ListPlacesProvider from './ListPlacesProvider'
@@ -23,23 +23,26 @@ export default function ListScreenShell({
   const pathname = usePathname()
   const { user } = useAuth()
   const activeView = activeViewFromPathname(pathname, listId)
+  const isBoard = activeView === 'board'
 
   const [listName, setListName] = useState('')
   const [memberCount, setMemberCount] = useState(0)
   const [membersOpen, setMembersOpen] = useState(false)
   const [viewingUsers, setViewingUsers] = useState<PresenceUser[]>([])
   const [chromeFooter, setChromeFooter] = useState<ReactNode>(null)
+  const [chromeSubheaderRight, setChromeSubheaderRight] = useState<ReactNode>(null)
+  const [chromeOverlayHidden, setChromeOverlayHidden] = useState(false)
   const [listLoading, setListLoading] = useState(true)
   const [listError, setListError] = useState('')
 
   useEffect(() => {
     let cancelled = false
     setListLoading(true)
-    void getList(listId)
-      .then((list) => {
+    void Promise.all([getList(listId), getListMembers(listId)])
+      .then(([list, membersData]) => {
         if (cancelled) return
         setListName(list.name)
-        setMemberCount(list.member_count ?? 0)
+        setMemberCount((membersData?.members || []).length)
         setListError('')
       })
       .catch(() => {
@@ -53,6 +56,19 @@ export default function ListScreenShell({
       cancelled = true
     }
   }, [listId])
+
+  useEffect(() => {
+    if (!isBoard) {
+      setChromeSubheaderRight(null)
+      setChromeOverlayHidden(false)
+    }
+  }, [isBoard])
+
+  useEffect(() => {
+    if (!isBoard) return
+    document.body.classList.add('board-screen-active')
+    return () => document.body.classList.remove('board-screen-active')
+  }, [isBoard])
 
   useListPresence({
     listId,
@@ -93,31 +109,47 @@ export default function ListScreenShell({
     openMembers: () => setMembersOpen(true),
     chromeFooter,
     setChromeFooter,
+    chromeSubheaderRight,
+    setChromeSubheaderRight,
+    chromeOverlayHidden,
+    setChromeOverlayHidden,
     onBack,
   }
 
+  const chromeWrapClass = [
+    'list-screen-chrome-wrap',
+    isBoard ? 'list-screen-chrome-wrap--overlay' : 'list-screen-chrome-wrap--page',
+    isBoard && chromeOverlayHidden ? 'list-screen-chrome-wrap--hidden' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   return (
     <ListScreenShellProvider value={shellValue}>
-      {activeView === 'board' ? (
-        children
-      ) : (
-        <ListPlacesProvider listId={listId} listName={listName}>
-          <div className="list-detail-scroll">
+      <ListPlacesProvider listId={listId} listName={listName}>
+        <div
+          className={
+            isBoard ? 'list-screen-shell list-screen-shell--board' : 'list-detail-scroll'
+          }
+        >
+          <div className={chromeWrapClass}>
             <ListScreenChrome
               listId={listId}
               listName={listName}
               otherViewers={otherViewers}
               activeView={activeView}
+              variant={isBoard ? 'overlay' : 'page'}
               onBack={onBack}
               memberCount={memberCount}
               onMembersClick={() => setMembersOpen(true)}
+              subheaderRight={chromeSubheaderRight}
             >
-              {chromeFooter}
+              {!isBoard ? chromeFooter : null}
             </ListScreenChrome>
-            {children}
           </div>
-        </ListPlacesProvider>
-      )}
+          {children}
+        </div>
+      </ListPlacesProvider>
 
       <ListMembersModal
         isOpen={membersOpen}
@@ -129,41 +161,5 @@ export default function ListScreenShell({
         onMembersUpdated={updateMemberCount}
       />
     </ListScreenShellProvider>
-  )
-}
-
-export function ListScreenHeader({
-  variant = 'page',
-  subheaderRight,
-  children,
-}: {
-  variant?: 'page' | 'overlay'
-  subheaderRight?: ReactNode
-  children?: ReactNode
-}) {
-  const {
-    listId,
-    listName,
-    activeView,
-    otherViewers,
-    memberCount,
-    openMembers,
-    onBack,
-  } = useListScreenShell()
-
-  return (
-    <ListScreenChrome
-      listId={listId}
-      listName={listName}
-      otherViewers={otherViewers}
-      activeView={activeView}
-      variant={variant}
-      onBack={onBack}
-      memberCount={memberCount}
-      onMembersClick={openMembers}
-      subheaderRight={subheaderRight}
-    >
-      {children}
-    </ListScreenChrome>
   )
 }
