@@ -244,6 +244,15 @@ const KM_PER_DEG_LAT = 111
 
 type GeoPoi = POIBase & { lat: number; lng: number }
 
+function median(values: number[]): number {
+  if (values.length === 0) return 0
+  const sorted = [...values].sort((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 === 0
+    ? (sorted[mid - 1] + sorted[mid]) / 2
+    : sorted[mid]
+}
+
 function percentile(values: number[], p: number): number {
   if (values.length === 0) return 0
   const sorted = [...values].sort((a, b) => a - b)
@@ -307,6 +316,107 @@ function clusterThresholdFromSpread(spreadKm: number): number {
   const maxKm = spreadKm * 0.25
   const fraction = spreadKm < 30 ? 0.15 : spreadKm < 400 ? 0.12 : 0.08
   return Math.min(maxKm, Math.max(minKm, spreadKm * fraction))
+}
+
+/** Cell width for NN probes — ~spread/√n keeps buckets small on average. */
+function queryCellSizeKm(pois: GeoPoi[]): number {
+  const spread = tripSpreadKm(pois)
+  return Math.max(spread / Math.max(1, Math.sqrt(pois.length)), 0.5)
+}
+
+function minCellWidthKm(grid: LatLngGrid, refLat: number): number {
+  const latKm = grid.cellLatDeg * KM_PER_DEG_LAT
+  const lngKm =
+    grid.cellLngDeg * KM_PER_DEG_LAT * Math.cos((refLat * Math.PI) / 180)
+  return Math.min(latKm, lngKm)
+}
+
+function maxGridRing(grid: LatLngGrid, row: number, col: number): number {
+  let maxRing = 0
+  for (const key of grid.buckets.keys()) {
+    const [r, c] = key.split(',').map(Number)
+    maxRing = Math.max(maxRing, Math.abs(r - row), Math.abs(c - col))
+  }
+  return maxRing
+}
+
+/** True nearest-neighbor distance for one pin via expanding grid rings. */
+function nearestNeighborKmInGrid(
+  pois: GeoPoi[],
+  grid: LatLngGrid,
+  index: number,
+): number {
+  if (pois.length < 2) return Infinity
+
+  const { row, col } = cellCoords(
+    pois[index],
+    grid.minLat,
+    grid.minLng,
+    grid.cellLatDeg,
+    grid.cellLngDeg,
+  )
+  const minCellKm = minCellWidthKm(grid, pois[index].lat)
+  const maxRing = maxGridRing(grid, row, col)
+  let best = Infinity
+
+  for (let ring = 0; ring <= maxRing; ring++) {
+    for (let dr = -ring; dr <= ring; dr++) {
+      for (let dc = -ring; dc <= ring; dc++) {
+        if (ring === 0) {
+          if (dr !== 0 || dc !== 0) continue
+        } else if (Math.max(Math.abs(dr), Math.abs(dc)) !== ring) {
+          continue
+        }
+
+        const bucket = grid.buckets.get(cellKey(row + dr, col + dc))
+        if (!bucket) continue
+        for (const j of bucket) {
+          if (j === index) continue
+          best = Math.min(
+            best,
+            haversineKm(
+              pois[index].lat,
+              pois[index].lng,
+              pois[j].lat,
+              pois[j].lng,
+            ),
+          )
+        }
+      }
+    }
+
+    if (best !== Infinity && (ring === 0 || best <= ring * minCellKm)) break
+  }
+
+  return best
+}
+
+/** Grid-accelerated NN distances — used for threshold only, not outlier split. */
+function nearestNeighborDistances(
+  pois: GeoPoi[],
+  cellSizeKm = queryCellSizeKm(pois),
+): number[] {
+  if (pois.length < 2) return pois.map(() => Infinity)
+  const grid = buildLatLngGrid(pois, cellSizeKm)
+  return pois.map((_, i) => nearestNeighborKmInGrid(pois, grid, i))
+}
+
+/**
+ * Cluster radius from median local spacing among core POIs, capped by spread
+ * so multi-city trips don't chain across regions.
+ */
+function clusterThresholdFromNeighborDistances(
+  neighborKm: number[],
+  spreadKm: number,
+): number {
+  if (neighborKm.length <= 1) return clusterThresholdFromSpread(spreadKm)
+
+  const med = median(neighborKm)
+  const p75 = percentile(neighborKm, 75)
+  const fromNeighbors = med * 1.75
+  const minKm = Math.max(0.5, spreadKm * 0.02)
+  const maxKm = Math.max(p75 * 2.5, spreadKm * 0.25)
+  return Math.min(maxKm, Math.max(minKm, fromNeighbors))
 }
 
 type LatLngGrid = {
@@ -411,8 +521,9 @@ function clusterByLatLngGrid(
  * Cluster geocoded POIs by real-world proximity; pins without lat/lng
  * always share one group (never clustered by current board position).
  *
- * Drops centroid outliers (O(n)), derives threshold from core trip spread,
- * then one lat/lng grid pass + union-find for clustering (O(n + e) typical).
+ * Drops centroid outliers (O(n)), derives threshold from median core NN
+ * spacing via one grid probe pass, then clusters with a second grid at that
+ * threshold + union-find (O(n log n + e) typical).
  */
 export function layoutByProximity(pois: POIBase[]): BoardLayoutResult {
   if (pois.length === 0) return new Map()
@@ -427,7 +538,11 @@ export function layoutByProximity(pois: POIBase[]): BoardLayoutResult {
     const { core, outliers } = splitOutliers(geo)
 
     if (core.length >= 2) {
-      const threshold = clusterThresholdFromSpread(tripSpreadKm(core))
+      const spread = tripSpreadKm(core)
+      const threshold = clusterThresholdFromNeighborDistances(
+        nearestNeighborDistances(core),
+        spread,
+      )
       let clusterId = 0
       for (const group of clusterByLatLngGrid(core, threshold).values()) {
         clusters.set(clusterId++, group)
