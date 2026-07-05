@@ -2,6 +2,8 @@
 import logging
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, DefaultMarkdownGenerator, PruningContentFilter
 
+from utils.robots import SCOUT_USER_AGENT
+
 log = logging.getLogger("scout.crawler")
 
 
@@ -24,10 +26,7 @@ def create_crawler_config(url: str, js_code: str = "", is_js_heavy: bool = False
         markdown_generator=md_generator,
         process_iframes=True,
         remove_overlay_elements=True,
-        user_agent=(
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            if is_js_heavy else None
-        ),
+        user_agent=SCOUT_USER_AGENT,
     )
 
 

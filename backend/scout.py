@@ -19,6 +19,7 @@ from utils.images import (
     fetch_og_image,
 )
 from utils.crawler import crawl_page
+from utils.robots import scout_url_allowed
 from utils.extraction import extract_villa_two_pass, extract_price_from_text
 from utils.scout_limits import (
     SCOUT_MAX_INPUT_CHARS,
@@ -303,6 +304,17 @@ async def scrape_and_thin_check(
     """
     print(f"[SCOUT] Scraping: {url}")
     crawl_url = add_search_params(url, check_in, check_out, guests)
+    if not await scout_url_allowed(crawl_url):
+        print("[WARN] robots.txt disallows crawl — use manual paste")
+        return {
+            "is_thin": True,
+            "robots_blocked": True,
+            "extraction_md": None,
+            "crawl_image_urls": None,
+            "image_candidate_urls": None,
+            "url": url,
+            "source_url": url,
+        }
     js_code = generate_js_params(check_in, check_out, guests)
     if is_js_heavy_site(crawl_url):
         scroll_js = "window.scrollTo(0, 1000);"
