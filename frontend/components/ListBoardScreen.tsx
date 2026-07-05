@@ -4,9 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BoardProvider, useBoardContext } from '@/lib/BoardContext'
 import type { BoardLayoutMode } from '@/lib/boardLayout'
 import type { BoardCreatablePoiType } from '@/lib/poi'
-import { useRouter } from 'next/navigation'
 import BoardView, { type BoardViewHandle } from './BoardView'
-import ListScreenChrome, { ListScreenChatButton } from './ListScreenChrome'
+import { ListScreenHeader } from './ListScreenShell'
+import { ListScreenChatButton } from './ListScreenChrome'
 import BoardScreenToolbar from './BoardScreenToolbar'
 import BoardScreenSortActions from './BoardScreenSortActions'
 import PoiDetailSidebar from './PoiDetailSidebar'
@@ -14,7 +14,6 @@ import GetawayDetailSheet from './GetawayDetailSheet'
 import CommentsSidebar from './CommentsSidebar'
 import ImageGallery from './ImageGallery'
 import BoardChatPanel from './BoardChatPanel'
-import ListMembersModal from './ListMembersModal'
 import { useIsMobile } from '@/hooks/useIsMobile'
 
 const IDLE_MS = 1000
@@ -28,19 +27,13 @@ export default function ListBoardScreen({ listId }: { listId: string }) {
 }
 
 function ListBoardScreenInner({ listId }: { listId: string }) {
-  const router = useRouter()
   const isMobile = useIsMobile()
   const boardRef = useRef<BoardViewHandle>(null)
   const idleTimerRef = useRef<number>()
   const {
-    list,
     pois,
-    members,
     error,
     setError,
-    otherViewers,
-    currentUserId,
-    updateMembers,
     handleUpdateGetaway,
     handleUpdatePoi,
     handleDeletePoi,
@@ -52,7 +45,6 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
   const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null)
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
-  const [membersOpen, setMembersOpen] = useState(false)
   const [focusedGetawayId, setFocusedGetawayId] = useState<string | null>(null)
   const [galleryImages, setGalleryImages] = useState<string[] | null>(null)
   const [galleryIndex, setGalleryIndex] = useState(0)
@@ -118,24 +110,13 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
     [handleDeletePoi],
   )
 
-  if (!list) {
-    return null
-  }
-
   return (
     <div className="board-screen">
       <div
         className={`board-screen__overlay${chromeVisible ? '' : ' board-screen__overlay--hidden'}`}
       >
-        <ListScreenChrome
-          listId={listId}
-          listName={list.name}
-          otherViewers={otherViewers}
-          activeView="board"
+        <ListScreenHeader
           variant="overlay"
-          onBack={() => router.push(`/?list=${listId}`)}
-          memberCount={members.length}
-          onMembersClick={() => setMembersOpen(true)}
           subheaderRight={
             <ListScreenChatButton
               chatOpen={chatOpen}
@@ -226,16 +207,6 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
         listId={listId}
         isOpen={chatOpen}
         onClose={() => setChatOpen(false)}
-      />
-
-      <ListMembersModal
-        isOpen={membersOpen}
-        onClose={() => setMembersOpen(false)}
-        listId={listId}
-        currentUserId={currentUserId}
-        onLeaveList={() => router.push('/')}
-        onError={setError}
-        onMembersUpdated={updateMembers}
       />
     </div>
   )

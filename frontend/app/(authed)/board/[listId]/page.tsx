@@ -1,7 +1,14 @@
 'use client'
 
-import ListBoardScreen from '@/components/ListBoardScreen'
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
-export default function BoardPage({ params }: { params: { listId: string } }) {
-  return <ListBoardScreen listId={params.listId} />
+export default function LegacyBoardRedirect({ params }: { params: { listId: string } }) {
+  const router = useRouter()
+
+  useEffect(() => {
+    router.replace(`/list/${params.listId}/board`)
+  }, [params.listId, router])
+
+  return null
 }

@@ -5,7 +5,8 @@ import { presenceColorForUserId } from '@/lib/presenceColors'
 import type { PresenceUser } from '@/lib/realtime'
 import ScoutCredits from './ScoutCredits'
 import ScoutCreditCost from './ScoutCreditCost'
-import ListViewToggle, { type ListView } from './ListViewToggle'
+import ListViewToggle from './ListViewToggle'
+import { type ListView } from '@/lib/listRoutes'
 
 export default function ListScreenChrome({
   listId,

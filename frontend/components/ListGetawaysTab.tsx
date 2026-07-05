@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 import { scoutUrl, scoutPaste, deleteGetaway, updateGetaway } from "@/lib/api";
 import { useListDetailContext } from "@/lib/ListDetailContext";
@@ -34,6 +34,7 @@ function tryShowNotification(
 }
 
 export default function ListGetawaysTab({
+  viewMode,
   pasteParam,
   urlParam,
   commentsOpen = false,
@@ -42,6 +43,7 @@ export default function ListGetawaysTab({
   onFocusedGetawayChange,
   onStickyContent,
 }: {
+  viewMode: 'table' | 'map'
   pasteParam?: string | null;
   urlParam?: string | null;
   commentsOpen?: boolean;
@@ -52,7 +54,7 @@ export default function ListGetawaysTab({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const viewParam = searchParams.get("view");
+  const pathname = usePathname();
   const {
     list,
     getaways,
@@ -73,7 +75,6 @@ export default function ListGetawaysTab({
   const [pasteGetaway, setPasteGetaway] = useState<any>(null);
   const [galleryImages, setGalleryImages] = useState<string[] | null>(null);
   const [galleryIndex, setGalleryIndex] = useState(0);
-  const viewMode = viewParam === "map" ? "map" : "table";
   const [mapGetawayId, setMapGetawayId] = useState<string | null>(null);
   const [scoutPanelExpanded, setScoutPanelExpanded] = useState(true);
 
@@ -88,8 +89,8 @@ export default function ListGetawaysTab({
   }, [viewMode, dataLoaded, isLoading, onRefresh]);
 
   useEffect(() => {
-    if (viewParam !== "map") setMapGetawayId(null);
-  }, [viewParam]);
+    if (viewMode !== 'map') setMapGetawayId(null);
+  }, [viewMode]);
 
   useEffect(() => {
     if (mapGetawayId && !getaways.some((g: any) => g.id === mapGetawayId)) {
@@ -446,7 +447,7 @@ export default function ListGetawaysTab({
             params.delete("paste");
             params.delete("url");
             const q = params.toString();
-            router.replace(q ? "/?" + q : "/", { scroll: false });
+            router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
           }
         }}
         onSubmit={handleScoutPaste}

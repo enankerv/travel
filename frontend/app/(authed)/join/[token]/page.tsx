@@ -27,7 +27,7 @@ export default function JoinPage() {
         if (cancelled) return
         await acceptInvite(token)
         if (cancelled) return
-        router.replace(`/?list=${invite.list_id}`)
+        router.replace(`/list/${invite.list_id}`)
       } catch (err: unknown) {
         if (cancelled) return
         const e = err as Error

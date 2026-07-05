@@ -1,14 +1,11 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { listViewHref, type ListView } from '@/lib/listRoutes'
 
-export type ListView = 'list' | 'map' | 'board'
+export type { ListView }
 
-export function listViewHref(listId: string, view: ListView): string {
-  if (view === 'board') return `/board/${listId}`
-  if (view === 'map') return `/?list=${listId}&view=map`
-  return `/?list=${listId}`
-}
+export { listViewHref }
 
 const VIEWS: { id: ListView; label: string }[] = [
   { id: 'list', label: 'List' },
