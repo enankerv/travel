@@ -248,14 +248,17 @@ export function poiDisplayNorm(
   poi: { subgroup_id?: string | null; board_x?: number; board_y?: number },
   subgroups: BoardSubgroup[],
   offset?: BoardNorm,
+  getRect?: (sg: BoardSubgroup) => { board_w: number; board_h: number },
 ): BoardNorm {
   const ox = offset?.wx ?? poi.board_x ?? 0.5
   const oy = offset?.wy ?? poi.board_y ?? 0.5
   const sgId = poi.subgroup_id ?? null
   if (!sgId) return { wx: ox, wy: oy }
   const sg = subgroupsById(subgroups).get(sgId)
-  if (!sg || sg.board_w <= 0 || sg.board_h <= 0) return { wx: ox, wy: oy }
-  return { wx: ox / sg.board_w, wy: oy / sg.board_h }
+  if (!sg) return { wx: ox, wy: oy }
+  const frame = getRect ? getRect(sg) : sg
+  if (frame.board_w <= 0 || frame.board_h <= 0) return { wx: ox, wy: oy }
+  return { wx: ox / frame.board_w, wy: oy / frame.board_h }
 }
 
 const MIN_SUBGROUP_SPAN = 0.08

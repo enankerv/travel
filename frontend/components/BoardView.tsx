@@ -361,7 +361,7 @@ const BoardView = forwardRef<
               ) {
                 offset = layoutGospel
               }
-              return poiDisplayNorm(poi, subgroups, offset)
+              return poiDisplayNorm(poi, subgroups, offset, subgroupEdit.getRect)
             }}
             getPinHoldState={presence.getPinHoldState}
             getPinHighlightColor={presence.getPinHighlightColor}
