@@ -582,4 +582,33 @@ export function computeBoardLayout(
   return mode === 'poi_type' ? layoutByPoiType(pois) : layoutByProximity(pois)
 }
 
+/** Subgroup id for scoped sort, or `null` for root-level pins. */
+export function resolveBoardSortScope(
+  selectedSubgroupId?: string | null,
+): string | null {
+  return selectedSubgroupId ?? null
+}
+
+export function poisInSortScope(
+  pois: POIBase[],
+  scopeSubgroupId: string | null,
+): POIBase[] {
+  return pois.filter((p) => (p.subgroup_id ?? null) === scopeSubgroupId)
+}
+
+export function storedPositionsFromLayout(
+  layout: BoardLayoutResult,
+  scopeSubgroupId: string | null,
+  subgroups: Array<{ id: string; board_w: number; board_h: number }>,
+): Array<{ id: string; board_x: number; board_y: number }> {
+  const sg = scopeSubgroupId
+    ? subgroups.find((s) => s.id === scopeSubgroupId)
+    : null
+  return [...layout.entries()].map(([id, pos]) => ({
+    id,
+    board_x: sg ? pos.wx * sg.board_w : pos.wx,
+    board_y: sg ? pos.wy * sg.board_h : pos.wy,
+  }))
+}
+
 export const BOARD_LAYOUT_ANIM_MS = 420

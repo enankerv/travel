@@ -5,11 +5,15 @@ import { bulkUpdatePoiPositions } from '@/lib/api'
 import {
   BOARD_LAYOUT_ANIM_MS,
   computeBoardLayout,
+  poisInSortScope,
+  resolveBoardSortScope,
+  storedPositionsFromLayout,
   type BoardLayoutMode,
 } from '@/lib/boardLayout'
 import type { BoardNorm } from '@/lib/boardMath'
 import { pruneStaleGospel } from '@/lib/boardPin'
 import type { BoardPoi } from '@/lib/board'
+import type { BoardSubgroup } from '@/lib/subgroup'
 import {
   commitGospelEntry,
   type GospelByPoiId,
@@ -29,6 +33,8 @@ export function useBoardLayout(opts: {
   otherViewers: PresenceUser[]
   enabled: boolean
   pois: BoardPoi[]
+  subgroups: BoardSubgroup[]
+  selectedSubgroupId?: string | null
   setPois: React.Dispatch<React.SetStateAction<BoardPoi[]>>
   setError: (msg: string) => void
   isDragActive: boolean
@@ -40,6 +46,8 @@ export function useBoardLayout(opts: {
     otherViewers,
     enabled,
     pois,
+    subgroups,
+    selectedSubgroupId = null,
     setPois,
     setError,
     isDragActive,
@@ -51,6 +59,10 @@ export function useBoardLayout(opts: {
   const [sorting, setSorting] = useState(false)
   const poisRef = useRef(pois)
   poisRef.current = pois
+  const subgroupsRef = useRef(subgroups)
+  subgroupsRef.current = subgroups
+  const selectedSubgroupIdRef = useRef(selectedSubgroupId)
+  selectedSubgroupIdRef.current = selectedSubgroupId
   const sortingRef = useRef(false)
   sortingRef.current = sorting
   const isDragActiveRef = useRef(isDragActive)
@@ -144,16 +156,22 @@ export function useBoardLayout(opts: {
 
   const applyBoardSort = useCallback(
     async (mode: BoardLayoutMode) => {
-      if (sorting || isDragActive || poisRef.current.length === 0) return
+      if (sorting || isDragActive) return
 
-      const layout = computeBoardLayout(poisRef.current, mode)
+      const allPois = poisRef.current
+      const subgroups = subgroupsRef.current
+      const scope = resolveBoardSortScope(selectedSubgroupIdRef.current)
+      const scoped = poisInSortScope(allPois, scope)
+      if (scoped.length === 0) return
+
+      const layout = computeBoardLayout(scoped, mode)
       if (layout.size === 0) return
 
-      const positions = [...layout.entries()].map(([id, pos]) => ({
-        id,
-        board_x: pos.wx,
-        board_y: pos.wy,
-      }))
+      const positions = storedPositionsFromLayout(
+        layout,
+        scope,
+        subgroups,
+      )
 
       await applyLayoutPositions(positions, { persist: true, mode })
     },

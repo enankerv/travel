@@ -176,6 +176,8 @@ const BoardView = forwardRef<
     otherViewers,
     enabled,
     pois,
+    subgroups,
+    selectedSubgroupId: selectedSubgroupId ?? null,
     setPois,
     setError,
     isDragActive:
