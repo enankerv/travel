@@ -5,7 +5,6 @@ import {
   BOARD_WORLD_W,
   type BoardCamera,
 } from '@/lib/boardCoords'
-import { BOARD_ROOT_SPACE, screenToLocalNorm, type BoardSpace } from '@/lib/boardSpace'
 import type { BoardSubgroup } from '@/lib/subgroup'
 
 export const BOARD_MIN_SCALE = 0.08
@@ -203,61 +202,20 @@ export function zoomCameraAtPoint(
   }
 }
 
-export function pinCenterNorm(
-  pinEl: HTMLElement,
-  viewport: HTMLDivElement,
-  camera: BoardCamera,
-  space: BoardSpace = BOARD_ROOT_SPACE,
-): BoardNorm | null {
-  const rect = pinEl.getBoundingClientRect()
-  return screenToLocalNorm(
-    viewport,
-    camera,
-    space,
-    rect.left + rect.width / 2,
-    rect.top + rect.height / 2,
-  )
-}
+export type PoiOffsetBounds = { maxWx: number; maxWy: number }
 
 /** Map cursor position → anchor, keeping pin center fixed relative to the grab. */
 export function anchorFromDragPointer(
   drag: PinDragGrab,
   cursorWx: number,
   cursorWy: number,
+  bounds: PoiOffsetBounds = { maxWx: 1, maxWy: 1 },
 ): BoardNorm {
   const centerWx = cursorWx - drag.grabOffsetWx
   const centerWy = cursorWy - drag.grabOffsetWy
   return {
-    wx: clamp(centerWx + drag.anchorFromCenterWx, 0, 1),
-    wy: clamp(centerWy + drag.anchorFromCenterWy, 0, 1),
-  }
-}
-
-export function computePinGrabOffsets(
-  pinEl: HTMLElement,
-  viewport: HTMLDivElement,
-  camera: BoardCamera,
-  clientX: number,
-  clientY: number,
-  anchorWx: number,
-  anchorWy: number,
-  space: BoardSpace = BOARD_ROOT_SPACE,
-): PinDragGrab {
-  const cursorNorm = screenToLocalNorm(viewport, camera, space, clientX, clientY)
-  const centerNorm = pinCenterNorm(pinEl, viewport, camera, space)
-  if (!cursorNorm || !centerNorm) {
-    return {
-      grabOffsetWx: 0,
-      grabOffsetWy: 0,
-      anchorFromCenterWx: 0,
-      anchorFromCenterWy: 0,
-    }
-  }
-  return {
-    grabOffsetWx: cursorNorm.wx - centerNorm.wx,
-    grabOffsetWy: cursorNorm.wy - centerNorm.wy,
-    anchorFromCenterWx: anchorWx - centerNorm.wx,
-    anchorFromCenterWy: anchorWy - centerNorm.wy,
+    wx: clamp(centerWx + drag.anchorFromCenterWx, 0, bounds.maxWx),
+    wy: clamp(centerWy + drag.anchorFromCenterWy, 0, bounds.maxWy),
   }
 }
 

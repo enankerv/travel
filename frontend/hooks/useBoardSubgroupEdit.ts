@@ -12,9 +12,7 @@ import { updateSubgroup } from '@/lib/api'
 import type { BoardCamera } from '@/lib/boardCoords'
 import {
   clampSubgroupRect,
-  parentSpaceForSubgroup,
-  screenToLocalNorm,
-  type BoardSpaceIndex,
+  screenToParentLocal,
 } from '@/lib/boardSpace'
 import type { BoardSubgroup } from '@/lib/subgroup'
 
@@ -42,7 +40,6 @@ type SubgroupDrag =
 export function useBoardSubgroupEdit(opts: {
   listId: string
   subgroups: BoardSubgroup[]
-  boardSpaceIndex: BoardSpaceIndex
   setSubgroups: React.Dispatch<React.SetStateAction<BoardSubgroup[]>>
   setError: (msg: string) => void
   viewportRef: RefObject<HTMLDivElement | null>
@@ -54,7 +51,6 @@ export function useBoardSubgroupEdit(opts: {
   const {
     listId,
     subgroups,
-    boardSpaceIndex,
     setSubgroups,
     setError,
     viewportRef,
@@ -89,16 +85,16 @@ export function useBoardSubgroupEdit(opts: {
     (sg: BoardSubgroup, clientX: number, clientY: number): { wx: number; wy: number } | null => {
       const vp = viewportRef.current
       if (!vp) return null
-      const parentSpace = parentSpaceForSubgroup(sg, boardSpaceIndex.spaceBySubgroupId)
-      return screenToLocalNorm(
+      return screenToParentLocal(
         vp,
         cameraRef.current ?? { x: 0, y: 0, scale: 1 },
-        parentSpace,
+        sg.parent_subgroup_id ?? null,
+        subgroupsRef.current,
         clientX,
         clientY,
       )
     },
-    [viewportRef, cameraRef, boardSpaceIndex],
+    [viewportRef, cameraRef],
   )
 
   const applyOverride = useCallback((subgroupId: string, rect: SubgroupRect) => {

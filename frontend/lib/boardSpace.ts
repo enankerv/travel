@@ -1,73 +1,20 @@
-/** Nested board coordinate spaces — local 0–1 coords compose to root board norm. */
+/** Board coords — frames are parent-local rects; POI positions are offsets from frame origin. */
 import { screenToBoardNorm, type BoardCamera } from '@/lib/boardCoords'
-import type { BoardNorm } from '@/lib/boardMath'
+import { clamp, type BoardNorm } from '@/lib/boardMath'
 import type { BoardSubgroup } from '@/lib/subgroup'
 
-/** Normalized rect on a parent space (root board or subgroup interior). */
-export type BoardSpace = {
-  /** Root-normalized origin X (0–1 of full board world). */
-  offsetWx: number
-  offsetWy: number
-  /** Root-normalized span (product of ancestor frame sizes). */
-  scaleW: number
-  scaleH: number
-}
+export type SubgroupRootRect = { x: number; y: number; w: number; h: number }
 
-/** Precomputed spaces + parent→children tree for hit tests and coord transforms. */
-export type BoardSpaceIndex = {
-  spaceBySubgroupId: Map<string | null, BoardSpace>
+export type BoardSubgroupTree = {
+  byId: Map<string, BoardSubgroup>
   childrenByParentId: Map<string | null, BoardSubgroup[]>
+  rootRectById: Map<string, SubgroupRootRect>
 }
 
-export function rootBoundsContains(space: BoardSpace, root: BoardNorm): boolean {
-  return (
-    root.wx >= space.offsetWx &&
-    root.wx <= space.offsetWx + space.scaleW &&
-    root.wy >= space.offsetWy &&
-    root.wy <= space.offsetWy + space.scaleH
-  )
-}
-
-export const BOARD_ROOT_SPACE: BoardSpace = {
-  offsetWx: 0,
-  offsetWy: 0,
-  scaleW: 1,
-  scaleH: 1,
-}
-
-export function spaceForSubgroup(parent: BoardSpace, sg: BoardSubgroup): BoardSpace {
-  return {
-    offsetWx: parent.offsetWx + sg.board_x * parent.scaleW,
-    offsetWy: parent.offsetWy + sg.board_y * parent.scaleH,
-    scaleW: parent.scaleW * sg.board_w,
-    scaleH: parent.scaleH * sg.board_h,
-  }
-}
-
-/** Map subgroup id → composed root space + parent→children tree. */
-export function buildBoardSpaceIndex(subgroups: BoardSubgroup[]): BoardSpaceIndex {
-  const childrenByParentId = subgroupsByParentId(subgroups)
-  const spaceBySubgroupId = new Map<string | null, BoardSpace>()
-  spaceBySubgroupId.set(null, BOARD_ROOT_SPACE)
-
-  function assign(parentId: string | null, parentSpace: BoardSpace) {
-    const children = childrenByParentId.get(parentId) ?? []
-    for (const sg of children) {
-      const space = spaceForSubgroup(parentSpace, sg)
-      spaceBySubgroupId.set(sg.id, space)
-      assign(sg.id, space)
-    }
-  }
-
-  assign(null, BOARD_ROOT_SPACE)
-  return { spaceBySubgroupId, childrenByParentId }
-}
-
-/** Map subgroup id → composed root space (`null` = board root). */
-export function buildBoardSpaceBySubgroupId(
+export function subgroupsById(
   subgroups: BoardSubgroup[],
-): Map<string | null, BoardSpace> {
-  return buildBoardSpaceIndex(subgroups).spaceBySubgroupId
+): Map<string, BoardSubgroup> {
+  return new Map(subgroups.map((sg) => [sg.id, sg]))
 }
 
 export function subgroupsByParentId(
@@ -103,27 +50,156 @@ export function poisBySubgroupId<T extends { subgroup_id?: string | null }>(
   return map
 }
 
-export function localNormToRootNorm(space: BoardSpace, local: BoardNorm): BoardNorm {
+function subgroupRootRect(
+  sg: BoardSubgroup,
+  byId: Map<string, BoardSubgroup>,
+): SubgroupRootRect {
+  const parentId = sg.parent_subgroup_id ?? null
+  if (!parentId) {
+    return {
+      x: sg.board_x,
+      y: sg.board_y,
+      w: sg.board_w,
+      h: sg.board_h,
+    }
+  }
+  const parent = byId.get(parentId)
+  if (!parent) {
+    return { x: sg.board_x, y: sg.board_y, w: sg.board_w, h: sg.board_h }
+  }
+  const pr = subgroupRootRect(parent, byId)
   return {
-    wx: space.offsetWx + local.wx * space.scaleW,
-    wy: space.offsetWy + local.wy * space.scaleH,
+    x: pr.x + sg.board_x * pr.w,
+    y: pr.y + sg.board_y * pr.h,
+    w: sg.board_w * pr.w,
+    h: sg.board_h * pr.h,
   }
 }
 
-export function rootNormToLocalNorm(
-  space: BoardSpace,
+export function buildBoardSubgroupTree(
+  subgroups: BoardSubgroup[],
+): BoardSubgroupTree {
+  const byId = subgroupsById(subgroups)
+  const rootRectById = new Map<string, SubgroupRootRect>()
+  for (const sg of subgroups) {
+    rootRectById.set(sg.id, subgroupRootRect(sg, byId))
+  }
+  return {
+    byId,
+    childrenByParentId: subgroupsByParentId(subgroups),
+    rootRectById,
+  }
+}
+
+function rootContainsRect(rect: SubgroupRootRect, root: BoardNorm): boolean {
+  return (
+    root.wx >= rect.x &&
+    root.wx <= rect.x + rect.w &&
+    root.wy >= rect.y &&
+    root.wy <= rect.y + rect.h
+  )
+}
+
+function parentLocalToRoot(
+  parentSubgroupId: string | null,
+  local: BoardNorm,
+  byId: Map<string, BoardSubgroup>,
+): BoardNorm {
+  if (parentSubgroupId === null) return local
+  const parent = byId.get(parentSubgroupId)
+  if (!parent) return local
+  const gp = parent.parent_subgroup_id ?? null
+  if (gp === null) {
+    return { wx: parent.board_x + local.wx, wy: parent.board_y + local.wy }
+  }
+  return parentLocalToRoot(
+    gp,
+    {
+      wx: parent.board_x + local.wx * parent.board_w,
+      wy: parent.board_y + local.wy * parent.board_h,
+    },
+    byId,
+  )
+}
+
+export function rootToParentLocal(
   root: BoardNorm,
+  parentSubgroupId: string | null,
+  subgroups: BoardSubgroup[],
+): BoardNorm {
+  const byId = subgroupsById(subgroups)
+  if (parentSubgroupId === null) return root
+  const parent = byId.get(parentSubgroupId)
+  if (!parent) return root
+  const gp = parent.parent_subgroup_id ?? null
+  if (gp === null) {
+    return { wx: root.wx - parent.board_x, wy: root.wy - parent.board_y }
+  }
+  const gpLocal = rootToParentLocal(root, gp, subgroups)
+  return {
+    wx: parent.board_w > 0 ? (gpLocal.wx - parent.board_x) / parent.board_w : 0,
+    wy: parent.board_h > 0 ? (gpLocal.wy - parent.board_y) / parent.board_h : 0,
+  }
+}
+
+export function poiToRoot(
+  poi: { subgroup_id?: string | null; board_x?: number; board_y?: number },
+  subgroups: BoardSubgroup[],
+  offset?: BoardNorm,
+): BoardNorm {
+  const ox = offset?.wx ?? poi.board_x ?? 0.5
+  const oy = offset?.wy ?? poi.board_y ?? 0.5
+  const sgId = poi.subgroup_id ?? null
+  if (!sgId) return { wx: ox, wy: oy }
+  const byId = subgroupsById(subgroups)
+  const sg = byId.get(sgId)
+  if (!sg) return { wx: ox, wy: oy }
+  return parentLocalToRoot(
+    sg.parent_subgroup_id ?? null,
+    { wx: sg.board_x + ox, wy: sg.board_y + oy },
+    byId,
+  )
+}
+
+export function poiFromRoot(
+  root: BoardNorm,
+  subgroupId: string | null,
+  subgroups: BoardSubgroup[],
   opts?: { clamp?: boolean },
 ): BoardNorm {
-  const lx = space.scaleW > 0 ? (root.wx - space.offsetWx) / space.scaleW : 0
-  const ly = space.scaleH > 0 ? (root.wy - space.offsetWy) / space.scaleH : 0
-  if (opts?.clamp) {
-    return {
-      wx: Math.min(1, Math.max(0, lx)),
-      wy: Math.min(1, Math.max(0, ly)),
+  if (!subgroupId) {
+    let wx = root.wx
+    let wy = root.wy
+    if (opts?.clamp) {
+      wx = clamp(wx, 0, 1)
+      wy = clamp(wy, 0, 1)
     }
+    return { wx, wy }
   }
-  return { wx: lx, wy: ly }
+  const sg = subgroupsById(subgroups).get(subgroupId)
+  if (!sg) return root
+  const parentLocal = rootToParentLocal(
+    root,
+    sg.parent_subgroup_id ?? null,
+    subgroups,
+  )
+  let wx = parentLocal.wx - sg.board_x
+  let wy = parentLocal.wy - sg.board_y
+  if (opts?.clamp) {
+    wx = clamp(wx, 0, sg.board_w)
+    wy = clamp(wy, 0, sg.board_h)
+  }
+  return { wx, wy }
+}
+
+export function poiOffsetBounds(
+  subgroupId: string | null,
+  subgroups: BoardSubgroup[],
+): { maxWx: number; maxWy: number } {
+  if (!subgroupId) return { maxWx: 1, maxWy: 1 }
+  const sg = subgroupsById(subgroups).get(subgroupId)
+  if (!sg) return { maxWx: 1, maxWy: 1 }
+  return { maxWx: sg.board_w, maxWy: sg.board_h }
 }
 
 export function screenToRootNorm(
@@ -135,36 +211,55 @@ export function screenToRootNorm(
   return screenToBoardNorm(viewport, camera, clientX, clientY)
 }
 
-export function screenToLocalNorm(
+export function screenToParentLocal(
   viewport: HTMLElement,
   camera: BoardCamera,
-  space: BoardSpace,
+  parentSubgroupId: string | null,
+  subgroups: BoardSubgroup[],
   clientX: number,
   clientY: number,
   opts?: { clamp?: boolean },
 ): BoardNorm | null {
   const root = screenToRootNorm(viewport, camera, clientX, clientY)
   if (!root) return null
-  return rootNormToLocalNorm(space, root, opts)
+  const local = rootToParentLocal(root, parentSubgroupId, subgroups)
+  if (!opts?.clamp) return local
+  return {
+    wx: clamp(local.wx, 0, 1),
+    wy: clamp(local.wy, 0, 1),
+  }
 }
 
-/** World-pixel size of a space (for layout math that still uses BOARD_WORLD_*). */
-export function poiRootNorm(
+export function screenToPoiOffset(
+  viewport: HTMLElement,
+  camera: BoardCamera,
+  clientX: number,
+  clientY: number,
+  subgroups: BoardSubgroup[],
+  subgroupId: string | null,
+  opts?: { clamp?: boolean },
+): BoardNorm | null {
+  const root = screenToRootNorm(viewport, camera, clientX, clientY)
+  if (!root) return null
+  return poiFromRoot(root, subgroupId, subgroups, opts)
+}
+
+export function poiDisplayNorm(
   poi: { subgroup_id?: string | null; board_x?: number; board_y?: number },
-  spaceBySubgroupId: Map<string | null, BoardSpace>,
-  localOverride?: BoardNorm,
+  subgroups: BoardSubgroup[],
+  offset?: BoardNorm,
 ): BoardNorm {
-  const local = localOverride ?? {
-    wx: poi.board_x ?? 0.5,
-    wy: poi.board_y ?? 0.5,
-  }
-  const space = spaceBySubgroupId.get(poi.subgroup_id ?? null) ?? BOARD_ROOT_SPACE
-  return localNormToRootNorm(space, local)
+  const ox = offset?.wx ?? poi.board_x ?? 0.5
+  const oy = offset?.wy ?? poi.board_y ?? 0.5
+  const sgId = poi.subgroup_id ?? null
+  if (!sgId) return { wx: ox, wy: oy }
+  const sg = subgroupsById(subgroups).get(sgId)
+  if (!sg || sg.board_w <= 0 || sg.board_h <= 0) return { wx: ox, wy: oy }
+  return { wx: ox / sg.board_w, wy: oy / sg.board_h }
 }
 
 const MIN_SUBGROUP_SPAN = 0.08
 
-/** Clamp a subgroup rect to stay inside its parent (local 0–1). */
 export function clampSubgroupRect(rect: {
   board_x: number
   board_y: number
@@ -179,27 +274,22 @@ export function clampSubgroupRect(rect: {
   return { board_x, board_y, board_w, board_h }
 }
 
-/**
- * Deepest subgroup whose root-space bounds contain ``root`` (for pin drop).
- * Walks the tree from the board root — O(depth × siblings) per level, not O(n).
- */
 export function subgroupContainingRootPoint(
   root: BoardNorm,
-  index: BoardSpaceIndex,
+  tree: BoardSubgroupTree,
 ): string | null {
   let parentId: string | null = null
   let bestId: string | null = null
 
   while (true) {
     const children: BoardSubgroup[] =
-      index.childrenByParentId.get(parentId) ?? []
+      tree.childrenByParentId.get(parentId) ?? []
     let hit: BoardSubgroup | null = null
 
-    // Siblings are sorted low→high z; last match is the topmost frame.
     for (let i = children.length - 1; i >= 0; i--) {
       const sg = children[i]
-      const space = index.spaceBySubgroupId.get(sg.id)
-      if (space && rootBoundsContains(space, root)) {
+      const rect = tree.rootRectById.get(sg.id)
+      if (rect && rootContainsRect(rect, root)) {
         hit = sg
         break
       }
@@ -211,11 +301,4 @@ export function subgroupContainingRootPoint(
   }
 
   return bestId
-}
-
-export function parentSpaceForSubgroup(
-  sg: BoardSubgroup,
-  spaceBySubgroupId: Map<string | null, BoardSpace>,
-): BoardSpace {
-  return spaceBySubgroupId.get(sg.parent_subgroup_id ?? null) ?? BOARD_ROOT_SPACE
 }

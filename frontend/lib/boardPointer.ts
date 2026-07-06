@@ -2,12 +2,13 @@
 import type { BoardCamera } from '@/lib/boardCoords'
 import {
   anchorFromDragPointer,
-  computePinGrabOffsets,
   exceedsDragThreshold,
   type BoardNorm,
   type PinDragGrab,
 } from '@/lib/boardMath'
-import { BOARD_ROOT_SPACE, screenToLocalNorm, type BoardSpace } from '@/lib/boardSpace'
+import { poiOffsetBounds, screenToPoiOffset } from '@/lib/boardSpace'
+import type { POIBase } from '@/lib/getaway'
+import type { BoardSubgroup } from '@/lib/subgroup'
 
 export type PanSession = {
   pointerId: number
@@ -83,17 +84,80 @@ export function panSessionMatches(
   return pan !== null && pan.pointerId === pointerId
 }
 
+function pinCenterOffset(
+  pinEl: HTMLElement,
+  viewport: HTMLDivElement,
+  camera: BoardCamera,
+  poi: POIBase,
+  subgroups: BoardSubgroup[],
+): BoardNorm | null {
+  const rect = pinEl.getBoundingClientRect()
+  return screenToPoiOffset(
+    viewport,
+    camera,
+    rect.left + rect.width / 2,
+    rect.top + rect.height / 2,
+    subgroups,
+    poi.subgroup_id ?? null,
+  )
+}
+
+export function computePinGrabOffsets(
+  pinEl: HTMLElement,
+  viewport: HTMLDivElement,
+  camera: BoardCamera,
+  clientX: number,
+  clientY: number,
+  anchorWx: number,
+  anchorWy: number,
+  poi: POIBase,
+  subgroups: BoardSubgroup[],
+): PinDragGrab {
+  const cursorNorm = screenToPoiOffset(
+    viewport,
+    camera,
+    clientX,
+    clientY,
+    subgroups,
+    poi.subgroup_id ?? null,
+  )
+  const centerNorm = pinCenterOffset(pinEl, viewport, camera, poi, subgroups)
+  if (!cursorNorm || !centerNorm) {
+    return {
+      grabOffsetWx: 0,
+      grabOffsetWy: 0,
+      anchorFromCenterWx: 0,
+      anchorFromCenterWy: 0,
+    }
+  }
+  return {
+    grabOffsetWx: cursorNorm.wx - centerNorm.wx,
+    grabOffsetWy: cursorNorm.wy - centerNorm.wy,
+    anchorFromCenterWx: anchorWx - centerNorm.wx,
+    anchorFromCenterWy: anchorWy - centerNorm.wy,
+  }
+}
+
 export function pinPosFromPointer(
   vp: HTMLElement,
   camera: BoardCamera,
   grab: PinDragGrab,
   clientX: number,
   clientY: number,
-  space: BoardSpace = BOARD_ROOT_SPACE,
+  poi: POIBase,
+  subgroups: BoardSubgroup[],
 ): BoardNorm | null {
-  const norm = screenToLocalNorm(vp, camera, space, clientX, clientY, { clamp: true })
-  if (!norm) return null
-  return anchorFromDragPointer(grab, norm.wx, norm.wy)
+  const bounds = poiOffsetBounds(poi.subgroup_id ?? null, subgroups)
+  const cursor = screenToPoiOffset(
+    vp,
+    camera,
+    clientX,
+    clientY,
+    subgroups,
+    poi.subgroup_id ?? null,
+  )
+  if (!cursor) return null
+  return anchorFromDragPointer(grab, cursor.wx, cursor.wy, bounds)
 }
 
 export function buildPendingPinPointer(opts: {
@@ -106,7 +170,8 @@ export function buildPendingPinPointer(opts: {
   pinEl: HTMLElement
   viewport: HTMLDivElement
   camera: BoardCamera
-  space?: BoardSpace
+  poi: POIBase
+  subgroups: BoardSubgroup[]
 }): PendingPinPointer {
   const grab = computePinGrabOffsets(
     opts.pinEl,
@@ -116,7 +181,8 @@ export function buildPendingPinPointer(opts: {
     opts.clientY,
     opts.anchorWx,
     opts.anchorWy,
-    opts.space,
+    opts.poi,
+    opts.subgroups,
   )
   return {
     poiId: opts.poiId,

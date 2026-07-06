@@ -18,14 +18,13 @@ import { useBoardPinPresence } from '@/hooks/useBoardPinPresence'
 import { useBoardSubgroupEdit } from '@/hooks/useBoardSubgroupEdit'
 import { useBoardViewport } from '@/hooks/useBoardViewport'
 import { BOARD_WORLD_H, BOARD_WORLD_W, screenToBoardNorm } from '@/lib/boardCoords'
-import { buildBoardSpaceIndex, BOARD_ROOT_SPACE } from '@/lib/boardSpace'
+import { buildBoardSubgroupTree, poiDisplayNorm, poiFromRoot, subgroupContainingRootPoint } from '@/lib/boardSpace'
 import {
   BOARD_CHAT_POI_DRAG_MIME,
   parseSuggestionDragPayload,
   suggestionToPoiCreate,
 } from '@/lib/boardChat'
 import type { BoardPoi } from '@/lib/board'
-import type { POIBase } from '@/lib/getaway'
 import {
   defaultTitleForPoiType,
   type BoardCreatablePoiType,
@@ -74,14 +73,23 @@ const BoardView = forwardRef<
     handleCreateSubgroup,
     handleUpdateSubgroup,
   } = useBoardContext()
-  const boardSpaceIndex = useMemo(
-    () => buildBoardSpaceIndex(subgroups),
+  const subgroupTree = useMemo(
+    () => buildBoardSubgroupTree(subgroups),
     [subgroups],
   )
-  const spaceForPoi = useCallback(
-    (poi: POIBase) =>
-      boardSpaceIndex.spaceBySubgroupId.get(poi.subgroup_id ?? null) ?? BOARD_ROOT_SPACE,
-    [boardSpaceIndex],
+
+  const poiFieldsAtRoot = useCallback(
+    (wx: number, wy: number) => {
+      const root = { wx, wy }
+      const subgroupId = subgroupContainingRootPoint(root, subgroupTree)
+      const offset = poiFromRoot(root, subgroupId, subgroups, { clamp: true })
+      return {
+        board_x: offset.wx,
+        board_y: offset.wy,
+        subgroup_id: subgroupId,
+      }
+    },
+    [subgroupTree, subgroups],
   )
   const dragPosOverrideRef = useRef<{ poiId: string; wx: number; wy: number } | null>(
     null,
@@ -130,7 +138,6 @@ const BoardView = forwardRef<
   const subgroupEdit = useBoardSubgroupEdit({
     listId,
     subgroups,
-    boardSpaceIndex,
     setSubgroups,
     setError,
     viewportRef,
@@ -143,6 +150,8 @@ const BoardView = forwardRef<
   const pinDrag = useBoardPinDrag({
     listId,
     pois,
+    subgroups,
+    subgroupTree,
     viewportRef,
     cameraRef,
     lockedPoiIds,
@@ -157,8 +166,6 @@ const BoardView = forwardRef<
       onSelectPoi?.(id)
     },
     onActivity,
-    spaceForPoi,
-    boardSpaceIndex,
   })
   handlePeerDragEndRef.current = pinDrag.handlePeerDragEnd
   dragPosOverrideRef.current = pinDrag.dragPosOverride
@@ -192,11 +199,11 @@ const BoardView = forwardRef<
   const addPoiAt = useCallback(
     async (wx: number, wy: number, poiType: BoardCreatablePoiType) => {
       try {
+        const placement = poiFieldsAtRoot(wx, wy)
         const poi = await createPoi(listId, {
           poi_type: poiType,
           title: defaultTitleForPoiType(poiType),
-          board_x: wx,
-          board_y: wy,
+          ...placement,
         })
         setPois((prev) => {
           if (prev.some((p) => p.id === poi.id)) return prev
@@ -206,7 +213,7 @@ const BoardView = forwardRef<
         setError('Failed to add item')
       }
     },
-    [listId, setPois, setError],
+    [listId, setPois, setError, poiFieldsAtRoot],
   )
 
   const addSuggestionAt = useCallback(
@@ -214,9 +221,10 @@ const BoardView = forwardRef<
       const suggestion = parseSuggestionDragPayload(raw)
       if (!suggestion) return
       try {
+        const placement = poiFieldsAtRoot(wx, wy)
         const poi = await createPoi(
           listId,
-          suggestionToPoiCreate(suggestion, wx, wy),
+          { ...suggestionToPoiCreate(suggestion, placement.board_x, placement.board_y), ...placement },
         )
         setPois((prev) => {
           if (prev.some((p) => p.id === poi.id)) return prev
@@ -227,7 +235,7 @@ const BoardView = forwardRef<
         setError('Failed to add suggestion to board')
       }
     },
-    [listId, setPois, setError, onSelectPoi],
+    [listId, setPois, setError, onSelectPoi, poiFieldsAtRoot],
   )
 
   const onViewportDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -343,16 +351,17 @@ const BoardView = forwardRef<
             pendingPoiId={pinDrag.pendingPoiId}
             layoutAnimating={boardLayout.layoutAnimating}
             getPinPos={(poi) => {
-              const dragPos = pinDrag.getPinPos(poi)
+              const stored = pinDrag.getPinPos(poi)
               const layoutGospel = boardLayout.getLayoutGospel(poi.id)
+              let offset = stored
               if (
                 layoutGospel &&
                 pinDrag.drag?.poiId !== poi.id &&
                 pinDrag.pendingPoiId !== poi.id
               ) {
-                return layoutGospel
+                offset = layoutGospel
               }
-              return dragPos
+              return poiDisplayNorm(poi, subgroups, offset)
             }}
             getPinHoldState={presence.getPinHoldState}
             getPinHighlightColor={presence.getPinHighlightColor}

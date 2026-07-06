@@ -12,12 +12,10 @@ import { bulkUpdatePoiPositions } from '@/lib/api'
 import type { BoardPoi } from '@/lib/board'
 import type { BoardCamera } from '@/lib/boardCoords'
 import {
-  BOARD_ROOT_SPACE,
-  localNormToRootNorm,
-  rootNormToLocalNorm,
+  poiFromRoot,
+  poiToRoot,
   subgroupContainingRootPoint,
-  type BoardSpace,
-  type BoardSpaceIndex,
+  type BoardSubgroupTree,
 } from '@/lib/boardSpace'
 import {
   clearGospelEntry,
@@ -37,10 +35,13 @@ import {
 } from '@/lib/boardPointer'
 import { pruneStaleGospel, resolvePinPosition } from '@/lib/boardPin'
 import type { POIBase } from '@/lib/getaway'
+import type { BoardSubgroup } from '@/lib/subgroup'
 
 export function useBoardPinDrag(opts: {
   listId: string
   pois: POIBase[]
+  subgroups: BoardSubgroup[]
+  subgroupTree: BoardSubgroupTree
   viewportRef: RefObject<HTMLDivElement | null>
   cameraRef: RefObject<BoardCamera | null>
   lockedPoiIds: ReadonlySet<string>
@@ -52,12 +53,12 @@ export function useBoardPinDrag(opts: {
   broadcastDragEnd: (poiId: string, wx: number, wy: number) => void
   onSelectPoi?: (poiId: string | null) => void
   onActivity?: () => void
-  spaceForPoi?: (poi: POIBase) => BoardSpace
-  boardSpaceIndex: BoardSpaceIndex
 }) {
   const {
     listId,
     pois,
+    subgroups,
+    subgroupTree,
     viewportRef,
     cameraRef,
     lockedPoiIds,
@@ -69,8 +70,6 @@ export function useBoardPinDrag(opts: {
     broadcastDragEnd,
     onSelectPoi,
     onActivity,
-    spaceForPoi = () => BOARD_ROOT_SPACE,
-    boardSpaceIndex,
   } = opts
 
   const [drag, setDrag] = useState<DragState | null>(null)
@@ -90,16 +89,8 @@ export function useBoardPinDrag(opts: {
   const onActivityRef = useRef(onActivity)
   onActivityRef.current = onActivity
 
-  const spaceForPoiRef = useRef(spaceForPoi)
-  spaceForPoiRef.current = spaceForPoi
-
-  const poiSpace = useCallback(
-    (poiId: string) => {
-      const poi = pois.find((p) => p.id === poiId)
-      return poi ? spaceForPoiRef.current(poi) : BOARD_ROOT_SPACE
-    },
-    [pois],
-  )
+  const subgroupsRef = useRef(subgroups)
+  subgroupsRef.current = subgroups
 
   const pingActivity = useCallback(() => {
     onActivityRef.current?.()
@@ -136,33 +127,36 @@ export function useBoardPinDrag(opts: {
     [broadcastDragStart],
   )
 
-  const boardSpaceIndexRef = useRef(boardSpaceIndex)
-  boardSpaceIndexRef.current = boardSpaceIndex
+  const subgroupTreeRef = useRef(subgroupTree)
+  subgroupTreeRef.current = subgroupTree
 
   const finishDrag = useCallback(
     async (state: DragState, pos: { wx: number; wy: number }) => {
       const poi = pois.find((p) => p.id === state.poiId)
       if (!poi) return
 
-      const fromSpace = spaceForPoiRef.current(poi)
-      const root = localNormToRootNorm(fromSpace, pos)
-      const index = boardSpaceIndexRef.current
-      const dropSubgroupId = subgroupContainingRootPoint(root, index)
-      const toSpace = index.spaceBySubgroupId.get(dropSubgroupId) ?? BOARD_ROOT_SPACE
-      const local = rootNormToLocalNorm(toSpace, root, { clamp: true })
+      const subgroupsNow = subgroupsRef.current
+      const root = poiToRoot(poi, subgroupsNow, pos)
+      const dropSubgroupId = subgroupContainingRootPoint(
+        root,
+        subgroupTreeRef.current,
+      )
+      const offset = poiFromRoot(root, dropSubgroupId, subgroupsNow, {
+        clamp: true,
+      })
 
       const prevSubgroupId = poi.subgroup_id ?? null
       const reparented = dropSubgroupId !== prevSubgroupId
 
-      commitGospel(state.poiId, local.wx, local.wy)
-      broadcastDragEnd(state.poiId, local.wx, local.wy)
+      commitGospel(state.poiId, offset.wx, offset.wy)
+      broadcastDragEnd(state.poiId, offset.wx, offset.wy)
       setPois((prev) =>
         prev.map((p) =>
           p.id === state.poiId
             ? {
                 ...p,
-                board_x: local.wx,
-                board_y: local.wy,
+                board_x: offset.wx,
+                board_y: offset.wy,
                 subgroup_id: dropSubgroupId,
               }
             : p,
@@ -172,8 +166,8 @@ export function useBoardPinDrag(opts: {
         await bulkUpdatePoiPositions(listId, [
           {
             id: state.poiId,
-            board_x: local.wx,
-            board_y: local.wy,
+            board_x: offset.wx,
+            board_y: offset.wy,
             ...(reparented ? { subgroup_id: dropSubgroupId } : {}),
           },
         ])
@@ -205,14 +199,16 @@ export function useBoardPinDrag(opts: {
           promotePendingToDrag(pending)
           pingActivity()
           const vp = viewportRef.current
-          if (vp) {
+          const poi = pois.find((p) => p.id === pending.poiId)
+          if (vp && poi) {
             const pos = pinPosFromPointer(
               vp,
               cameraRef.current ?? DEFAULT_BOARD_CAMERA,
               pending,
               e.clientX,
               e.clientY,
-              poiSpace(pending.poiId),
+              poi,
+              subgroupsRef.current,
             )
             if (pos) {
               setDragPos(pos)
@@ -227,14 +223,16 @@ export function useBoardPinDrag(opts: {
       if (activeDrag && activeDrag.pointerId === e.pointerId) {
         pingActivity()
         const vp = viewportRef.current
-        if (!vp) return true
+        const poi = pois.find((p) => p.id === activeDrag.poiId)
+        if (!vp || !poi) return true
         const pos = pinPosFromPointer(
           vp,
           cameraRef.current ?? DEFAULT_BOARD_CAMERA,
           activeDrag,
           e.clientX,
           e.clientY,
-          poiSpace(activeDrag.poiId),
+          poi,
+          subgroupsRef.current,
         )
         if (!pos) return true
         setDragPos(pos)
@@ -250,7 +248,7 @@ export function useBoardPinDrag(opts: {
       pingActivity,
       broadcastDragMove,
       promotePendingToDrag,
-      poiSpace,
+      pois,
     ],
   )
 
@@ -306,7 +304,8 @@ export function useBoardPinDrag(opts: {
         pinEl: e.currentTarget,
         viewport: vp,
         camera: cameraRef.current ?? DEFAULT_BOARD_CAMERA,
-        space: spaceForPoiRef.current(poi),
+        poi,
+        subgroups: subgroupsRef.current,
       })
       setPendingPoiId(poi.id)
       broadcastDragStart(poi.id, wx, wy)
