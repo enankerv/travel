@@ -20,6 +20,9 @@ import {
   updateGetaway,
   updatePoi,
   type CommentRecord,
+  createSubgroup,
+  deleteSubgroup,
+  updateSubgroup,
 } from '@/lib/api'
 import { useAuth } from '@/lib/AuthContext'
 import { useListRealtime, useListPresence, type PresenceUser } from '@/lib/realtime'
@@ -34,7 +37,18 @@ import {
   updateCommentOnBoardPoi,
   type BoardPoi,
 } from '@/lib/board'
-import type { BoardSubgroup } from '@/lib/subgroup'
+import type {
+  BoardSubgroup,
+  BoardSubgroupCreate,
+  BoardSubgroupUpdate,
+} from '@/lib/subgroup'
+import {
+  canNestSubgroupUnder,
+  countPoisInSubgroupSubtree,
+  MAX_SUBGROUP_DEPTH,
+  subgroupDeleteConfirmMessage,
+  subgroupSubtreeIds,
+} from '@/lib/subgroup'
 
 export type BoardContextValue = {
   listId: string
@@ -65,6 +79,12 @@ export type BoardContextValue = {
   handleUpdateGetaway: (poiId: string, updates: GetawayUpdate) => Promise<void>
   handleUpdatePoi: (poiId: string, updates: POIUpdate) => Promise<void>
   handleDeletePoi: (poiId: string) => Promise<boolean>
+  handleCreateSubgroup: (body: BoardSubgroupCreate) => Promise<BoardSubgroup | null>
+  handleUpdateSubgroup: (
+    subgroupId: string,
+    updates: BoardSubgroupUpdate,
+  ) => Promise<BoardSubgroup | null>
+  handleDeleteSubgroup: (subgroupId: string) => Promise<boolean>
   partySize: number
 }
 
@@ -300,6 +320,63 @@ export function BoardProvider({
     [listId, pois],
   )
 
+  const handleCreateSubgroup = useCallback(
+    async (body: BoardSubgroupCreate) => {
+      const parentId = body.parent_subgroup_id ?? null
+      if (!canNestSubgroupUnder(parentId, subgroups)) {
+        setError(`Groups can nest at most ${MAX_SUBGROUP_DEPTH} levels deep`)
+        return null
+      }
+      try {
+        const created = await createSubgroup(listId, body)
+        setSubgroups((prev) => [...prev, created])
+        return created
+      } catch {
+        setError('Failed to create group')
+        return null
+      }
+    },
+    [listId, subgroups, setError],
+  )
+
+  const handleUpdateSubgroup = useCallback(
+    async (subgroupId: string, updates: BoardSubgroupUpdate) => {
+      try {
+        const updated = await updateSubgroup(listId, subgroupId, updates)
+        setSubgroups((prev) =>
+          prev.map((s) => (s.id === subgroupId ? updated : s)),
+        )
+        return updated
+      } catch {
+        setError('Failed to update group')
+        return null
+      }
+    },
+    [listId, setError],
+  )
+
+  const handleDeleteSubgroup = useCallback(
+    async (subgroupId: string) => {
+      const sg = subgroups.find((s) => s.id === subgroupId)
+      if (!sg) return false
+      const poiCount = countPoisInSubgroupSubtree(subgroupId, subgroups, pois)
+      if (!confirm(subgroupDeleteConfirmMessage(sg.name, poiCount))) return false
+      try {
+        await deleteSubgroup(listId, subgroupId)
+        const removeIds = subgroupSubtreeIds(subgroupId, subgroups)
+        setSubgroups((prev) => prev.filter((s) => !removeIds.has(s.id)))
+        setPois((prev) =>
+          prev.filter((p) => !p.subgroup_id || !removeIds.has(p.subgroup_id)),
+        )
+        return true
+      } catch {
+        setError('Failed to delete group')
+        return false
+      }
+    },
+    [listId, subgroups, pois, setError],
+  )
+
   if (isLoading || !list) {
     return <LoadingView message="Loading board…" />
   }
@@ -329,6 +406,9 @@ export function BoardProvider({
     handleUpdateGetaway,
     handleUpdatePoi,
     handleDeletePoi,
+    handleCreateSubgroup,
+    handleUpdateSubgroup,
+    handleDeleteSubgroup,
     partySize: 1,
   }
 

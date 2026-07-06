@@ -19,14 +19,16 @@ import {
   startPanSession,
   type PanSession,
 } from '@/lib/boardPointer'
+import type { BoardSubgroup } from '@/lib/subgroup'
 
 export function useBoardViewport(opts: {
   pois: POIBase[]
+  subgroups?: BoardSubgroup[]
   dragPosOverrideRef?: RefObject<{ poiId: string; wx: number; wy: number } | null>
   onActivity?: () => void
   onClearSelection?: () => void
 }) {
-  const { pois, dragPosOverrideRef, onActivity, onClearSelection } = opts
+  const { pois, subgroups = [], dragPosOverrideRef, onActivity, onClearSelection } = opts
 
   const viewportRef = useRef<HTMLDivElement>(null)
   const worldRef = useRef<HTMLDivElement>(null)
@@ -71,6 +73,9 @@ export function useBoardViewport(opts: {
     [flushCamera, pingActivity],
   )
 
+  const subgroupsRef = useRef(subgroups)
+  subgroupsRef.current = subgroups
+
   const fitCamera = useCallback((): boolean => {
     const vp = viewportRef.current
     if (!vp) return false
@@ -78,6 +83,7 @@ export function useBoardViewport(opts: {
       vp,
       pois,
       dragPosOverrideRef?.current ?? null,
+      subgroupsRef.current,
     )
     if (!cam) return false
     applyCamera(cam)

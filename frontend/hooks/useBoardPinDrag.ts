@@ -12,6 +12,14 @@ import { updatePoi } from '@/lib/api'
 import type { BoardPoi } from '@/lib/board'
 import type { BoardCamera } from '@/lib/boardCoords'
 import {
+  BOARD_ROOT_SPACE,
+  localNormToRootNorm,
+  rootNormToLocalNorm,
+  subgroupContainingRootPoint,
+  type BoardSpace,
+  type BoardSpaceIndex,
+} from '@/lib/boardSpace'
+import {
   clearGospelEntry,
   commitGospelEntry,
   DEFAULT_BOARD_CAMERA,
@@ -44,6 +52,8 @@ export function useBoardPinDrag(opts: {
   broadcastDragEnd: (poiId: string, wx: number, wy: number) => void
   onSelectPoi?: (poiId: string | null) => void
   onActivity?: () => void
+  spaceForPoi?: (poi: POIBase) => BoardSpace
+  boardSpaceIndex: BoardSpaceIndex
 }) {
   const {
     listId,
@@ -59,6 +69,8 @@ export function useBoardPinDrag(opts: {
     broadcastDragEnd,
     onSelectPoi,
     onActivity,
+    spaceForPoi = () => BOARD_ROOT_SPACE,
+    boardSpaceIndex,
   } = opts
 
   const [drag, setDrag] = useState<DragState | null>(null)
@@ -77,6 +89,17 @@ export function useBoardPinDrag(opts: {
   onSelectPoiRef.current = onSelectPoi
   const onActivityRef = useRef(onActivity)
   onActivityRef.current = onActivity
+
+  const spaceForPoiRef = useRef(spaceForPoi)
+  spaceForPoiRef.current = spaceForPoi
+
+  const poiSpace = useCallback(
+    (poiId: string) => {
+      const poi = pois.find((p) => p.id === poiId)
+      return poi ? spaceForPoiRef.current(poi) : BOARD_ROOT_SPACE
+    },
+    [pois],
+  )
 
   const pingActivity = useCallback(() => {
     onActivityRef.current?.()
@@ -113,30 +136,62 @@ export function useBoardPinDrag(opts: {
     [broadcastDragStart],
   )
 
+  const boardSpaceIndexRef = useRef(boardSpaceIndex)
+  boardSpaceIndexRef.current = boardSpaceIndex
+
   const finishDrag = useCallback(
     async (state: DragState, pos: { wx: number; wy: number }) => {
-      commitGospel(state.poiId, pos.wx, pos.wy)
-      broadcastDragEnd(state.poiId, pos.wx, pos.wy)
+      const poi = pois.find((p) => p.id === state.poiId)
+      if (!poi) return
+
+      const fromSpace = spaceForPoiRef.current(poi)
+      const root = localNormToRootNorm(fromSpace, pos)
+      const index = boardSpaceIndexRef.current
+      const dropSubgroupId = subgroupContainingRootPoint(root, index)
+      const toSpace = index.spaceBySubgroupId.get(dropSubgroupId) ?? BOARD_ROOT_SPACE
+      const local = rootNormToLocalNorm(toSpace, root, { clamp: true })
+
+      const prevSubgroupId = poi.subgroup_id ?? null
+      const reparented = dropSubgroupId !== prevSubgroupId
+
+      commitGospel(state.poiId, local.wx, local.wy)
+      broadcastDragEnd(state.poiId, local.wx, local.wy)
       setPois((prev) =>
         prev.map((p) =>
-          p.id === state.poiId ? { ...p, board_x: pos.wx, board_y: pos.wy } : p,
+          p.id === state.poiId
+            ? {
+                ...p,
+                board_x: local.wx,
+                board_y: local.wy,
+                subgroup_id: dropSubgroupId,
+              }
+            : p,
         ),
       )
       try {
-        await updatePoi(listId, state.poiId, { board_x: pos.wx, board_y: pos.wy })
+        await updatePoi(listId, state.poiId, {
+          board_x: local.wx,
+          board_y: local.wy,
+          ...(reparented ? { subgroup_id: dropSubgroupId } : {}),
+        })
       } catch {
         setError('Failed to save pin position')
         setGospelByPoiId((prev) => clearGospelEntry(prev, state.poiId))
         setPois((prev) =>
           prev.map((p) =>
             p.id === state.poiId
-              ? { ...p, board_x: state.startWx, board_y: state.startWy }
+              ? {
+                  ...p,
+                  board_x: state.startWx,
+                  board_y: state.startWy,
+                  subgroup_id: prevSubgroupId,
+                }
               : p,
           ),
         )
       }
     },
-    [listId, setPois, setError, broadcastDragEnd, commitGospel],
+    [listId, pois, setPois, setError, broadcastDragEnd, commitGospel],
   )
 
   const onPinPointerMove = useCallback(
@@ -154,6 +209,7 @@ export function useBoardPinDrag(opts: {
               pending,
               e.clientX,
               e.clientY,
+              poiSpace(pending.poiId),
             )
             if (pos) {
               setDragPos(pos)
@@ -175,6 +231,7 @@ export function useBoardPinDrag(opts: {
           activeDrag,
           e.clientX,
           e.clientY,
+          poiSpace(activeDrag.poiId),
         )
         if (!pos) return true
         setDragPos(pos)
@@ -190,6 +247,7 @@ export function useBoardPinDrag(opts: {
       pingActivity,
       broadcastDragMove,
       promotePendingToDrag,
+      poiSpace,
     ],
   )
 
@@ -245,6 +303,7 @@ export function useBoardPinDrag(opts: {
         pinEl: e.currentTarget,
         viewport: vp,
         camera: cameraRef.current ?? DEFAULT_BOARD_CAMERA,
+        space: spaceForPoiRef.current(poi),
       })
       setPendingPoiId(poi.id)
       broadcastDragStart(poi.id, wx, wy)

@@ -1,5 +1,5 @@
 /** Pointer session types and pure pointer-event logic for the board. */
-import { screenToBoardNorm, type BoardCamera } from '@/lib/boardCoords'
+import type { BoardCamera } from '@/lib/boardCoords'
 import {
   anchorFromDragPointer,
   computePinGrabOffsets,
@@ -7,6 +7,7 @@ import {
   type BoardNorm,
   type PinDragGrab,
 } from '@/lib/boardMath'
+import { BOARD_ROOT_SPACE, screenToLocalNorm, type BoardSpace } from '@/lib/boardSpace'
 
 export type PanSession = {
   pointerId: number
@@ -42,6 +43,7 @@ export function isBoardBackgroundTarget(
   return (
     t.classList.contains('board-view__world') ||
     t.classList.contains('board-view__cork') ||
+    t.classList.contains('board-subgroup__surface') ||
     t === cur
   )
 }
@@ -87,8 +89,9 @@ export function pinPosFromPointer(
   grab: PinDragGrab,
   clientX: number,
   clientY: number,
+  space: BoardSpace = BOARD_ROOT_SPACE,
 ): BoardNorm | null {
-  const norm = screenToBoardNorm(vp, camera, clientX, clientY)
+  const norm = screenToLocalNorm(vp, camera, space, clientX, clientY, { clamp: true })
   if (!norm) return null
   return anchorFromDragPointer(grab, norm.wx, norm.wy)
 }
@@ -103,6 +106,7 @@ export function buildPendingPinPointer(opts: {
   pinEl: HTMLElement
   viewport: HTMLDivElement
   camera: BoardCamera
+  space?: BoardSpace
 }): PendingPinPointer {
   const grab = computePinGrabOffsets(
     opts.pinEl,
@@ -112,6 +116,7 @@ export function buildPendingPinPointer(opts: {
     opts.clientY,
     opts.anchorWx,
     opts.anchorWy,
+    opts.space,
   )
   return {
     poiId: opts.poiId,

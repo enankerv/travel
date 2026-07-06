@@ -3,9 +3,10 @@ import type { POIBase } from '@/lib/getaway'
 import {
   BOARD_WORLD_H,
   BOARD_WORLD_W,
-  screenToBoardNorm,
   type BoardCamera,
 } from '@/lib/boardCoords'
+import { BOARD_ROOT_SPACE, screenToLocalNorm, type BoardSpace } from '@/lib/boardSpace'
+import type { BoardSubgroup } from '@/lib/subgroup'
 
 export const BOARD_MIN_SCALE = 0.08
 export const BOARD_MAX_SCALE = 2.5
@@ -28,6 +29,9 @@ export type PinDragGrab = {
   anchorFromCenterWx: number
   anchorFromCenterWy: number
 }
+
+/** Visual padding around subgroup frames when fitting (world px). */
+export const BOARD_SUBGROUP_FIT_PAD = 16
 
 export function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n))
@@ -69,6 +73,51 @@ export function poiBoundsWorld(
   }
 
   return { minX, minY, maxX, maxY }
+}
+
+function mergeBounds(a: BoardBounds | null, b: BoardBounds): BoardBounds {
+  if (!a) return b
+  return {
+    minX: Math.min(a.minX, b.minX),
+    minY: Math.min(a.minY, b.minY),
+    maxX: Math.max(a.maxX, b.maxX),
+    maxY: Math.max(a.maxY, b.maxY),
+  }
+}
+
+function subgroupFrameBoundsWorld(sg: BoardSubgroup): BoardBounds {
+  const pad = BOARD_SUBGROUP_FIT_PAD
+  return {
+    minX: sg.board_x * BOARD_WORLD_W - pad,
+    minY: sg.board_y * BOARD_WORLD_H - pad,
+    maxX: (sg.board_x + sg.board_w) * BOARD_WORLD_W + pad,
+    maxY: (sg.board_y + sg.board_h) * BOARD_WORLD_H + pad,
+  }
+}
+
+/**
+ * Fit bounds for the board root: top-level subgroup frames plus root-level pins.
+ * Pins inside subgroups are omitted — they are laid out within their frame.
+ */
+export function boardFitBoundsWorld(
+  pois: POIBase[],
+  subgroups: BoardSubgroup[],
+  posOverride?: { poiId: string; wx: number; wy: number } | null,
+): BoardBounds | null {
+  const rootPois = pois.filter((p) => (p.subgroup_id ?? null) === null)
+  const rootOverride =
+    posOverride && rootPois.some((p) => p.id === posOverride.poiId)
+      ? posOverride
+      : null
+
+  let bounds = poiBoundsWorld(rootPois, rootOverride)
+
+  for (const sg of subgroups) {
+    if ((sg.parent_subgroup_id ?? null) !== null) continue
+    bounds = mergeBounds(bounds, subgroupFrameBoundsWorld(sg))
+  }
+
+  return bounds
 }
 
 export function cameraForBounds(
@@ -129,8 +178,9 @@ export function computeFitCamera(
   viewportH: number,
   pois: POIBase[],
   posOverride?: { poiId: string; wx: number; wy: number } | null,
+  subgroups: BoardSubgroup[] = [],
 ): BoardCamera {
-  const bounds = poiBoundsWorld(pois, posOverride)
+  const bounds = boardFitBoundsWorld(pois, subgroups, posOverride)
   if (!bounds) return cameraForEmptyBoard(viewportW, viewportH)
   return cameraForBounds(viewportW, viewportH, bounds)
 }
@@ -157,11 +207,13 @@ export function pinCenterNorm(
   pinEl: HTMLElement,
   viewport: HTMLDivElement,
   camera: BoardCamera,
+  space: BoardSpace = BOARD_ROOT_SPACE,
 ): BoardNorm | null {
   const rect = pinEl.getBoundingClientRect()
-  return screenToBoardNorm(
+  return screenToLocalNorm(
     viewport,
     camera,
+    space,
     rect.left + rect.width / 2,
     rect.top + rect.height / 2,
   )
@@ -189,9 +241,10 @@ export function computePinGrabOffsets(
   clientY: number,
   anchorWx: number,
   anchorWy: number,
+  space: BoardSpace = BOARD_ROOT_SPACE,
 ): PinDragGrab {
-  const cursorNorm = screenToBoardNorm(viewport, camera, clientX, clientY)
-  const centerNorm = pinCenterNorm(pinEl, viewport, camera)
+  const cursorNorm = screenToLocalNorm(viewport, camera, space, clientX, clientY)
+  const centerNorm = pinCenterNorm(pinEl, viewport, camera, space)
   if (!cursorNorm || !centerNorm) {
     return {
       grabOffsetWx: 0,

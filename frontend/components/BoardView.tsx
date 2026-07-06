@@ -2,11 +2,10 @@
 
 import {
   forwardRef,
-  memo,
   useCallback,
   useImperativeHandle,
+  useMemo,
   useRef,
-  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import { createPoi } from '@/lib/api'
@@ -16,96 +15,30 @@ import { useBoardPinFocusSync } from '@/hooks/useBoardPinFocusSync'
 import type { BoardLayoutMode } from '@/lib/boardLayout'
 import { useBoardPinDrag } from '@/hooks/useBoardPinDrag'
 import { useBoardPinPresence } from '@/hooks/useBoardPinPresence'
+import { useBoardSubgroupEdit } from '@/hooks/useBoardSubgroupEdit'
 import { useBoardViewport } from '@/hooks/useBoardViewport'
-import { useSignedImageUrls } from '@/hooks/useSignedImageUrls'
 import { BOARD_WORLD_H, BOARD_WORLD_W, screenToBoardNorm } from '@/lib/boardCoords'
+import { buildBoardSpaceIndex, BOARD_ROOT_SPACE } from '@/lib/boardSpace'
 import {
   BOARD_CHAT_POI_DRAG_MIME,
   parseSuggestionDragPayload,
   suggestionToPoiCreate,
 } from '@/lib/boardChat'
-import { isLockedByPeer, pinLabel, pinStackZIndex, pinTiltDeg, type PinHoldState } from '@/lib/boardPin'
+import type { BoardPoi } from '@/lib/board'
 import type { POIBase } from '@/lib/getaway'
 import {
   defaultTitleForPoiType,
-  iconForPoiType,
-  poiImageSources,
   type BoardCreatablePoiType,
 } from '@/lib/poi'
-import type { BoardPoi } from '@/lib/board'
 import BoardCursorLayer from './BoardCursorLayer'
+import BoardSurface from './BoardSurface'
 
 export type BoardViewHandle = {
   fitCamera: () => void
   addPoiAtCenter: (poiType: BoardCreatablePoiType) => void
   applyBoardSort: (mode: BoardLayoutMode) => Promise<void>
+  addGroup: (parentSubgroupId?: string | null) => Promise<void>
 }
-
-const BoardPin = memo(function BoardPin({
-  poi,
-  wx,
-  wy,
-  holdState,
-  isSelected,
-  lockedByPeer,
-  highlightColor,
-  layoutAnimating,
-  onPointerDown,
-}: {
-  poi: POIBase
-  wx: number
-  wy: number
-  holdState: PinHoldState
-  isSelected: boolean
-  lockedByPeer: boolean
-  highlightColor?: string
-  layoutAnimating?: boolean
-  onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>, poi: POIBase) => void
-}) {
-  const signedUrls = useSignedImageUrls(poiImageSources(poi))
-  const img = signedUrls[0] ?? ''
-  const isHeld = holdState !== 'none'
-  const showHighlight = isSelected || isHeld || !!highlightColor
-  const label = pinLabel(poi)
-  return (
-    <button
-      type="button"
-      className={`board-pin board-pin--${poi.poi_type}${isHeld ? ' board-pin--dragging' : ''}${holdState === 'local' ? ' board-pin--local-drag' : ''}${holdState === 'remote' ? ' board-pin--remote-drag' : ''}${lockedByPeer ? ' board-pin--locked' : ''}${showHighlight ? ' board-pin--selected' : ''}${layoutAnimating ? ' board-pin--layout-animating' : ''}`}
-      style={{
-        left: `${wx * 100}%`,
-        top: `${wy * 100}%`,
-        zIndex: pinStackZIndex(
-          poi.board_z ?? 0,
-          isHeld || lockedByPeer || isSelected,
-        ),
-        ...(showHighlight
-          ? ({
-              '--pin-highlight':
-                highlightColor ?? 'var(--board-pin-select, #5b8cff)',
-            } as CSSProperties)
-          : {}),
-        ['--pin-tilt' as string]: `${pinTiltDeg(poi.id)}deg`,
-      }}
-      disabled={lockedByPeer}
-      onPointerDown={(e) => onPointerDown(e, poi)}
-      aria-label={label}
-    >
-      <span className="board-pin__tack" aria-hidden />
-      <span className="board-pin__polaroid">
-        <span className="board-pin__photo">
-          {img ? (
-            <img className="board-pin__thumb" src={img} alt="" draggable={false} />
-          ) : (
-            <span className="board-pin__placeholder" aria-hidden>
-              {iconForPoiType(poi.poi_type)}
-            </span>
-          )}
-        </span>
-        <span className="board-pin__caption">{label}</span>
-      </span>
-    </button>
-  )
-})
 
 const BoardView = forwardRef<
   BoardViewHandle,
@@ -115,6 +48,8 @@ const BoardView = forwardRef<
     onActivity?: () => void
     selectedPoiId?: string | null
     onSelectPoi?: (poiId: string | null) => void
+    selectedSubgroupId?: string | null
+    onSelectSubgroup?: (subgroupId: string | null) => void
   }
 >(function BoardView(
   {
@@ -123,16 +58,31 @@ const BoardView = forwardRef<
     onActivity,
     selectedPoiId = null,
     onSelectPoi,
+    selectedSubgroupId = null,
+    onSelectSubgroup,
   },
   ref,
 ) {
   const {
     pois,
     setPois,
+    subgroups,
+    setSubgroups,
     otherViewers,
     setError,
     currentUserId,
+    handleCreateSubgroup,
+    handleUpdateSubgroup,
   } = useBoardContext()
+  const boardSpaceIndex = useMemo(
+    () => buildBoardSpaceIndex(subgroups),
+    [subgroups],
+  )
+  const spaceForPoi = useCallback(
+    (poi: POIBase) =>
+      boardSpaceIndex.spaceBySubgroupId.get(poi.subgroup_id ?? null) ?? BOARD_ROOT_SPACE,
+    [boardSpaceIndex],
+  )
   const dragPosOverrideRef = useRef<{ poiId: string; wx: number; wy: number } | null>(
     null,
   )
@@ -151,9 +101,13 @@ const BoardView = forwardRef<
     onPanPointerUp,
   } = useBoardViewport({
     pois,
+    subgroups,
     dragPosOverrideRef,
     onActivity,
-    onClearSelection: () => onSelectPoi?.(null),
+    onClearSelection: () => {
+      onSelectPoi?.(null)
+      onSelectSubgroup?.(null)
+    },
   })
 
   const {
@@ -173,6 +127,19 @@ const BoardView = forwardRef<
     onPeerDragEnd: (poiId, wx, wy) => handlePeerDragEndRef.current(poiId, wx, wy),
   })
 
+  const subgroupEdit = useBoardSubgroupEdit({
+    listId,
+    subgroups,
+    boardSpaceIndex,
+    setSubgroups,
+    setError,
+    viewportRef,
+    cameraRef,
+    onActivity,
+    selectedSubgroupId: selectedSubgroupId ?? null,
+    setSelectedSubgroupId: (id) => onSelectSubgroup?.(id),
+  })
+
   const pinDrag = useBoardPinDrag({
     listId,
     pois,
@@ -185,8 +152,13 @@ const BoardView = forwardRef<
     broadcastDragStart,
     broadcastDragMove,
     broadcastDragEnd,
-    onSelectPoi,
+    onSelectPoi: (id) => {
+      onSelectSubgroup?.(null)
+      onSelectPoi?.(id)
+    },
     onActivity,
+    spaceForPoi,
+    boardSpaceIndex,
   })
   handlePeerDragEndRef.current = pinDrag.handlePeerDragEnd
   dragPosOverrideRef.current = pinDrag.dragPosOverride
@@ -199,7 +171,10 @@ const BoardView = forwardRef<
     pois,
     setPois,
     setError,
-    isDragActive: !!pinDrag.drag || !!pinDrag.pendingPoiId,
+    isDragActive:
+      !!pinDrag.drag ||
+      !!pinDrag.pendingPoiId ||
+      subgroupEdit.isSubgroupDragging,
     onAfterLayout: fitCamera,
   })
 
@@ -276,14 +251,31 @@ const BoardView = forwardRef<
     [addSuggestionAt, cameraRef, viewportRef],
   )
 
+  const addGroup = useCallback(
+    async (parentSubgroupId?: string | null) => {
+      const parent = parentSubgroupId ?? selectedSubgroupId ?? null
+      const name =
+        window.prompt('Group name', `Group ${subgroups.length + 1}`)?.trim() ||
+        ''
+      if (!name) return
+      const created = await handleCreateSubgroup({
+        name,
+        parent_subgroup_id: parent,
+      })
+      if (created) onSelectSubgroup?.(created.id)
+    },
+    [subgroups.length, selectedSubgroupId, handleCreateSubgroup, onSelectSubgroup],
+  )
+
   useImperativeHandle(
     ref,
     () => ({
       fitCamera,
       addPoiAtCenter: (poiType: BoardCreatablePoiType) => void addPoiAt(0.5, 0.5, poiType),
       applyBoardSort: boardLayout.applyBoardSort,
+      addGroup,
     }),
-    [addPoiAt, fitCamera, boardLayout.applyBoardSort],
+    [addPoiAt, addGroup, boardLayout.applyBoardSort, fitCamera],
   )
 
   const onViewportPointerDown = useCallback(
@@ -295,18 +287,29 @@ const BoardView = forwardRef<
 
   const onViewportPointerMove = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
+      if (subgroupEdit.onSubgroupPointerMove(e)) return
       if (onPanPointerMove(e)) return
       pinDrag.onPinPointerMove(e)
     },
-    [onPanPointerMove, pinDrag],
+    [onPanPointerMove, pinDrag, subgroupEdit],
   )
 
   const onViewportPointerUp = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
+      subgroupEdit.onSubgroupPointerUp(e.pointerId)
       onPanPointerUp(e.pointerId)
       pinDrag.onPinPointerUp(e.pointerId)
     },
-    [onPanPointerUp, pinDrag],
+    [onPanPointerUp, pinDrag, subgroupEdit],
+  )
+
+  const onRenameSubgroup = useCallback(
+    (sg: { id: string; name: string }) => {
+      const name = window.prompt('Rename group', sg.name)?.trim()
+      if (!name || name === sg.name) return
+      void handleUpdateSubgroup(sg.id, { name })
+    },
+    [handleUpdateSubgroup],
   )
 
   return (
@@ -329,35 +332,40 @@ const BoardView = forwardRef<
         >
           <div className="board-view__cork" aria-hidden />
 
-          {presence.sortedPins.map((poi) => {
-            const dragPos = pinDrag.getPinPos(poi)
-            const layoutGospel = boardLayout.getLayoutGospel(poi.id)
-            const pos =
-              layoutGospel &&
-              pinDrag.drag?.poiId !== poi.id &&
-              pinDrag.pendingPoiId !== poi.id
-                ? layoutGospel
-                : dragPos
-            const lockedByPeer = isLockedByPeer(
-              poi.id,
-              lockedPoiIds,
-              pinDrag.drag?.poiId,
-            )
-            return (
-              <BoardPin
-                key={poi.id}
-                poi={poi}
-                wx={pos.wx}
-                wy={pos.wy}
-                holdState={presence.getPinHoldState(poi.id)}
-                isSelected={selectedPoiId === poi.id}
-                lockedByPeer={lockedByPeer}
-                highlightColor={presence.getPinHighlightColor(poi.id)}
-                layoutAnimating={boardLayout.layoutAnimating}
-                onPointerDown={pinDrag.onPinPointerDown}
-              />
-            )
-          })}
+          <BoardSurface
+            parentSubgroupId={null}
+            subgroups={subgroups}
+            sortedPins={presence.sortedPins}
+            selectedPoiId={selectedPoiId}
+            selectedSubgroupId={selectedSubgroupId}
+            lockedPoiIds={lockedPoiIds}
+            localDragPoiId={pinDrag.drag?.poiId}
+            pendingPoiId={pinDrag.pendingPoiId}
+            layoutAnimating={boardLayout.layoutAnimating}
+            getPinPos={(poi) => {
+              const dragPos = pinDrag.getPinPos(poi)
+              const layoutGospel = boardLayout.getLayoutGospel(poi.id)
+              if (
+                layoutGospel &&
+                pinDrag.drag?.poiId !== poi.id &&
+                pinDrag.pendingPoiId !== poi.id
+              ) {
+                return layoutGospel
+              }
+              return dragPos
+            }}
+            getPinHoldState={presence.getPinHoldState}
+            getPinHighlightColor={presence.getPinHighlightColor}
+            onPinPointerDown={pinDrag.onPinPointerDown}
+            getSubgroupRect={subgroupEdit.getRect}
+            onSubgroupSelect={(id) => {
+              onSelectPoi?.(null)
+              onSelectSubgroup?.(id)
+            }}
+            onSubgroupMovePointerDown={subgroupEdit.onSubgroupMovePointerDown}
+            onSubgroupResizePointerDown={subgroupEdit.onSubgroupResizePointerDown}
+            onRenameSubgroup={onRenameSubgroup}
+          />
 
           <BoardCursorLayer
             listId={listId}

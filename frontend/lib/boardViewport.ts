@@ -1,12 +1,13 @@
 /** Viewport camera state and DOM bindings. */
 import type { POIBase } from '@/lib/getaway'
+import type { BoardCamera } from '@/lib/boardCoords'
 import {
   cameraTransform,
   computeFitCamera,
   zoomCameraAtPoint,
   type BoardNorm,
 } from '@/lib/boardMath'
-import type { BoardCamera } from '@/lib/boardCoords'
+import type { BoardSubgroup } from '@/lib/subgroup'
 
 export const DEFAULT_BOARD_CAMERA: BoardCamera = { x: 0, y: 0, scale: 0.35 }
 
@@ -75,10 +76,17 @@ export function computeViewportFitCamera(
   vp: HTMLElement,
   pois: POIBase[],
   posOverride?: { poiId: string; wx: number; wy: number } | null,
+  subgroups: BoardSubgroup[] = [],
 ): BoardCamera | null {
   const size = readViewportSize(vp)
   if (!size) return null
-  return computeFitCamera(size.width, size.height, pois, posOverride)
+  return computeFitCamera(
+    size.width,
+    size.height,
+    pois,
+    posOverride,
+    subgroups,
+  )
 }
 
 /** Wheel zoom on the board viewport. Returns detach. */

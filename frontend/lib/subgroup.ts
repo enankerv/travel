@@ -43,6 +43,31 @@ export type BoardSubgroupDeleteResponse = {
 /** Max nesting depth enforced by the API (top-level subgroup = depth 1). */
 export const MAX_SUBGROUP_DEPTH = 5
 
+/** Depth from board root: top-level subgroup = 1. */
+export function subgroupDepth(
+  subgroupId: string | null | undefined,
+  subgroups: BoardSubgroup[],
+): number {
+  if (!subgroupId) return 0
+  const byId = new Map(subgroups.map((sg) => [sg.id, sg]))
+  let depth = 0
+  let current: string | null = subgroupId
+  while (current) {
+    depth += 1
+    const sg = byId.get(current)
+    current = sg?.parent_subgroup_id ?? null
+  }
+  return depth
+}
+
+export function canNestSubgroupUnder(
+  parentSubgroupId: string | null,
+  subgroups: BoardSubgroup[],
+): boolean {
+  if (!parentSubgroupId) return true
+  return subgroupDepth(parentSubgroupId, subgroups) < MAX_SUBGROUP_DEPTH
+}
+
 /** All subgroup ids in the subtree rooted at ``subgroupId`` (inclusive). */
 export function subgroupSubtreeIds(
   subgroupId: string,

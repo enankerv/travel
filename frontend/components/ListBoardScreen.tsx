@@ -42,12 +42,16 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
     handleUpdateGetaway,
     handleUpdatePoi,
     handleDeletePoi,
+    handleDeleteSubgroup,
+    handleUpdateSubgroup,
+    subgroups,
   } = useBoardContext()
 
   const [chromeVisible, setChromeVisible] = useState(true)
   const [creating, setCreating] = useState(false)
   const [sorting, setSorting] = useState(false)
   const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null)
+  const [selectedSubgroupId, setSelectedSubgroupId] = useState<string | null>(null)
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
   const [chatSending, setChatSending] = useState(false)
@@ -148,6 +152,34 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
     [revealChrome],
   )
 
+  const selectedSubgroup = useMemo(
+    () =>
+      selectedSubgroupId
+        ? subgroups.find((s) => s.id === selectedSubgroupId)
+        : undefined,
+    [selectedSubgroupId, subgroups],
+  )
+
+  const handleAddGroup = useCallback(() => {
+    revealChrome()
+    void boardRef.current?.addGroup(selectedSubgroupId)
+  }, [revealChrome, selectedSubgroupId])
+
+  const handleDeleteGroup = useCallback(async () => {
+    if (!selectedSubgroupId) return
+    revealChrome()
+    const deleted = await handleDeleteSubgroup(selectedSubgroupId)
+    if (deleted) setSelectedSubgroupId(null)
+  }, [revealChrome, selectedSubgroupId, handleDeleteSubgroup])
+
+  const handleRenameGroup = useCallback(() => {
+    if (!selectedSubgroup) return
+    revealChrome()
+    const name = window.prompt('Rename group', selectedSubgroup.name)?.trim()
+    if (!name || name === selectedSubgroup.name) return
+    void handleUpdateSubgroup(selectedSubgroup.id, { name })
+  }, [revealChrome, selectedSubgroup, handleUpdateSubgroup])
+
   const onDeletePoi = useCallback(
     async (poiId: string) => {
       const deleted = await handleDeletePoi(poiId)
@@ -169,8 +201,12 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
         <BoardScreenToolbar
           creating={creating}
           sorting={sorting}
+          hasSelectedGroup={!!selectedSubgroupId}
           onFitCamera={handleFitCamera}
           onAddItem={handleAddItem}
+          onAddGroup={handleAddGroup}
+          onDeleteGroup={() => void handleDeleteGroup()}
+          onRenameGroup={handleRenameGroup}
         />
       </div>
 
@@ -189,7 +225,12 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
         enabled={!isMobile}
         onActivity={hideChromeOnActivity}
         selectedPoiId={selectedPoiId}
-        onSelectPoi={setSelectedPoiId}
+        onSelectPoi={(id: string | null) => {
+          setSelectedPoiId(id)
+          if (id) setSelectedSubgroupId(null)
+        }}
+        selectedSubgroupId={selectedSubgroupId}
+        onSelectSubgroup={setSelectedSubgroupId}
       />
 
       {selectedPoi && !isMobile && (
