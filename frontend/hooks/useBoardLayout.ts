@@ -8,6 +8,7 @@ import {
   poisInSortScope,
   resolveBoardSortScope,
   storedPositionsFromLayout,
+  subgroupLayoutBounds,
   type BoardLayoutMode,
 } from '@/lib/boardLayout'
 import type { BoardNorm } from '@/lib/boardMath'
@@ -164,7 +165,9 @@ export function useBoardLayout(opts: {
       const scoped = poisInSortScope(allPois, scope)
       if (scoped.length === 0) return
 
-      const layout = computeBoardLayout(scoped, mode)
+      const sg = scope ? subgroups.find((s) => s.id === scope) : null
+      const bounds = sg ? subgroupLayoutBounds(sg) : undefined
+      const layout = computeBoardLayout(scoped, mode, bounds)
       if (layout.size === 0) return
 
       const positions = storedPositionsFromLayout(

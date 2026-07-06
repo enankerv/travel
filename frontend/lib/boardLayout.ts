@@ -29,9 +29,35 @@ const INTRA_GROUP_GAP_PX = 10
 /** Even gap between distinct group boxes — close but not overlapping. */
 const INTER_GROUP_GAP_PX = 112
 
-const BOARD_MARGIN_PX = 0.06 * BOARD_WORLD_W
-const USABLE_W_PX = BOARD_WORLD_W - BOARD_MARGIN_PX * 2
-const USABLE_H_PX = BOARD_WORLD_H - BOARD_MARGIN_PX * 2
+/** Pixel span used for layout + centering (full board or subgroup interior). */
+export type LayoutBounds = {
+  worldW: number
+  worldH: number
+}
+
+const BOARD_LAYOUT_BOUNDS: LayoutBounds = {
+  worldW: BOARD_WORLD_W,
+  worldH: BOARD_WORLD_H,
+}
+
+export function subgroupLayoutBounds(sg: {
+  board_w: number
+  board_h: number
+}): LayoutBounds {
+  return {
+    worldW: sg.board_w * BOARD_WORLD_W,
+    worldH: sg.board_h * BOARD_WORLD_H,
+  }
+}
+
+function usablePx(bounds: LayoutBounds) {
+  const marginX = 0.06 * bounds.worldW
+  const marginY = 0.06 * bounds.worldH
+  return {
+    usableW: bounds.worldW - marginX * 2,
+    usableH: bounds.worldH - marginY * 2,
+  }
+}
 
 const STEP_X_PX = PIN_W_PX + INTRA_GROUP_GAP_PX
 const STEP_Y_PX = PIN_H_PX + INTRA_GROUP_GAP_PX
@@ -69,6 +95,7 @@ function layoutGroupAt(
   originPxX: number,
   originPxY: number,
   out: BoardLayoutResult,
+  bounds: LayoutBounds,
 ) {
   group.items.forEach((poi, i) => {
     const col = i % group.cols
@@ -76,23 +103,26 @@ function layoutGroupAt(
     const anchorPxX = originPxX + col * STEP_X_PX + PIN_W_PX / 2
     const anchorPxY = originPxY + row * STEP_Y_PX + PIN_H_PX
     out.set(poi.id, {
-      wx: anchorPxX / BOARD_WORLD_W,
-      wy: anchorPxY / BOARD_WORLD_H,
+      wx: anchorPxX / bounds.worldW,
+      wy: anchorPxY / bounds.worldH,
     })
   })
 }
 
 /**
  * Pack group boxes in a local grid (origin top-left), then center the whole
- * layout on the board midpoint — never anchor sorts to the top/bottom edge.
+ * layout on the bounds midpoint — never anchor sorts to the top/bottom edge.
  */
-function layoutGroupBoxes(groups: GroupBox[]): BoardLayoutResult {
+function layoutGroupBoxes(
+  groups: GroupBox[],
+  bounds: LayoutBounds = BOARD_LAYOUT_BOUNDS,
+): BoardLayoutResult {
   const out: BoardLayoutResult = new Map()
   if (groups.length === 0) return out
 
   if (groups.length === 1) {
-    layoutGroupAt(groups[0], 0, 0, out)
-    return centerLayoutOnBoard(out)
+    layoutGroupAt(groups[0], 0, 0, out, bounds)
+    return centerLayoutInBounds(out, bounds)
   }
 
   const groupCols = Math.ceil(Math.sqrt(groups.length))
@@ -114,17 +144,20 @@ function layoutGroupBoxes(groups: GroupBox[]): BoardLayoutResult {
   for (const { rowGroups, rowWidth, rowHeight } of rowMetrics) {
     let xPx = (maxRowWidth - rowWidth) / 2
     for (const group of rowGroups) {
-      layoutGroupAt(group, xPx, yPx, out)
+      layoutGroupAt(group, xPx, yPx, out, bounds)
       xPx += group.widthPx + INTER_GROUP_GAP_PX
     }
     yPx += rowHeight + INTER_GROUP_GAP_PX
   }
 
-  return centerLayoutOnBoard(out)
+  return centerLayoutInBounds(out, bounds)
 }
 
-/** Scale (if needed) and translate so the layout centroid sits on the board center. */
-function centerLayoutOnBoard(layout: BoardLayoutResult): BoardLayoutResult {
+/** Scale (if needed) and translate so the layout centroid sits on the bounds center. */
+function centerLayoutInBounds(
+  layout: BoardLayoutResult,
+  bounds: LayoutBounds,
+): BoardLayoutResult {
   if (layout.size === 0) return layout
 
   let minPxX = Infinity
@@ -133,8 +166,8 @@ function centerLayoutOnBoard(layout: BoardLayoutResult): BoardLayoutResult {
   let maxPxY = -Infinity
 
   for (const pos of layout.values()) {
-    const pxX = pos.wx * BOARD_WORLD_W
-    const pxY = pos.wy * BOARD_WORLD_H
+    const pxX = pos.wx * bounds.worldW
+    const pxY = pos.wy * bounds.worldH
     minPxX = Math.min(minPxX, pxX - PIN_W_PX / 2)
     minPxY = Math.min(minPxY, pxY - PIN_H_PX)
     maxPxX = Math.max(maxPxX, pxX + PIN_W_PX / 2)
@@ -146,27 +179,31 @@ function centerLayoutOnBoard(layout: BoardLayoutResult): BoardLayoutResult {
   const layoutW = maxPxX - minPxX
   const layoutH = maxPxY - minPxY
 
+  const { usableW, usableH } = usablePx(bounds)
   let scale = 1
-  if (layoutW > USABLE_W_PX) scale = Math.min(scale, USABLE_W_PX / layoutW)
-  if (layoutH > USABLE_H_PX) scale = Math.min(scale, USABLE_H_PX / layoutH)
+  if (layoutW > usableW) scale = Math.min(scale, usableW / layoutW)
+  if (layoutH > usableH) scale = Math.min(scale, usableH / layoutH)
 
-  const boardCx = BOARD_WORLD_W / 2
-  const boardCy = BOARD_WORLD_H / 2
+  const centerPxX = bounds.worldW / 2
+  const centerPxY = bounds.worldH / 2
 
   const centered = new Map<string, BoardNorm>()
   for (const [id, pos] of layout) {
-    const pxX = pos.wx * BOARD_WORLD_W
-    const pxY = pos.wy * BOARD_WORLD_H
+    const pxX = pos.wx * bounds.worldW
+    const pxY = pos.wy * bounds.worldH
     centered.set(id, {
-      wx: (boardCx + (pxX - layoutCx) * scale) / BOARD_WORLD_W,
-      wy: (boardCy + (pxY - layoutCy) * scale) / BOARD_WORLD_H,
+      wx: (centerPxX + (pxX - layoutCx) * scale) / bounds.worldW,
+      wy: (centerPxY + (pxY - layoutCy) * scale) / bounds.worldH,
     })
   }
   return centered
 }
 
 /** One tight box per poi_type. */
-export function layoutByPoiType(pois: POIBase[]): BoardLayoutResult {
+export function layoutByPoiType(
+  pois: POIBase[],
+  bounds: LayoutBounds = BOARD_LAYOUT_BOUNDS,
+): BoardLayoutResult {
   if (pois.length === 0) return new Map()
 
   const byType = new Map<string, POIBase[]>()
@@ -187,7 +224,7 @@ export function layoutByPoiType(pois: POIBase[]): BoardLayoutResult {
     return computeGroupBox(items)
   })
 
-  return layoutGroupBoxes(groups)
+  return layoutGroupBoxes(groups, bounds)
 }
 
 function haversineKm(
@@ -525,7 +562,10 @@ function clusterByLatLngGrid(
  * spacing via one grid probe pass, then clusters with a second grid at that
  * threshold + union-find (O(n log n + e) typical).
  */
-export function layoutByProximity(pois: POIBase[]): BoardLayoutResult {
+export function layoutByProximity(
+  pois: POIBase[],
+  bounds: LayoutBounds = BOARD_LAYOUT_BOUNDS,
+): BoardLayoutResult {
   if (pois.length === 0) return new Map()
 
   const geoPois = pois.filter(hasGeo)
@@ -572,14 +612,17 @@ export function layoutByProximity(pois: POIBase[]): BoardLayoutResult {
       ),
     )
 
-  return layoutGroupBoxes(groups)
+  return layoutGroupBoxes(groups, bounds)
 }
 
 export function computeBoardLayout(
   pois: POIBase[],
   mode: BoardLayoutMode,
+  bounds: LayoutBounds = BOARD_LAYOUT_BOUNDS,
 ): BoardLayoutResult {
-  return mode === 'poi_type' ? layoutByPoiType(pois) : layoutByProximity(pois)
+  return mode === 'poi_type'
+    ? layoutByPoiType(pois, bounds)
+    : layoutByProximity(pois, bounds)
 }
 
 /** Subgroup id for scoped sort, or `null` for root-level pins. */
