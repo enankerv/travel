@@ -735,14 +735,27 @@ BEGIN
   UPDATE public.pois AS p
   SET
     board_x = (elem->>'board_x')::double precision,
-    board_y = (elem->>'board_y')::double precision
+    board_y = (elem->>'board_y')::double precision,
+    subgroup_id = CASE
+      WHEN elem ? 'subgroup_id' THEN (elem->>'subgroup_id')::uuid
+      ELSE p.subgroup_id
+    END
   FROM jsonb_array_elements(p_positions) AS elem
   WHERE p.id = (elem->>'id')::uuid
     AND p.list_id = p_list_id
     AND (elem->>'board_x') IS NOT NULL
     AND (elem->>'board_y') IS NOT NULL
     AND (elem->>'board_x')::double precision BETWEEN 0 AND 1
-    AND (elem->>'board_y')::double precision BETWEEN 0 AND 1;
+    AND (elem->>'board_y')::double precision BETWEEN 0 AND 1
+    AND (
+      NOT (elem ? 'subgroup_id')
+      OR (elem->>'subgroup_id') IS NULL
+      OR EXISTS (
+        SELECT 1 FROM public.board_subgroups sg
+        WHERE sg.id = (elem->>'subgroup_id')::uuid
+          AND sg.list_id = p_list_id
+      )
+    );
 
   GET DIAGNOSTICS updated_count = ROW_COUNT;
   RETURN updated_count;

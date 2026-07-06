@@ -5,7 +5,7 @@ try:
     from unittest.mock import patch
     from fastapi.testclient import TestClient
     from app import app
-    from models import POI
+    from models import POI, PoiPersistResult
     client = TestClient(app)
     _HAS_DEPS = True
 except (ImportError, RuntimeError) as e:
@@ -73,16 +73,17 @@ def test_list_pois_rejects_getaway_filter(auth_patches):
 @pytest.mark.skipif(not _HAS_DEPS, reason=f"Missing deps for route tests: {_IMPORT_ERROR if not _HAS_DEPS else ''}")
 def test_get_poi(auth_patches):
     poi = _sample_poi()
-    with patch.object(POI, "get", return_value=poi):
-        r = client.get(f"/api/lists/{LIST_ID}/pois/{POI_ID}", headers=AUTH_HEADERS)
-        assert r.status_code == 200
-        assert r.json()["id"] == POI_ID
+    row = poi.model_dump()
+    with patch("db.pois.fetch_poi_row_in_list", return_value=row):
+        with patch("models.poi_from_row", return_value=poi):
+            r = client.get(f"/api/lists/{LIST_ID}/pois/{POI_ID}", headers=AUTH_HEADERS)
+            assert r.status_code == 200
+            assert r.json()["id"] == POI_ID
 
 
 @pytest.mark.skipif(not _HAS_DEPS, reason=f"Missing deps for route tests: {_IMPORT_ERROR if not _HAS_DEPS else ''}")
 def test_get_poi_wrong_list_returns_404(auth_patches):
-    poi = _sample_poi(list_id="other-list")
-    with patch.object(POI, "get", return_value=poi):
+    with patch("db.pois.fetch_poi_row_in_list", return_value=None):
         r = client.get(f"/api/lists/{LIST_ID}/pois/{POI_ID}", headers=AUTH_HEADERS)
         assert r.status_code == 404
 
@@ -117,19 +118,43 @@ def test_create_poi_rejects_getaway_subtype(auth_patches):
 
 @pytest.mark.skipif(not _HAS_DEPS, reason=f"Missing deps for route tests: {_IMPORT_ERROR if not _HAS_DEPS else ''}")
 def test_update_poi_spine_fields(auth_patches):
-    current = _sample_poi()
     updated = _sample_poi(title="Renamed")
-    with patch.object(POI, "get", return_value=current):
-        with patch.object(POI, "update_by_id", return_value=updated) as update_by_id:
-            r = client.put(
-                f"/api/lists/{LIST_ID}/pois/{POI_ID}",
-                json={"title": "Renamed"},
-                headers=AUTH_HEADERS,
-            )
-            assert r.status_code == 200
-            assert r.json()["ok"] is True
-            assert r.json()["poi"]["title"] == "Renamed"
-            update_by_id.assert_called_once_with(POI_ID, "fake", title="Renamed")
+    with patch.object(
+        POI,
+        "update_by_id",
+        return_value=PoiPersistResult(updated, "ok"),
+    ) as update_by_id:
+        r = client.put(
+            f"/api/lists/{LIST_ID}/pois/{POI_ID}",
+            json={"title": "Renamed"},
+            headers=AUTH_HEADERS,
+        )
+        assert r.status_code == 200
+        assert r.json()["ok"] is True
+        assert r.json()["poi"]["title"] == "Renamed"
+        update_by_id.assert_called_once_with(
+            POI_ID, "fake", list_id=LIST_ID, title="Renamed",
+        )
+
+
+@pytest.mark.skipif(not _HAS_DEPS, reason=f"Missing deps for route tests: {_IMPORT_ERROR if not _HAS_DEPS else ''}")
+def test_update_poi_board_only_returns_ok_without_poi(auth_patches):
+    with patch.object(
+        POI,
+        "update_by_id",
+        return_value=PoiPersistResult(None, "ok"),
+    ) as update_by_id:
+        r = client.put(
+            f"/api/lists/{LIST_ID}/pois/{POI_ID}",
+            json={"board_x": 0.2, "board_y": 0.3},
+            headers=AUTH_HEADERS,
+        )
+        assert r.status_code == 200
+        assert r.json()["ok"] is True
+        assert r.json()["poi"] is None
+        update_by_id.assert_called_once_with(
+            POI_ID, "fake", list_id=LIST_ID, board_x=0.2, board_y=0.3,
+        )
 
 
 @pytest.mark.skipif(not _HAS_DEPS, reason=f"Missing deps for route tests: {_IMPORT_ERROR if not _HAS_DEPS else ''}")
@@ -144,17 +169,15 @@ def test_update_poi_empty_body_returns_400(auth_patches):
 
 @pytest.mark.skipif(not _HAS_DEPS, reason=f"Missing deps for route tests: {_IMPORT_ERROR if not _HAS_DEPS else ''}")
 def test_delete_poi(auth_patches):
-    poi = _sample_poi()
-    with patch.object(POI, "get", return_value=poi):
-        with patch.object(POI, "delete_by_id", return_value=True) as delete_by_id:
-            r = client.delete(f"/api/lists/{LIST_ID}/pois/{POI_ID}", headers=AUTH_HEADERS)
-            assert r.status_code == 200
-            assert r.json()["ok"] is True
-            delete_by_id.assert_called_once_with(POI_ID, "fake")
+    with patch.object(POI, "delete_by_id", return_value=True) as delete_by_id:
+        r = client.delete(f"/api/lists/{LIST_ID}/pois/{POI_ID}", headers=AUTH_HEADERS)
+        assert r.status_code == 200
+        assert r.json()["ok"] is True
+        delete_by_id.assert_called_once_with(POI_ID, "fake", list_id=LIST_ID)
 
 
 @pytest.mark.skipif(not _HAS_DEPS, reason=f"Missing deps for route tests: {_IMPORT_ERROR if not _HAS_DEPS else ''}")
 def test_delete_poi_not_found(auth_patches):
-    with patch.object(POI, "get", return_value=None):
+    with patch.object(POI, "delete_by_id", return_value=False):
         r = client.delete(f"/api/lists/{LIST_ID}/pois/{POI_ID}", headers=AUTH_HEADERS)
         assert r.status_code == 404

@@ -49,4 +49,4 @@ def test_persist_update_geocodes_when_location_changes():
                     geocode.assert_called_once_with("New town", user_id="user-1")
                     assert changes["lat"] == 3.0
                     assert changes["lng"] == 4.0
-                    assert result is updated
+                    assert result.poi is updated

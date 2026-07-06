@@ -267,7 +267,7 @@ export async function updatePoi(
   listId: string,
   poiId: string,
   updates: POIUpdate,
-): Promise<POIBase> {
+): Promise<POIBase | null> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_URL}/api/lists/${listId}/pois/${poiId}`, {
     method: 'PUT',
@@ -276,13 +276,14 @@ export async function updatePoi(
   })
   if (!res.ok) throw new Error('Failed to update POI')
   const data = await res.json()
-  return data.poi
+  return data.poi ?? null
 }
 
 export type PoiBoardPosition = {
   id: string
   board_x: number
   board_y: number
+  subgroup_id?: string | null
 }
 
 export async function bulkUpdatePoiPositions(

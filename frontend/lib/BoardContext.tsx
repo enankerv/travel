@@ -285,11 +285,13 @@ export function BoardProvider({
       try {
         const updated = await updatePoi(listId, poiId, updates)
         setPois((prev) =>
-          prev.map((p) =>
-            p.id === poiId
-              ? mergeBoardPoiFromRealtime(p, updated as BoardPoi)
-              : p,
-          ),
+          prev.map((p) => {
+            if (p.id !== poiId) return p
+            if (updated) {
+              return mergeBoardPoiFromRealtime(p, updated as BoardPoi)
+            }
+            return { ...p, ...updates }
+          }),
         )
       } catch {
         setError('Failed to update item')

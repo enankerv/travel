@@ -1,6 +1,6 @@
 """Pydantic models for FastAPI endpoints."""
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, PrivateAttr
-from typing import ClassVar, Optional, Literal
+from typing import ClassVar, Literal, NamedTuple, Optional
 
 
 # ============================================================================
@@ -176,6 +176,14 @@ class POIBase(BaseModel):
     subgroup_id: Optional[str] = None
 
 
+_BOARD_ONLY_FIELDS = frozenset({"board_x", "board_y", "board_z", "subgroup_id"})
+
+
+class PoiPersistResult(NamedTuple):
+    poi: Optional["POI"]
+    status: Literal["ok", "not_found"]
+
+
 class POI(POIBase):
     """The single POI model: spine fields (composed on fetch) plus behavior.
 
@@ -248,8 +256,14 @@ class POI(POIBase):
 
     @classmethod
     def _persist_update(
-        cls, poi_id: str, auth_token: str, model_cls: type["POI"], changes: dict,
-    ) -> Optional["POI"]:
+        cls,
+        poi_id: str,
+        auth_token: str,
+        model_cls: type["POI"],
+        changes: dict,
+        *,
+        list_id: str | None = None,
+    ) -> PoiPersistResult:
         from db.pois import update_poi_row, update_subtype_row
         from routes.auth import extract_user_id_from_token
         from utils.geocode import geocode, location_query_if_changed
@@ -274,11 +288,18 @@ class POI(POIBase):
                     changes["lng"] = lng
 
         spine, sub = model_cls._split_writable(changes)
+        board_only = not sub and set(changes.keys()) <= _BOARD_ONLY_FIELDS
+
         if spine:
-            update_poi_row(poi_id, spine, auth_token)
+            row = update_poi_row(poi_id, spine, auth_token, list_id=list_id)
+            if list_id is not None and not row:
+                return PoiPersistResult(None, "not_found")
         if sub and model_cls._SUBTYPE_TABLE:
             update_subtype_row(model_cls._SUBTYPE_TABLE, poi_id, sub, auth_token)
-        return model_cls.get(poi_id, auth_token)
+        if board_only:
+            return PoiPersistResult(None, "ok")
+        poi = model_cls.get(poi_id, auth_token)
+        return PoiPersistResult(poi, "ok" if poi else "not_found")
 
     # ---- reads (query params) ---------------------------------------------
     @classmethod
@@ -341,7 +362,9 @@ class POI(POIBase):
     @classmethod
     def update(cls, poi: "POI", **changes) -> Optional["POI"]:
         """Apply ``changes`` to a fetched instance; uses its bound auth token."""
-        return cls._persist_update(poi.id, poi._session_token(), type(poi), changes)
+        return cls._persist_update(
+            poi.id, poi._session_token(), type(poi), changes,
+        ).poi
 
     @classmethod
     def delete(cls, poi: "POI") -> bool:
@@ -357,15 +380,21 @@ class POI(POIBase):
 
     # ---- update / delete (id + token — scout / background paths) ----------
     @classmethod
-    def update_by_id(cls, poi_id: str, auth_token: str, **changes) -> Optional["POI"]:
+    def update_by_id(
+        cls, poi_id: str, auth_token: str, *, list_id: str | None = None, **changes
+    ) -> PoiPersistResult:
         """Apply ``changes`` by poi id with an explicit auth token."""
-        return cls._persist_update(poi_id, auth_token, cls, changes)
+        return cls._persist_update(
+            poi_id, auth_token, cls, changes, list_id=list_id,
+        )
 
     @classmethod
-    def delete_by_id(cls, poi_id: str, auth_token: str) -> bool:
+    def delete_by_id(
+        cls, poi_id: str, auth_token: str, *, list_id: str | None = None,
+    ) -> bool:
         """Delete by poi id with an explicit auth token."""
         from db.pois import delete_poi_row
-        return delete_poi_row(poi_id, auth_token)
+        return delete_poi_row(poi_id, auth_token, list_id=list_id)
 
     @classmethod
     def replace_images_by_id(cls, poi_id: str, auth_token: str, image_paths: list[str]) -> None:
@@ -463,7 +492,7 @@ GetawayEditorUpdate = Getaway.Update
 
 class POIUpdateResponse(BaseModel):
     ok: bool
-    poi: POI
+    poi: Optional[POI] = None
 
 
 class POICreate(BaseModel):
@@ -509,6 +538,7 @@ class PoiBoardPosition(BaseModel):
     id: str
     board_x: float = Field(ge=0, le=1)
     board_y: float = Field(ge=0, le=1)
+    subgroup_id: Optional[str] = None
 
 
 class BulkPoiPositionsUpdate(BaseModel):

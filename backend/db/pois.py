@@ -52,6 +52,21 @@ def fetch_poi_row(poi_id: str, auth_token: str) -> dict | None:
     return sign_images([compose_poi_row(response.data[0])], auth_token)[0]
 
 
+def fetch_poi_row_in_list(poi_id: str, list_id: str, auth_token: str) -> dict | None:
+    """One composed + signed POI row when it belongs to ``list_id``."""
+    client = get_supabase_client(auth_token)
+    response = (
+        client.table("pois")
+        .select(_SELECT_WITH_DETAILS)
+        .eq("id", poi_id)
+        .eq("list_id", list_id)
+        .execute()
+    )
+    if not response.data:
+        return None
+    return sign_images([compose_poi_row(response.data[0])], auth_token)[0]
+
+
 def fetch_list_poi_rows(list_id: str, auth_token: str, poi_type: str | None = None) -> list[dict]:
     """Composed + signed POI rows for a list, optionally filtered by poi_type."""
     client = get_supabase_client(auth_token)
@@ -76,12 +91,21 @@ def insert_poi_row(list_id: str, fields: dict, auth_token: str, user_id: str | N
     return response.data[0] if response.data else None
 
 
-def update_poi_row(poi_id: str, fields: dict, auth_token: str) -> dict | None:
-    """Update spine columns on a POI."""
+def update_poi_row(
+    poi_id: str,
+    fields: dict,
+    auth_token: str,
+    *,
+    list_id: str | None = None,
+) -> dict | None:
+    """Update spine columns on a POI. When ``list_id`` is set, only rows on that list match."""
     if not fields:
         return None
     client = get_supabase_client(auth_token)
-    response = client.table("pois").update(fields).eq("id", poi_id).execute()
+    query = client.table("pois").update(fields).eq("id", poi_id)
+    if list_id is not None:
+        query = query.eq("list_id", list_id)
+    response = query.execute()
     return response.data[0] if response.data else None
 
 
@@ -102,10 +126,18 @@ def bulk_update_poi_positions(
     return int(count) if count is not None else 0
 
 
-def delete_poi_row(poi_id: str, auth_token: str) -> bool:
+def delete_poi_row(
+    poi_id: str,
+    auth_token: str,
+    *,
+    list_id: str | None = None,
+) -> bool:
     """Delete a POI (subtype rows, images, votes, comments cascade)."""
     client = get_supabase_client(auth_token)
-    response = client.table("pois").delete().eq("id", poi_id).execute()
+    query = client.table("pois").delete().eq("id", poi_id)
+    if list_id is not None:
+        query = query.eq("list_id", list_id)
+    response = query.execute()
     return bool(response.data)
 
 

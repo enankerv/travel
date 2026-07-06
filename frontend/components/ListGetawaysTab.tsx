@@ -213,9 +213,11 @@ export default function ListGetawaysTab({
     try {
       const updated = await updatePoi(listId, poiId, updates);
       setPois((prev) =>
-        prev.map((p) =>
-          p.id === poiId ? mergePoiFromRealtime(p, updated) : p,
-        ),
+        prev.map((p) => {
+          if (p.id !== poiId) return p;
+          if (updated) return mergePoiFromRealtime(p, updated);
+          return { ...p, ...updates };
+        }),
       );
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to update item");

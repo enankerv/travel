@@ -17,12 +17,6 @@ from routes.auth import extract_auth_token, extract_user_id_from_token
 router = APIRouter(prefix="/lists", tags=["pois"])
 
 
-def _require_poi_in_list(poi: POI | None, list_id: str) -> POI:
-    if not poi or poi.list_id != list_id:
-        raise HTTPException(status_code=404, detail="POI not found")
-    return poi
-
-
 def _reject_subtyped_poi_type(poi_type: str) -> None:
     if poi_class_for_type(poi_type)._SUBTYPE_TABLE:
         raise HTTPException(
@@ -68,7 +62,7 @@ async def bulk_update_poi_positions_endpoint(
         token = extract_auth_token(authorization)
         from db.pois import bulk_update_poi_positions
 
-        payload = [p.model_dump() for p in body.positions]
+        payload = [p.model_dump(exclude_unset=True) for p in body.positions]
         updated = bulk_update_poi_positions(list_id, payload, token)
         if updated == 0:
             raise HTTPException(status_code=404, detail="No POIs updated")
@@ -88,7 +82,13 @@ async def get_poi_endpoint(
     """Get one POI by id (spine fields)."""
     try:
         token = extract_auth_token(authorization)
-        return _require_poi_in_list(POI.get(poi_id, token), list_id)
+        from db.pois import fetch_poi_row_in_list
+        from models import poi_from_row
+
+        row = fetch_poi_row_in_list(poi_id, list_id, token)
+        if not row:
+            raise HTTPException(status_code=404, detail="POI not found")
+        return poi_from_row(row, token)
     except HTTPException:
         raise
     except Exception as e:
@@ -131,14 +131,13 @@ async def update_poi_endpoint(
         updates = body.model_dump(exclude_unset=True)
         if not updates:
             raise HTTPException(status_code=400, detail="No fields to update.")
-        _require_poi_in_list(POI.get(poi_id, token), list_id)
         if "subgroup_id" in updates:
             _validate_subgroup_id(list_id, updates.get("subgroup_id"), token)
 
-        result = POI.update_by_id(poi_id, token, **updates)
-        if not result:
+        outcome = POI.update_by_id(poi_id, token, list_id=list_id, **updates)
+        if outcome.status == "not_found":
             raise HTTPException(status_code=404, detail="POI not found")
-        return POIUpdateResponse(ok=True, poi=result)
+        return POIUpdateResponse(ok=True, poi=outcome.poi)
     except HTTPException:
         raise
     except Exception as e:
@@ -154,8 +153,7 @@ async def delete_poi_endpoint(
     """Delete a POI (cascades subtype, images, votes, comments)."""
     try:
         token = extract_auth_token(authorization)
-        _require_poi_in_list(POI.get(poi_id, token), list_id)
-        if not POI.delete_by_id(poi_id, token):
+        if not POI.delete_by_id(poi_id, token, list_id=list_id):
             raise HTTPException(status_code=404, detail="POI not found")
         return {"ok": True}
     except HTTPException:

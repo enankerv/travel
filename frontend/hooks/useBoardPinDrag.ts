@@ -8,7 +8,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react'
-import { updatePoi } from '@/lib/api'
+import { bulkUpdatePoiPositions } from '@/lib/api'
 import type { BoardPoi } from '@/lib/board'
 import type { BoardCamera } from '@/lib/boardCoords'
 import {
@@ -169,11 +169,14 @@ export function useBoardPinDrag(opts: {
         ),
       )
       try {
-        await updatePoi(listId, state.poiId, {
-          board_x: local.wx,
-          board_y: local.wy,
-          ...(reparented ? { subgroup_id: dropSubgroupId } : {}),
-        })
+        await bulkUpdatePoiPositions(listId, [
+          {
+            id: state.poiId,
+            board_x: local.wx,
+            board_y: local.wy,
+            ...(reparented ? { subgroup_id: dropSubgroupId } : {}),
+          },
+        ])
       } catch {
         setError('Failed to save pin position')
         setGospelByPoiId((prev) => clearGospelEntry(prev, state.poiId))

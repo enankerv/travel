@@ -34,10 +34,10 @@ async def update_getaway_endpoint(
         if not updates:
             raise HTTPException(status_code=400, detail="No fields to update.")
 
-        result = Getaway.update_by_id(poi_id, token, **updates)
-        if not result:
+        outcome = Getaway.update_by_id(poi_id, token, list_id=list_id, **updates)
+        if outcome.status == "not_found":
             raise HTTPException(status_code=404, detail="Getaway not found")
-        return {"ok": True, "getaway": result}
+        return {"ok": True, "getaway": outcome.poi}
     except HTTPException:
         raise
     except Exception as e:
