@@ -26,6 +26,7 @@ type SubgroupDrag =
       kind: 'move'
       subgroupId: string
       pointerId: number
+      targetEl: HTMLElement
       grabDx: number
       grabDy: number
       start: SubgroupRect
@@ -34,6 +35,7 @@ type SubgroupDrag =
       kind: 'resize-se'
       subgroupId: string
       pointerId: number
+      targetEl: HTMLElement
       start: SubgroupRect
     }
 
@@ -154,6 +156,7 @@ export function useBoardSubgroupEdit(opts: {
         kind: 'move',
         subgroupId: sg.id,
         pointerId: e.pointerId,
+        targetEl: e.currentTarget,
         grabDx: local.wx - rect.board_x,
         grabDy: local.wy - rect.board_y,
         start: rect,
@@ -175,6 +178,7 @@ export function useBoardSubgroupEdit(opts: {
         kind: 'resize-se',
         subgroupId: sg.id,
         pointerId: e.pointerId,
+        targetEl: e.currentTarget,
         start: getRect(sg),
       }
       setIsSubgroupDragging(true)
@@ -228,6 +232,26 @@ export function useBoardSubgroupEdit(opts: {
     [commitRect],
   )
 
+  const cancelInteraction = useCallback(() => {
+    const drag = dragRef.current
+    if (!drag) return
+
+    try {
+      drag.targetEl.releasePointerCapture(drag.pointerId)
+    } catch {
+      // Ignore if capture was not set.
+    }
+
+    setOverrideById((o) => {
+      if (!(drag.subgroupId in o)) return o
+      const next = { ...o }
+      delete next[drag.subgroupId]
+      return next
+    })
+    dragRef.current = null
+    setIsSubgroupDragging(false)
+  }, [])
+
   useEffect(() => {
     return () => {
       dragRef.current = null
@@ -243,6 +267,7 @@ export function useBoardSubgroupEdit(opts: {
     onSubgroupResizePointerDown,
     onSubgroupPointerMove,
     onSubgroupPointerUp,
+    cancelInteraction,
     isSubgroupDragging,
   }
 }

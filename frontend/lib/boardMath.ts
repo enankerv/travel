@@ -202,6 +202,27 @@ export function zoomCameraAtPoint(
   }
 }
 
+/** Pinch zoom + pan: keep the world point under the initial centroid under the current one. */
+export function pinchCamera(
+  startCam: BoardCamera,
+  startCenterX: number,
+  startCenterY: number,
+  startDistance: number,
+  centerX: number,
+  centerY: number,
+  distance: number,
+): BoardCamera {
+  const wx = (startCenterX - startCam.x) / startCam.scale
+  const wy = (startCenterY - startCam.y) / startCam.scale
+  const scaleRatio = distance / startDistance
+  const newScale = clamp(startCam.scale * scaleRatio, BOARD_MIN_SCALE, BOARD_MAX_SCALE)
+  return {
+    x: centerX - wx * newScale,
+    y: centerY - wy * newScale,
+    scale: newScale,
+  }
+}
+
 export type PoiOffsetBounds = { maxWx: number; maxWy: number }
 
 /** Map cursor position → anchor, keeping pin center fixed relative to the grab. */

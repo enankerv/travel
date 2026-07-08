@@ -97,6 +97,7 @@ const BoardView = forwardRef<
   const handlePeerDragEndRef = useRef<(poiId: string, wx: number, wy: number) => void>(
     () => {},
   )
+  const onPinchInterruptRef = useRef<() => void>(() => {})
 
   const {
     viewportRef,
@@ -116,6 +117,7 @@ const BoardView = forwardRef<
       onSelectPoi?.(null)
       onSelectSubgroup?.(null)
     },
+    onPinchStart: () => onPinchInterruptRef.current(),
   })
 
   const {
@@ -169,6 +171,10 @@ const BoardView = forwardRef<
   })
   handlePeerDragEndRef.current = pinDrag.handlePeerDragEnd
   dragPosOverrideRef.current = pinDrag.dragPosOverride
+  onPinchInterruptRef.current = () => {
+    pinDrag.cancelInteraction()
+    subgroupEdit.cancelInteraction()
+  }
 
   const boardLayout = useBoardLayout({
     listId,
