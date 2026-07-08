@@ -122,6 +122,11 @@ export function useBoardPinDrag(opts: {
       dragRef.current = next
       setDrag(next)
       setDragPos({ wx: pending.startWx, wy: pending.startWy })
+      try {
+        pending.pinEl.setPointerCapture(pending.pointerId)
+      } catch {
+        // Pointer may already be captured elsewhere.
+      }
       broadcastDragStart(pending.poiId, pending.startWx, pending.startWy)
     },
     [broadcastDragStart],
@@ -289,7 +294,6 @@ export function useBoardPinDrag(opts: {
       if (lockedPoiIds.has(poi.id)) return
       setGospelByPoiId((prev) => clearGospelEntry(prev, poi.id))
       pingActivity()
-      e.currentTarget.setPointerCapture(e.pointerId)
       const wx = poi.board_x ?? 0.5
       const wy = poi.board_y ?? 0.5
       const vp = viewportRef.current
@@ -312,6 +316,34 @@ export function useBoardPinDrag(opts: {
     },
     [viewportRef, cameraRef, pingActivity, lockedPoiIds, broadcastDragStart],
   )
+
+  const cancelInteraction = useCallback(() => {
+    const pending = pendingPinRef.current
+    if (pending) {
+      try {
+        pending.pinEl.releasePointerCapture(pending.pointerId)
+      } catch {
+        // Ignore if capture was not set.
+      }
+      pendingPinRef.current = null
+      setPendingPoiId(null)
+      broadcastDragEnd(pending.poiId, pending.startWx, pending.startWy)
+    }
+
+    const activeDrag = dragRef.current
+    if (!activeDrag) return
+
+    try {
+      activeDrag.pinEl.releasePointerCapture(activeDrag.pointerId)
+    } catch {
+      // Ignore if capture was not set.
+    }
+    broadcastDragEnd(activeDrag.poiId, activeDrag.startWx, activeDrag.startWy)
+    setGospelByPoiId((prev) => clearGospelEntry(prev, activeDrag.poiId))
+    dragRef.current = null
+    setDrag(null)
+    setDragPos(null)
+  }, [broadcastDragEnd])
 
   useEffect(() => {
     return () => {
@@ -348,6 +380,7 @@ export function useBoardPinDrag(opts: {
     onPinPointerDown,
     onPinPointerMove,
     onPinPointerUp,
+    cancelInteraction,
     getPinPos,
   }
 }

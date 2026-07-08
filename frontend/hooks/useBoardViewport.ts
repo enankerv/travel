@@ -13,11 +13,16 @@ import {
   panCamera,
 } from '@/lib/boardViewport'
 import {
+  cameraFromPinchSession,
   isBoardBackgroundTarget,
   panSessionMatches,
+  pinchSessionMatches,
   shouldStartViewportPan,
   startPanSession,
+  startPinchSession,
   type PanSession,
+  type PinchPointer,
+  type PinchSession,
 } from '@/lib/boardPointer'
 import type { BoardSubgroup } from '@/lib/subgroup'
 
@@ -27,8 +32,10 @@ export function useBoardViewport(opts: {
   dragPosOverrideRef?: RefObject<{ poiId: string; wx: number; wy: number } | null>
   onActivity?: () => void
   onClearSelection?: () => void
+  onPinchStart?: () => void
 }) {
-  const { pois, subgroups = [], dragPosOverrideRef, onActivity, onClearSelection } = opts
+  const { pois, subgroups = [], dragPosOverrideRef, onActivity, onClearSelection, onPinchStart } =
+    opts
 
   const viewportRef = useRef<HTMLDivElement>(null)
   const worldRef = useRef<HTMLDivElement>(null)
@@ -36,6 +43,9 @@ export function useBoardViewport(opts: {
   const cameraRafRef = useRef(0)
   const pendingCameraRef = useRef<BoardCamera | null>(null)
   const panningRef = useRef<PanSession | null>(null)
+  const pinchRef = useRef<PinchSession | null>(null)
+  const pinchPointersRef = useRef(new Map<number, PinchPointer>())
+  const pinchingRef = useRef(false)
   const spaceDownRef = useRef(false)
   const initialFitDone = useRef(false)
 
@@ -43,6 +53,8 @@ export function useBoardViewport(opts: {
   onActivityRef.current = onActivity
   const onClearSelectionRef = useRef(onClearSelection)
   onClearSelectionRef.current = onClearSelection
+  const onPinchStartRef = useRef(onPinchStart)
+  onPinchStartRef.current = onPinchStart
 
   const [interacting, setInteracting] = useState(false)
 
@@ -128,8 +140,86 @@ export function useBoardViewport(opts: {
     )
   }, [flushCamera, pingActivity])
 
+  useEffect(() => {
+    const vp = viewportRef.current
+    if (!vp) return
+
+    const toViewportLocal = (clientX: number, clientY: number): PinchPointer => {
+      const rect = vp.getBoundingClientRect()
+      return { x: clientX - rect.left, y: clientY - rect.top }
+    }
+
+    const beginPinch = () => {
+      const pointers = pinchPointersRef.current
+      if (pointers.size < 2) return
+
+      const ids = [...pointers.keys()].slice(0, 2) as [number, number]
+      const session = startPinchSession(pointers, ids, cameraRef.current)
+      if (!session) return
+
+      panningRef.current = null
+      pinchRef.current = session
+      pinchingRef.current = true
+      onPinchStartRef.current?.()
+      onClearSelectionRef.current?.()
+      pingActivity()
+      setInteracting(true)
+    }
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return
+      pinchPointersRef.current.set(e.pointerId, toViewportLocal(e.clientX, e.clientY))
+      if (pinchPointersRef.current.size >= 2) beginPinch()
+    }
+
+    const onPointerMove = (e: PointerEvent) => {
+      const pointers = pinchPointersRef.current
+      if (!pointers.has(e.pointerId)) return
+      pointers.set(e.pointerId, toViewportLocal(e.clientX, e.clientY))
+
+      const pinch = pinchRef.current
+      if (!pinch) {
+        if (pointers.size >= 2) beginPinch()
+        return
+      }
+
+      const next = cameraFromPinchSession(pinch, pointers)
+      if (!next) return
+      e.preventDefault()
+      scheduleCamera(next)
+    }
+
+    const endPointer = (pointerId: number) => {
+      pinchPointersRef.current.delete(pointerId)
+      if (!pinchSessionMatches(pinchRef.current, pointerId)) return
+      pinchRef.current = null
+      pinchingRef.current = false
+      if (pinchPointersRef.current.size === 0) setInteracting(false)
+    }
+
+    const onPointerUp = (e: PointerEvent) => {
+      endPointer(e.pointerId)
+    }
+
+    vp.addEventListener('pointerdown', onPointerDown, { capture: true })
+    vp.addEventListener('pointermove', onPointerMove, { passive: false })
+    vp.addEventListener('pointerup', onPointerUp)
+    vp.addEventListener('pointercancel', onPointerUp)
+
+    return () => {
+      vp.removeEventListener('pointerdown', onPointerDown, { capture: true })
+      vp.removeEventListener('pointermove', onPointerMove)
+      vp.removeEventListener('pointerup', onPointerUp)
+      vp.removeEventListener('pointercancel', onPointerUp)
+      pinchPointersRef.current.clear()
+      pinchRef.current = null
+      pinchingRef.current = false
+    }
+  }, [scheduleCamera, pingActivity])
+
   const onPanPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
+      if (pinchingRef.current) return false
       const onBackground = isBoardBackgroundTarget(e.target, e.currentTarget)
       if (
         !shouldStartViewportPan({
@@ -157,6 +247,7 @@ export function useBoardViewport(opts: {
 
   const onPanPointerMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
+      if (pinchingRef.current) return false
       const pan = panningRef.current
       if (!panSessionMatches(pan, e.pointerId)) return false
       scheduleCamera(panCamera(cameraRef.current, pan, e.clientX, e.clientY))
@@ -179,6 +270,7 @@ export function useBoardViewport(opts: {
     worldRef,
     cameraRef,
     interacting,
+    pinchingRef,
     fitCamera,
     onPanPointerDown,
     onPanPointerMove,
