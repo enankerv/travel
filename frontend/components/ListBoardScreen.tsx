@@ -13,7 +13,7 @@ import PoiDetailSidebar from './PoiDetailSidebar'
 import GetawayDetailSheet from './GetawayDetailSheet'
 import CommentsSidebar from './CommentsSidebar'
 import ImageGallery from './ImageGallery'
-import BoardChatPanel from './BoardChatPanel'
+import BoardChat from './BoardChat'
 import { useIsMobile } from '@/hooks/useIsMobile'
 
 const IDLE_MS = 1000
@@ -281,7 +281,7 @@ function ListBoardScreenInner({ listId }: { listId: string }) {
         />
       )}
 
-      <BoardChatPanel
+      <BoardChat
         listId={listId}
         isOpen={chatOpen}
         onClose={() => setChatOpen(false)}
