@@ -5,7 +5,7 @@ import type { POIBase } from '@/lib/getaway'
 import type { BoardCamera } from '@/lib/boardCoords'
 import {
   applyCameraToWorld,
-  attachBoardPinchZoom,
+  attachBoardTouchGestures,
   attachBoardWheelZoom,
   attachSpacePanKeys,
   attachViewportFitObserver,
@@ -13,7 +13,6 @@ import {
   DEFAULT_BOARD_CAMERA,
   panCamera,
 } from '@/lib/boardViewport'
-import { exceedsDragThreshold } from '@/lib/boardMath'
 import {
   isBoardBackgroundTarget,
   panSessionMatches,
@@ -37,9 +36,7 @@ export function useBoardViewport(opts: {
   const cameraRef = useRef<BoardCamera>(DEFAULT_BOARD_CAMERA)
   const cameraRafRef = useRef(0)
   const pendingCameraRef = useRef<BoardCamera | null>(null)
-  const panningRef = useRef<PanSession | null>(null)
-  const touchPanPendingRef = useRef<PanSession | null>(null)
-  const pinchActiveRef = useRef(false)
+  const mousePanRef = useRef<PanSession | null>(null)
   const spaceDownRef = useRef(false)
   const initialFitDone = useRef(false)
 
@@ -67,21 +64,22 @@ export function useBoardViewport(opts: {
     applyCamera(next)
   }, [applyCamera])
 
+  /** rAF-batched updates — wheel zoom only. */
   const scheduleCamera = useCallback(
     (cam: BoardCamera) => {
       pendingCameraRef.current = cam
-      pingActivity()
       if (cameraRafRef.current) return
       cameraRafRef.current = requestAnimationFrame(flushCamera)
     },
-    [flushCamera, pingActivity],
+    [flushCamera],
   )
 
   const resolveCamera = useCallback((): BoardCamera => {
     return pendingCameraRef.current ?? cameraRef.current
   }, [])
 
-  const applyCameraNow = useCallback(
+  /** Immediate apply — touch pan/pinch on native listeners. */
+  const applyCameraImmediate = useCallback(
     (cam: BoardCamera) => {
       pendingCameraRef.current = null
       if (cameraRafRef.current) {
@@ -89,9 +87,8 @@ export function useBoardViewport(opts: {
         cameraRafRef.current = 0
       }
       applyCamera(cam)
-      pingActivity()
     },
-    [applyCamera, pingActivity],
+    [applyCamera],
   )
 
   const subgroupsRef = useRef(subgroups)
@@ -142,32 +139,18 @@ export function useBoardViewport(opts: {
   useEffect(() => {
     const vp = viewportRef.current
     if (!vp) return
-    return attachBoardPinchZoom(vp, resolveCamera, applyCameraNow, {
-      onPinchStart: () => {
-        const pan = panningRef.current ?? touchPanPendingRef.current
-        if (pan) {
-          try {
-            vp.releasePointerCapture(pan.pointerId)
-          } catch {
-            // Pointer may already be released.
-          }
-        }
-        panningRef.current = null
-        touchPanPendingRef.current = null
-        pinchActiveRef.current = true
-        setInteracting(true)
-      },
-      onPinchEnd: () => {
-        pinchActiveRef.current = false
-        setInteracting(false)
-      },
+    return attachBoardTouchGestures(vp, {
+      getCamera: resolveCamera,
+      applyCamera: applyCameraImmediate,
+      onClearSelection: () => onClearSelectionRef.current?.(),
       onActivity: pingActivity,
+      onInteractingChange: setInteracting,
     })
-  }, [applyCameraNow, resolveCamera, pingActivity])
+  }, [applyCameraImmediate, resolveCamera, pingActivity])
 
   const onPanPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
-      if (pinchActiveRef.current) return false
+      if (e.pointerType === 'touch') return false
 
       const onBackground = isBoardBackgroundTarget(e.target, e.currentTarget)
       if (
@@ -182,18 +165,13 @@ export function useBoardViewport(opts: {
       onClearSelectionRef.current?.()
       pingActivity()
       e.currentTarget.setPointerCapture(e.pointerId)
-
-      const cam = resolveCamera()
-      const session = startPanSession(e.pointerId, e.clientX, e.clientY, cam)
-
-      // Defer touch pan until move so a second finger can land for pinch.
-      if (e.pointerType === 'touch') {
-        touchPanPendingRef.current = session
-        return true
-      }
-
+      mousePanRef.current = startPanSession(
+        e.pointerId,
+        e.clientX,
+        e.clientY,
+        resolveCamera(),
+      )
       setInteracting(true)
-      panningRef.current = session
       return true
     },
     [pingActivity, resolveCamera],
@@ -201,47 +179,23 @@ export function useBoardViewport(opts: {
 
   const onPanPointerMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
-      if (pinchActiveRef.current) return false
+      if (e.pointerType === 'touch') return false
 
-      const pending = touchPanPendingRef.current
-      if (pending && pending.pointerId === e.pointerId && !panningRef.current) {
-        if (
-          exceedsDragThreshold(
-            pending.startX,
-            pending.startY,
-            e.clientX,
-            e.clientY,
-          )
-        ) {
-          panningRef.current = pending
-          touchPanPendingRef.current = null
-          setInteracting(true)
-        } else {
-          return true
-        }
-      }
-
-      const pan = panningRef.current
+      const pan = mousePanRef.current
       if (!panSessionMatches(pan, e.pointerId)) return false
-      scheduleCamera(
-        panCamera(resolveCamera(), pan, e.clientX, e.clientY),
+      applyCameraImmediate(
+        panCamera(cameraRef.current, pan, e.clientX, e.clientY),
       )
       return true
     },
-    [resolveCamera, scheduleCamera],
+    [applyCameraImmediate],
   )
 
   const onPanPointerUp = useCallback((pointerId: number) => {
-    if (panSessionMatches(touchPanPendingRef.current, pointerId)) {
-      touchPanPendingRef.current = null
-      return true
-    }
-    if (panSessionMatches(panningRef.current, pointerId)) {
-      panningRef.current = null
-      setInteracting(false)
-      return true
-    }
-    return false
+    if (!panSessionMatches(mousePanRef.current, pointerId)) return false
+    mousePanRef.current = null
+    setInteracting(false)
+    return true
   }, [])
 
   return {

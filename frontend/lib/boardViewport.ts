@@ -4,11 +4,18 @@ import type { BoardCamera } from '@/lib/boardCoords'
 import {
   cameraTransform,
   computeFitCamera,
+  exceedsDragThreshold,
   pinchZoomCamera,
   zoomCameraAtPoint,
   type BoardNorm,
 } from '@/lib/boardMath'
 import type { BoardSubgroup } from '@/lib/subgroup'
+import {
+  isBoardBackgroundTarget,
+  panSessionMatches,
+  startPanSession,
+  type PanSession,
+} from '@/lib/boardPointer'
 
 export const DEFAULT_BOARD_CAMERA: BoardCamera = { x: 0, y: 0, scale: 0.35 }
 
@@ -115,84 +122,147 @@ function pinchMetrics(
   }
 }
 
-function isTouchLikePointer(e: PointerEvent) {
-  return e.pointerType === 'touch' || e.pointerType === 'pen'
+function isTouchPointer(e: PointerEvent) {
+  return e.pointerType === 'touch'
+}
+
+function releaseCapture(vp: HTMLElement, pointerId: number) {
+  try {
+    vp.releasePointerCapture(pointerId)
+  } catch {
+    // Pointer may already be released.
+  }
 }
 
 /**
- * Two-finger pinch zoom on the board viewport (capture phase so pins don't
- * block tracking). Returns detach.
+ * Touch pan + pinch on the board viewport (capture phase so pins don't block
+ * tracking). Owns gesture state internally. Returns detach.
  */
-export function attachBoardPinchZoom(
+export function attachBoardTouchGestures(
   vp: HTMLElement,
-  getCamera: () => BoardCamera,
-  applyCamera: (cam: BoardCamera) => void,
-  opts?: {
-    onPinchStart?: () => void
-    onPinchEnd?: () => void
+  opts: {
+    getCamera: () => BoardCamera
+    applyCamera: (cam: BoardCamera) => void
+    onClearSelection?: () => void
     onActivity?: () => void
+    onInteractingChange?: (active: boolean) => void
   },
 ): () => void {
   const pointers = new Map<number, PinchPointer>()
-  let session: PinchSession | null = null
+  let pinchSession: PinchSession | null = null
+  let touchPending: PanSession | null = null
+  let touchPanning: PanSession | null = null
 
-  const startSessionIfReady = () => {
+  const clearTouchPan = () => {
+    const captureId = touchPanning?.pointerId ?? touchPending?.pointerId
+    touchPending = null
+    touchPanning = null
+    if (captureId != null) releaseCapture(vp, captureId)
+  }
+
+  const startPinchIfReady = () => {
     if (pointers.size !== 2) return
     const rect = vp.getBoundingClientRect()
     const metrics = pinchMetrics(pointers, rect)
     if (!metrics || metrics.dist < MIN_PINCH_DIST_PX) return
-    session = {
+
+    clearTouchPan()
+    pinchSession = {
       startDist: metrics.dist,
       startMidX: metrics.midX,
       startMidY: metrics.midY,
-      startCam: getCamera(),
+      startCam: opts.getCamera(),
     }
-    opts?.onPinchStart?.()
-    opts?.onActivity?.()
+    opts.onActivity?.()
+    opts.onInteractingChange?.(true)
   }
 
-  const endSessionIfNeeded = () => {
-    if (pointers.size >= 2) return
-    if (!session) return
-    session = null
-    opts?.onPinchEnd?.()
+  const endPinchIfNeeded = () => {
+    if (pointers.size >= 2 || !pinchSession) return
+    pinchSession = null
+    opts.onInteractingChange?.(false)
   }
 
   const onPointerDown = (e: PointerEvent) => {
-    if (!isTouchLikePointer(e)) return
+    if (!isTouchPointer(e)) return
     pointers.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY })
-    if (pointers.size === 2) startSessionIfReady()
+
+    if (pointers.size === 1 && isBoardBackgroundTarget(e.target, vp) && e.button === 0) {
+      opts.onClearSelection?.()
+      opts.onActivity?.()
+      vp.setPointerCapture(e.pointerId)
+      touchPending = startPanSession(
+        e.pointerId,
+        e.clientX,
+        e.clientY,
+        opts.getCamera(),
+      )
+    }
+
+    if (pointers.size === 2) startPinchIfReady()
   }
 
   const onPointerMove = (e: PointerEvent) => {
     if (!pointers.has(e.pointerId)) return
     pointers.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY })
-    if (!session || pointers.size < 2) return
+
+    if (pinchSession && pointers.size >= 2) {
+      e.preventDefault()
+      const rect = vp.getBoundingClientRect()
+      const metrics = pinchMetrics(pointers, rect)
+      if (!metrics || pinchSession.startDist < MIN_PINCH_DIST_PX) return
+      opts.applyCamera(
+        pinchZoomCamera(
+          pinchSession.startCam,
+          pinchSession.startMidX,
+          pinchSession.startMidY,
+          pinchSession.startDist,
+          metrics.midX,
+          metrics.midY,
+          metrics.dist,
+        ),
+      )
+      return
+    }
+
+    if (touchPending && touchPending.pointerId === e.pointerId && !touchPanning) {
+      if (
+        exceedsDragThreshold(
+          touchPending.startX,
+          touchPending.startY,
+          e.clientX,
+          e.clientY,
+        )
+      ) {
+        touchPanning = touchPending
+        touchPending = null
+        opts.onInteractingChange?.(true)
+      } else {
+        return
+      }
+    }
+
+    const pan = touchPanning
+    if (!pan || pan.pointerId !== e.pointerId) return
 
     e.preventDefault()
-    opts?.onActivity?.()
-
-    const rect = vp.getBoundingClientRect()
-    const metrics = pinchMetrics(pointers, rect)
-    if (!metrics || session.startDist < MIN_PINCH_DIST_PX) return
-
-    applyCamera(
-      pinchZoomCamera(
-        session.startCam,
-        session.startMidX,
-        session.startMidY,
-        session.startDist,
-        metrics.midX,
-        metrics.midY,
-        metrics.dist,
-      ),
-    )
+    opts.applyCamera(panCamera(opts.getCamera(), pan, e.clientX, e.clientY))
   }
 
   const onPointerUp = (e: PointerEvent) => {
     if (!pointers.has(e.pointerId)) return
     pointers.delete(e.pointerId)
-    endSessionIfNeeded()
+
+    if (panSessionMatches(touchPending, e.pointerId)) {
+      touchPending = null
+      releaseCapture(vp, e.pointerId)
+    } else if (panSessionMatches(touchPanning, e.pointerId)) {
+      touchPanning = null
+      opts.onInteractingChange?.(false)
+      releaseCapture(vp, e.pointerId)
+    }
+
+    endPinchIfNeeded()
   }
 
   const capture = true
