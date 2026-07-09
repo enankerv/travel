@@ -201,6 +201,36 @@ export function zoomCameraAtPointWithFactor(
   }
 }
 
+/**
+ * Pinch zoom (and two-finger pan): keep the world point under the gesture-start
+ * centroid glued to the current centroid while scaling from start distance.
+ */
+export function pinchZoomCamera(
+  startCam: BoardCamera,
+  startMidX: number,
+  startMidY: number,
+  startDist: number,
+  currentMidX: number,
+  currentMidY: number,
+  currentDist: number,
+): BoardCamera {
+  if (startDist < 1) return startCam
+
+  const anchorWorldX = (startMidX - startCam.x) / startCam.scale
+  const anchorWorldY = (startMidY - startCam.y) / startCam.scale
+  const scale = clamp(
+    startCam.scale * (currentDist / startDist),
+    BOARD_MIN_SCALE,
+    BOARD_MAX_SCALE,
+  )
+
+  return {
+    x: currentMidX - anchorWorldX * scale,
+    y: currentMidY - anchorWorldY * scale,
+    scale,
+  }
+}
+
 /** Wheel zoom toward a viewport-local point (mx, my). */
 export function zoomCameraAtPoint(
   cam: BoardCamera,

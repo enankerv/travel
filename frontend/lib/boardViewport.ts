@@ -4,8 +4,8 @@ import type { BoardCamera } from '@/lib/boardCoords'
 import {
   cameraTransform,
   computeFitCamera,
+  pinchZoomCamera,
   zoomCameraAtPoint,
-  zoomCameraAtPointWithFactor,
   type BoardNorm,
 } from '@/lib/boardMath'
 import type { BoardSubgroup } from '@/lib/subgroup'
@@ -96,6 +96,8 @@ type PinchPointer = { clientX: number; clientY: number }
 
 type PinchSession = {
   startDist: number
+  startMidX: number
+  startMidY: number
   startCam: BoardCamera
 }
 
@@ -124,7 +126,7 @@ function isTouchLikePointer(e: PointerEvent) {
 export function attachBoardPinchZoom(
   vp: HTMLElement,
   getCamera: () => BoardCamera,
-  scheduleCamera: (cam: BoardCamera) => void,
+  applyCamera: (cam: BoardCamera) => void,
   opts?: {
     onPinchStart?: () => void
     onPinchEnd?: () => void
@@ -139,7 +141,12 @@ export function attachBoardPinchZoom(
     const rect = vp.getBoundingClientRect()
     const metrics = pinchMetrics(pointers, rect)
     if (!metrics || metrics.dist < MIN_PINCH_DIST_PX) return
-    session = { startDist: metrics.dist, startCam: getCamera() }
+    session = {
+      startDist: metrics.dist,
+      startMidX: metrics.midX,
+      startMidY: metrics.midY,
+      startCam: getCamera(),
+    }
     opts?.onPinchStart?.()
     opts?.onActivity?.()
   }
@@ -169,13 +176,15 @@ export function attachBoardPinchZoom(
     const metrics = pinchMetrics(pointers, rect)
     if (!metrics || session.startDist < MIN_PINCH_DIST_PX) return
 
-    const factor = metrics.dist / session.startDist
-    scheduleCamera(
-      zoomCameraAtPointWithFactor(
+    applyCamera(
+      pinchZoomCamera(
         session.startCam,
+        session.startMidX,
+        session.startMidY,
+        session.startDist,
         metrics.midX,
         metrics.midY,
-        factor,
+        metrics.dist,
       ),
     )
   }
