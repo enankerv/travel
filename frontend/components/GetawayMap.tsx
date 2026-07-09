@@ -120,7 +120,7 @@ export default function GetawayMap({
     );
   }
 
-  if (withCoords.length === 0) {
+  if (pois.length === 0) {
     return (
       <div className="getaway-map getaway-map--empty">
         <p>No items with location data yet.</p>
@@ -132,13 +132,19 @@ export default function GetawayMap({
     );
   }
 
+  const defaultCenter: [number, number] =
+    withCoords.length > 0
+      ? [withCoords[0].lat, withCoords[0].lng]
+      : [20, 0];
+  const defaultZoom = withCoords.length > 0 ? 6 : 2;
+
   const L = typeof window !== "undefined" ? require("leaflet") : null;
 
   return (
     <div className="getaway-map">
       <MapContainer
-        center={[withCoords[0].lat, withCoords[0].lng]}
-        zoom={6}
+        center={defaultCenter}
+        zoom={defaultZoom}
         className="getaway-map__container"
       >
         <TileLayer
