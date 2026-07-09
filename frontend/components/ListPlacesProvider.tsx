@@ -65,7 +65,10 @@ export default function ListPlacesProvider({
         return [row as POIBase, ...prev]
       })
       if (row.poi_type && row.poi_type !== 'getaway') return
-      setGetaways((prev) => [row as Getaway, ...prev])
+      setGetaways((prev) => {
+        if (prev.some((g) => g.id === row.id)) return prev
+        return [row as Getaway, ...prev]
+      })
     },
     onUpdate: (row) => {
       setPois((prev) =>
@@ -74,13 +77,16 @@ export default function ListPlacesProvider({
         ),
       )
       if (row.poi_type && row.poi_type !== 'getaway') return
-      setGetaways((prev) =>
-        prev.map((g) =>
-          g.id === row.id
-            ? (mergePoiFromRealtime(g, row as POIBase) as Getaway)
-            : g,
-        ),
-      )
+      setGetaways((prev) => {
+        const index = prev.findIndex((g) => g.id === row.id)
+        if (index < 0) return prev
+        const next = [...prev]
+        next[index] = mergePoiFromRealtime(
+          prev[index],
+          row as POIBase,
+        ) as Getaway
+        return next
+      })
     },
     onDelete: (id) => {
       setPois((prev) => prev.filter((p) => p.id !== id))

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 import { scoutPaste, deleteGetaway, updateGetaway, updatePoi, deletePoi } from "@/lib/api";
@@ -58,19 +58,9 @@ export default function ListGetawaysTab({
   const listId = list.id;
   const [error, setError] = useState("");
   const [pasteScoutLoading, setPasteScoutLoading] = useState(false);
-  const onGetawayLoading = useCallback(
-    (getawayId: string) => {
-      setGetaways((prev) =>
-        prev.map((g) =>
-          g.id === getawayId ? { ...g, import_status: "loading" } : g,
-        ),
-      );
-    },
-    [setGetaways],
-  );
   const { lastFailedUrl, setLastFailedUrl, handleScoutUrl } = useScoutUrl(
     listId,
-    { setError, onGetawayLoading },
+    { setError },
   );
   const [lastFailedPaste, setLastFailedPaste] = useState("");
   const [showPasteModal, setShowPasteModal] = useState(false);
@@ -128,9 +118,6 @@ export default function ListGetawaysTab({
       const result = await scoutPaste(text, listId, originalUrl, getawayId);
       if (result.ok) {
         setPasteGetaway(null);
-        if (getawayId) {
-          onGetawayLoading(getawayId);
-        }
         tryShowScoutNotification("Processing Paste...", {
           body: result.truncated
             ? "Text was truncated for length limits. Extracting getaway details..."

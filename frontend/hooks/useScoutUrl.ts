@@ -12,10 +12,8 @@ export function useScoutUrl(
   listId: string,
   {
     setError,
-    onGetawayLoading,
   }: {
     setError?: (message: string) => void
-    onGetawayLoading?: (getawayId: string) => void
   } = {},
 ) {
   const [scoutLoading, setScoutLoading] = useState(false)
@@ -36,9 +34,6 @@ export function useScoutUrl(
               body: 'Credit refunded for thin scrape.',
               icon: '↩️',
             })
-          }
-          if (getawayId) {
-            onGetawayLoading?.(getawayId)
           }
           tryShowScoutNotification('Scouting...', {
             body: 'Processing listing...',
@@ -67,7 +62,7 @@ export function useScoutUrl(
         setScoutLoading(false)
       }
     },
-    [listId, onGetawayLoading, setError],
+    [listId, setError],
   )
 
   return { scoutLoading, lastFailedUrl, setLastFailedUrl, handleScoutUrl }
