@@ -5,6 +5,7 @@ import {
   cameraTransform,
   computeFitCamera,
   zoomCameraAtPoint,
+  zoomCameraAtPointWithFactor,
   type BoardNorm,
 } from '@/lib/boardMath'
 import type { BoardSubgroup } from '@/lib/subgroup'
@@ -87,6 +88,118 @@ export function computeViewportFitCamera(
     posOverride,
     subgroups,
   )
+}
+
+const MIN_PINCH_DIST_PX = 10
+
+type PinchPointer = { clientX: number; clientY: number }
+
+type PinchSession = {
+  startDist: number
+  startCam: BoardCamera
+}
+
+function pinchMetrics(
+  pointers: Map<number, PinchPointer>,
+  rect: DOMRect,
+): { midX: number; midY: number; dist: number } | null {
+  const pts = [...pointers.values()]
+  if (pts.length < 2) return null
+  const [a, b] = pts
+  return {
+    midX: (a.clientX + b.clientX) / 2 - rect.left,
+    midY: (a.clientY + b.clientY) / 2 - rect.top,
+    dist: Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY),
+  }
+}
+
+function isTouchLikePointer(e: PointerEvent) {
+  return e.pointerType === 'touch' || e.pointerType === 'pen'
+}
+
+/**
+ * Two-finger pinch zoom on the board viewport (capture phase so pins don't
+ * block tracking). Returns detach.
+ */
+export function attachBoardPinchZoom(
+  vp: HTMLElement,
+  getCamera: () => BoardCamera,
+  scheduleCamera: (cam: BoardCamera) => void,
+  opts?: {
+    onPinchStart?: () => void
+    onPinchEnd?: () => void
+    onActivity?: () => void
+  },
+): () => void {
+  const pointers = new Map<number, PinchPointer>()
+  let session: PinchSession | null = null
+
+  const startSessionIfReady = () => {
+    if (pointers.size !== 2) return
+    const rect = vp.getBoundingClientRect()
+    const metrics = pinchMetrics(pointers, rect)
+    if (!metrics || metrics.dist < MIN_PINCH_DIST_PX) return
+    session = { startDist: metrics.dist, startCam: getCamera() }
+    opts?.onPinchStart?.()
+    opts?.onActivity?.()
+  }
+
+  const endSessionIfNeeded = () => {
+    if (pointers.size >= 2) return
+    if (!session) return
+    session = null
+    opts?.onPinchEnd?.()
+  }
+
+  const onPointerDown = (e: PointerEvent) => {
+    if (!isTouchLikePointer(e)) return
+    pointers.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY })
+    if (pointers.size === 2) startSessionIfReady()
+  }
+
+  const onPointerMove = (e: PointerEvent) => {
+    if (!pointers.has(e.pointerId)) return
+    pointers.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY })
+    if (!session || pointers.size < 2) return
+
+    e.preventDefault()
+    opts?.onActivity?.()
+
+    const rect = vp.getBoundingClientRect()
+    const metrics = pinchMetrics(pointers, rect)
+    if (!metrics || session.startDist < MIN_PINCH_DIST_PX) return
+
+    const factor = metrics.dist / session.startDist
+    scheduleCamera(
+      zoomCameraAtPointWithFactor(
+        session.startCam,
+        metrics.midX,
+        metrics.midY,
+        factor,
+      ),
+    )
+  }
+
+  const onPointerUp = (e: PointerEvent) => {
+    if (!pointers.has(e.pointerId)) return
+    pointers.delete(e.pointerId)
+    endSessionIfNeeded()
+  }
+
+  const capture = true
+  vp.addEventListener('pointerdown', onPointerDown, capture)
+  vp.addEventListener('pointermove', onPointerMove, { passive: false, capture })
+  vp.addEventListener('pointerup', onPointerUp, capture)
+  vp.addEventListener('pointercancel', onPointerUp, capture)
+  vp.addEventListener('lostpointercapture', onPointerUp, capture)
+
+  return () => {
+    vp.removeEventListener('pointerdown', onPointerDown, capture)
+    vp.removeEventListener('pointermove', onPointerMove, capture)
+    vp.removeEventListener('pointerup', onPointerUp, capture)
+    vp.removeEventListener('pointercancel', onPointerUp, capture)
+    vp.removeEventListener('lostpointercapture', onPointerUp, capture)
+  }
 }
 
 /** Wheel zoom on the board viewport. Returns detach. */

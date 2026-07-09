@@ -5,6 +5,7 @@ import type { POIBase } from '@/lib/getaway'
 import type { BoardCamera } from '@/lib/boardCoords'
 import {
   applyCameraToWorld,
+  attachBoardPinchZoom,
   attachBoardWheelZoom,
   attachSpacePanKeys,
   attachViewportFitObserver,
@@ -115,18 +116,31 @@ export function useBoardViewport(opts: {
   useEffect(() => {
     const vp = viewportRef.current
     if (!vp) return
-    return attachBoardWheelZoom(
-      vp,
-      () => cameraRef.current,
-      (cam) => {
-        pendingCameraRef.current = cam
-        pingActivity()
-        if (cameraRafRef.current) return
-        cameraRafRef.current = requestAnimationFrame(flushCamera)
+    return attachBoardWheelZoom(vp, () => cameraRef.current, scheduleCamera, pingActivity)
+  }, [scheduleCamera, pingActivity])
+
+  useEffect(() => {
+    const vp = viewportRef.current
+    if (!vp) return
+    return attachBoardPinchZoom(vp, () => cameraRef.current, scheduleCamera, {
+      onPinchStart: () => {
+        const pan = panningRef.current
+        if (pan) {
+          try {
+            vp.releasePointerCapture(pan.pointerId)
+          } catch {
+            // Pointer may already be released.
+          }
+        }
+        panningRef.current = null
+        setInteracting(true)
       },
-      pingActivity,
-    )
-  }, [flushCamera, pingActivity])
+      onPinchEnd: () => {
+        setInteracting(false)
+      },
+      onActivity: pingActivity,
+    })
+  }, [scheduleCamera, pingActivity])
 
   const onPanPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {

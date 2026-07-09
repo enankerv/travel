@@ -185,21 +185,31 @@ export function computeFitCamera(
 }
 
 /** Zoom toward a viewport-local point (mx, my), keeping that world point fixed. */
-export function zoomCameraAtPoint(
+export function zoomCameraAtPointWithFactor(
   cam: BoardCamera,
   mx: number,
   my: number,
-  deltaY: number,
+  factor: number,
 ): BoardCamera {
   const wx = (mx - cam.x) / cam.scale
   const wy = (my - cam.y) / cam.scale
-  const factor = deltaY < 0 ? 1.08 : 1 / 1.08
   const newScale = clamp(cam.scale * factor, BOARD_MIN_SCALE, BOARD_MAX_SCALE)
   return {
     x: mx - wx * newScale,
     y: my - wy * newScale,
     scale: newScale,
   }
+}
+
+/** Wheel zoom toward a viewport-local point (mx, my). */
+export function zoomCameraAtPoint(
+  cam: BoardCamera,
+  mx: number,
+  my: number,
+  deltaY: number,
+): BoardCamera {
+  const factor = deltaY < 0 ? 1.08 : 1 / 1.08
+  return zoomCameraAtPointWithFactor(cam, mx, my, factor)
 }
 
 export type PoiOffsetBounds = { maxWx: number; maxWy: number }
