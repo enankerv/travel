@@ -11,6 +11,16 @@ import httpx
 log = logging.getLogger("scout.images")
 
 SUPABASE_BUCKET = "getaway-images"
+MAX_GETAWAY_IMAGES = 10
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+
+_ALLOWED_IMAGE_TYPES = {
+    "image/jpeg": "jpg",
+    "image/jpg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/gif": "gif",
+}
 
 # Regex patterns for image extraction
 MD_IMAGE_RE = re.compile(r"!\[[^\]]*\]\((https?://[^\s\)]+\.(?:jpe?g|png|webp|avif))\)", re.IGNORECASE)
@@ -107,6 +117,64 @@ async def upload_images_to_supabase(
                 log.warning("failed to upload image %s: %s", img_url[:80], e, exc_info=True)
 
     return public_urls if public_urls else None
+
+
+def content_type_to_ext(content_type: str | None) -> str | None:
+    """Map an image MIME type to a storage file extension."""
+    ct = (content_type or "").split(";")[0].strip().lower()
+    return _ALLOWED_IMAGE_TYPES.get(ct)
+
+
+def allocate_getaway_image_paths(
+    poi_id: str,
+    *,
+    start_index: int,
+    content_types: list[str | None],
+) -> list[str]:
+    """Build storage object paths for a batch of manual uploads."""
+    paths: list[str] = []
+    for offset, content_type in enumerate(content_types):
+        ext = content_type_to_ext(content_type)
+        if ext is None:
+            continue
+        index = start_index + len(paths)
+        paths.append(f"{poi_id}/{index:02d}.{ext}")
+    return paths
+
+
+def create_signed_getaway_upload_urls(
+    paths: list[str],
+    auth_token: str,
+) -> list[dict[str, str]]:
+    """Return presigned upload URLs/tokens for direct client uploads."""
+    from db import get_supabase_client
+    from storage3.types import CreateSignedUploadUrlOptions
+
+    if not auth_token or not paths:
+        return []
+
+    client = get_supabase_client(auth_token)
+    bucket = client.storage.from_(SUPABASE_BUCKET)
+    bucket._headers["authorization"] = f"Bearer {auth_token}"
+
+    uploads: list[dict[str, str]] = []
+    for path in paths:
+        result = bucket.create_signed_upload_url(
+            path, CreateSignedUploadUrlOptions(upsert="true")
+        )
+        if isinstance(result, dict):
+            signed_url = (
+                result.get("signedUrl")
+                or result.get("signed_url")
+                or result.get("signedURL")
+                or ""
+            )
+            uploads.append({
+                "path": result.get("path") or path,
+                "token": result.get("token") or "",
+                "signed_url": signed_url,
+            })
+    return uploads
 
 
 def pick_best_images_from_media(media: dict, villa_name: str = "", base_url: str = "", max_images: int = 1) -> list[str]:

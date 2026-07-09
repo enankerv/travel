@@ -149,6 +149,68 @@ export async function deleteGetaway(listId: string, poiId: string) {
   return res.json()
 }
 
+export async function prepareGetawayImageUploadUrls(
+  listId: string,
+  poiId: string,
+  files: { content_type: string }[],
+): Promise<{
+  uploads: Array<{ path: string; token: string; signed_url: string }>
+}> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_URL}/api/lists/${listId}/getaways/${poiId}/images/upload-urls`,
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ files }),
+    },
+  )
+  if (!res.ok) {
+    let message = 'Failed to prepare photo upload'
+    try {
+      const data = await res.json()
+      if (typeof data?.detail === 'string') message = data.detail
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message)
+  }
+  return res.json()
+}
+
+export async function uploadGetawayImages(
+  listId: string,
+  poiId: string,
+  files: File[],
+) {
+  const { uploads } = await prepareGetawayImageUploadUrls(
+    listId,
+    poiId,
+    files.map((file) => ({
+      content_type: file.type || 'image/jpeg',
+    })),
+  )
+  if (uploads.length !== files.length) {
+    throw new Error('Could not prepare upload URLs for every photo')
+  }
+
+  const bucket = supabase.storage.from('getaway-images')
+  for (let i = 0; i < files.length; i++) {
+    const slot = uploads[i]
+    const file = files[i]
+    const contentType = file.type || 'image/jpeg'
+    const { error } = await bucket.uploadToSignedUrl(
+      slot.path,
+      slot.token,
+      file,
+      { contentType },
+    )
+    if (error) {
+      throw new Error(error.message || 'Failed to upload photo')
+    }
+  }
+}
+
 // POIs (spine — cork board pins, etc.)
 export async function listPois(listId: string, poiType?: string): Promise<POIBase[]> {
   const headers = await getAuthHeaders()

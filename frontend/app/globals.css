@@ -2075,6 +2075,42 @@ button:focus-visible {
   color: var(--red);
 }
 
+.getaway-photo-upload {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  padding: 0.2rem 0.45rem;
+  white-space: nowrap;
+}
+
+.getaway-photo-upload:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.getaway-photo-upload:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.thumb-placeholder--upload {
+  padding: 0.35rem;
+}
+
+.getaway-detail-sheet__photo-upload {
+  margin-bottom: 1rem;
+}
+
+.getaway-mobile-card__photo-upload {
+  font-size: 0.75rem;
+  margin-right: 0.35rem;
+  padding: 0.25rem 0.5rem;
+}
+
 /* Modal overlay - portal to body, above footer */
 .modal-overlay {
   position: fixed;

@@ -232,8 +232,6 @@ async def persist_listing_to_getaway(
     if image_urls:
         row["thumbnail_url"] = image_urls[0]
     Getaway.update_by_id(poi_id, auth_token, **row)
-    if image_urls:
-        Getaway.replace_images_by_id(poi_id, image_urls, auth_token)
     print("[OK] Success! Getaway updated in Supabase")
     return {"path": f"/getaways/{poi_id}", "poi_id": poi_id}
 

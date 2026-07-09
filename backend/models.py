@@ -196,9 +196,9 @@ class POI(POIBase):
 
     * ``get`` / ``for_list`` — query params + token (token stored on result),
     * ``new`` — creation fields + token (token stored on result),
-    * ``update`` / ``delete`` / ``replace_images`` — take a fetched instance
+    * ``update`` / ``delete`` — take a fetched instance
       (uses its bound token),
-    * ``update_by_id`` / ``delete_by_id`` / ``replace_images_by_id`` — take
+    * ``update_by_id`` / ``delete_by_id`` — take
       an id + explicit token (for scout/background paths that only hold an id).
 
     Subtypes (Getaway, ...) inherit these hooks and may override ``_subtype_columns``
@@ -382,12 +382,6 @@ class POI(POIBase):
         from db.pois import delete_poi_row
         return delete_poi_row(poi.id, poi._session_token())
 
-    @classmethod
-    def replace_images(cls, poi: "POI", image_paths: list[str]) -> None:
-        """Replace this instance's ordered image set; uses its bound auth token."""
-        from db.pois import insert_poi_images
-        insert_poi_images(poi.id, image_paths, poi._session_token())
-
     # ---- update / delete (id + token — scout / background paths) ----------
     @classmethod
     def update_by_id(
@@ -405,12 +399,6 @@ class POI(POIBase):
         """Delete by poi id with an explicit auth token."""
         from db.pois import delete_poi_row
         return delete_poi_row(poi_id, auth_token, list_id=list_id)
-
-    @classmethod
-    def replace_images_by_id(cls, poi_id: str, auth_token: str, image_paths: list[str]) -> None:
-        """Replace images by poi id with an explicit auth token."""
-        from db.pois import insert_poi_images
-        insert_poi_images(poi_id, image_paths, auth_token)
 
     # ---- related data (uses bound token) ----------------------------------
     def votes(self) -> list["Vote"]:
@@ -729,6 +717,25 @@ class ScoutPackCheckout(BaseModel):
     pack_id: str
     success_url: str
     cancel_url: str
+
+
+class GetawayImageUploadFile(BaseModel):
+    content_type: str
+
+
+class GetawayImageUploadUrlsRequest(BaseModel):
+    files: list[GetawayImageUploadFile] = Field(..., min_length=1)
+
+
+class GetawayImageUploadSlot(BaseModel):
+    path: str
+    token: str
+    signed_url: str
+
+
+class GetawayImageUploadUrlsResponse(BaseModel):
+    ok: bool = True
+    uploads: list[GetawayImageUploadSlot]
 
 
 # ============================================================================

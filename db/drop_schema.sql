@@ -7,6 +7,7 @@
 
 -- Triggers -------------------------------------------------------------------
 
+DROP TRIGGER IF EXISTS getaway_storage_image_trigger ON storage.objects;
 DROP TRIGGER IF EXISTS votes_broadcast_list_trigger ON public.votes;
 DROP TRIGGER IF EXISTS comments_broadcast_list_trigger ON public.comments;
 DROP TRIGGER IF EXISTS getaway_images_broadcast_trigger ON public.getaway_images;
@@ -104,6 +105,7 @@ DROP TABLE IF EXISTS public.profiles;
 
 -- Functions ------------------------------------------------------------------
 
+DROP FUNCTION IF EXISTS public.getaway_storage_image_trigger();
 DROP FUNCTION IF EXISTS public.votes_broadcast_list_trigger();
 DROP FUNCTION IF EXISTS public.comments_broadcast_list_trigger();
 DROP FUNCTION IF EXISTS public.getaway_images_broadcast_trigger();

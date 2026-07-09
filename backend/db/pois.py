@@ -157,14 +157,14 @@ def update_subtype_row(table: str, poi_id: str, fields: dict, auth_token: str) -
     client.table(table).update(fields).eq("poi_id", poi_id).execute()
 
 
-def insert_poi_images(poi_id: str, image_urls: list[str], auth_token: str) -> None:
-    """Replace the image rows for a POI (stored as ``poi_id/NN.ext`` paths)."""
-    if not image_urls:
-        return
+def fetch_poi_image_paths(poi_id: str, auth_token: str) -> list[str]:
+    """Ordered storage paths for a POI's gallery (unsigned)."""
     client = get_supabase_client(auth_token)
-    client.table("poi_images").delete().eq("poi_id", poi_id).execute()
-    rows = [
-        {"poi_id": poi_id, "image_url": url, "position": i}
-        for i, url in enumerate(image_urls)
-    ]
-    client.table("poi_images").insert(rows).execute()
+    response = (
+        client.table("poi_images")
+        .select("image_url, position")
+        .eq("poi_id", poi_id)
+        .order("position")
+        .execute()
+    )
+    return [r["image_url"] for r in (response.data or [])]

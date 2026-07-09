@@ -128,7 +128,18 @@ export default function GetawayRow({
           if (key === 'image') {
             return (
               <td key={key} className="col-thumb">
-                {getaway.import_status === 'loading' ? (
+                {thumbUrl ? (
+                  <div
+                    className="thumb-link"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleImageClick(e)
+                    }}
+                    title="Click to view images"
+                  >
+                    <img src={thumbUrl} alt={getaway.title ?? ''} className="thumb" />
+                  </div>
+                ) : getaway.import_status === 'loading' ? (
                   <div className="spinner" style={{ width: '2rem', height: '2rem' }} />
                 ) : (
                   <div className="thumb-placeholder">

@@ -5,7 +5,6 @@ import { useSignedImageUrls } from "@/hooks/useSignedImageUrls";
 import { useListDetailContext } from "@/lib/ListDetailContext";
 import { formatPerPersonLine } from "@/lib/pricePerPerson";
 import { CommentIcon, ThumbsUpIcon, TrashIcon } from "./icons";
-
 function formatListingPrice(price: number | null | undefined, currency?: string | null) {
   if (price == null) return "—";
   const sym = currency === "EUR" ? "€" : "$";

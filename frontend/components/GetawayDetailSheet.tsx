@@ -12,6 +12,7 @@ import PoiEditForm, { poiEditStateFromPoi } from "./PoiEditForm";
 import { poiEditPayload, poiImageSources, poiDisplayAddress } from "@/lib/poi";
 import PoiVoteBar from "./PoiVoteBar";
 import ImageCarousel from "./ImageCarousel";
+import GetawayPhotoUpload from "./GetawayPhotoUpload";
 import InlineComments from "./InlineComments";
 
 function formatPrice(price: number | null | undefined, currency?: string | null) {
@@ -188,13 +189,22 @@ export default function GetawayDetailSheet({
             )
           ) : (
             <>
-              {signedUrls.length > 0 && (
+              {signedUrls.length > 0 ? (
                 <ImageCarousel
                   images={signedUrls}
                   alt={getaway.title ?? ""}
                   className="getaway-detail-sheet__carousel"
                 />
-              )}
+              ) : isGetaway ? (
+                <div className="getaway-detail-sheet__photo-upload">
+                  <GetawayPhotoUpload
+                    getawayId={getaway.id}
+                    listId={listCtx?.list.id}
+                    onUploaded={listCtx?.onRefresh}
+                    label="Add photos from your device"
+                  />
+                </div>
+              ) : null}
 
               <PoiVoteBar
                 poiId={getaway.id}

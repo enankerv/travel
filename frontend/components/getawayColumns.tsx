@@ -6,6 +6,7 @@ import { formatPerPersonLine } from "@/lib/pricePerPerson";
 import EditableCell from "@/components/EditableCell";
 import VoteCell from "@/components/VoteCell";
 import { TrashIcon, ExternalLinkIcon } from "@/components/icons";
+import GetawayPhotoUpload from "@/components/GetawayPhotoUpload";
 
 export const COLUMN_KEYS = [
   "rank",
@@ -167,7 +168,9 @@ const COLUMN_CONFIG: Record<ColumnKey, ColumnDef> = {
             </div>
           )
         ) : (
-          <div className="thumb-placeholder">—</div>
+          <div className="thumb-placeholder thumb-placeholder--upload">
+            <GetawayPhotoUpload getawayId={getaway.id} label="Add photos" />
+          </div>
         )}
       </td>
     ),
