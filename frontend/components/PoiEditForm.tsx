@@ -53,6 +53,49 @@ export default function PoiEditForm({
           onChange={(e) => setEditData({ ...editData, address: e.target.value })}
         />
       </div>
+      <div className="getaway-detail-sheet__edit-row">
+        <div className="getaway-detail-sheet__edit-field">
+          <label>Latitude</label>
+          <input
+            type="text"
+            inputMode="decimal"
+            className="sheet-edit-input"
+            placeholder="e.g. 48.8566"
+            value={editData.lat != null ? String(editData.lat) : ''}
+            onChange={(e) => {
+              const v = e.target.value.trim()
+              const n = parseFloat(v)
+              setEditData({
+                ...editData,
+                lat: v === '' ? null : Number.isNaN(n) ? editData.lat ?? null : n,
+              })
+            }}
+          />
+        </div>
+        <div className="getaway-detail-sheet__edit-field">
+          <label>Longitude</label>
+          <input
+            type="text"
+            inputMode="decimal"
+            className="sheet-edit-input"
+            placeholder="e.g. 2.3522"
+            value={editData.lng != null ? String(editData.lng) : ''}
+            onChange={(e) => {
+              const v = e.target.value.trim()
+              const n = parseFloat(v)
+              setEditData({
+                ...editData,
+                lng: v === '' ? null : Number.isNaN(n) ? editData.lng ?? null : n,
+              })
+            }}
+          />
+        </div>
+      </div>
+      <p
+        style={{ margin: '0 0 1rem', fontSize: '0.85em', color: 'var(--muted)' }}
+      >
+        Map pin position. Leave blank to geocode from the address on save.
+      </p>
       <div className="getaway-detail-sheet__edit-field">
         <label>Link</label>
         <input

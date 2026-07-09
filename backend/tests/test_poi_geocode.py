@@ -86,3 +86,41 @@ def test_persist_update_geocodes_when_location_changes():
                     assert changes["lat"] == 3.0
                     assert changes["lng"] == 4.0
                     assert result.poi is updated
+
+
+def test_persist_update_skips_geocode_when_coords_set():
+    current = _sample_poi(location="Old town", address="Old address")
+    updated = _sample_poi(
+        location="Old town",
+        address="New address",
+        lat=42.99,
+        lng=11.95,
+    )
+    changes = {
+        "address": "New address",
+        "lat": 42.99,
+        "lng": 11.95,
+    }
+    with patch("utils.geocode.geocode") as geocode:
+        with patch("routes.auth.extract_user_id_from_token", return_value="user-1"):
+            with patch.object(POI, "get", side_effect=[updated]):
+                with patch("db.pois.update_poi_row", return_value={}):
+                    result = POI._persist_update("poi-1", "fake", POI, changes)
+                    geocode.assert_not_called()
+                    assert changes["lat"] == 42.99
+                    assert changes["lng"] == 11.95
+                    assert result.poi is updated
+
+
+def test_persist_update_geocodes_when_coords_cleared():
+    current = _sample_poi(address="Old address", lat=1.0, lng=2.0)
+    updated = _sample_poi(address="New address")
+    changes = {"address": "New address", "lat": None, "lng": None}
+    with patch("utils.geocode.geocode", return_value=(3.0, 4.0)) as geocode:
+        with patch("routes.auth.extract_user_id_from_token", return_value="user-1"):
+            with patch.object(POI, "get", side_effect=[current, updated]):
+                with patch("db.pois.update_poi_row", return_value={}):
+                    POI._persist_update("poi-1", "fake", POI, changes)
+                    geocode.assert_called_once_with("New address", user_id="user-1")
+                    assert changes["lat"] == 3.0
+                    assert changes["lng"] == 4.0

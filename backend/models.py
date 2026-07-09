@@ -275,24 +275,27 @@ class POI(POIBase):
             pass
 
         if user_id and ("location" in changes or "region" in changes or "address" in changes):
-            current = model_cls.get(poi_id, auth_token)
-            if current:
-                q = None
-                if "address" in changes:
-                    q = geocode_query_for_poi_fields({
-                        "address": changes.get("address"),
-                        "location": changes.get("location", current.location),
-                    })
-                if not q:
-                    q = location_query_if_changed(
-                        current_location=current.location,
-                        current_region=getattr(current, "region", None),
-                        changes=changes,
-                    )
-                if q:
-                    lat, lng = geocode(q, user_id=user_id)
-                    changes["lat"] = lat
-                    changes["lng"] = lng
+            lat_manual = "lat" in changes and changes.get("lat") is not None
+            lng_manual = "lng" in changes and changes.get("lng") is not None
+            if not lat_manual and not lng_manual:
+                current = model_cls.get(poi_id, auth_token)
+                if current:
+                    q = None
+                    if "address" in changes:
+                        q = geocode_query_for_poi_fields({
+                            "address": changes.get("address"),
+                            "location": changes.get("location", current.location),
+                        })
+                    if not q:
+                        q = location_query_if_changed(
+                            current_location=current.location,
+                            current_region=getattr(current, "region", None),
+                            changes=changes,
+                        )
+                    if q:
+                        lat, lng = geocode(q, user_id=user_id)
+                        changes["lat"] = lat
+                        changes["lng"] = lng
 
         spine, sub = model_cls._split_writable(changes)
         board_only = not sub and set(changes.keys()) <= _BOARD_ONLY_FIELDS

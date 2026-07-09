@@ -104,6 +104,11 @@ function emptyToNull(value: string | null | undefined): string | null {
   return trimmed || null
 }
 
+function coordForPayload(value: number | null | undefined): number | null {
+  if (value == null) return null
+  return Number.isFinite(value) ? value : null
+}
+
 /** Spine fields editable in PoiEditForm → POIUpdate payload. */
 export function poiEditPayload(data: POIBase): POIUpdate {
   return {
@@ -111,6 +116,8 @@ export function poiEditPayload(data: POIBase): POIUpdate {
     description: emptyToNull(data.description),
     address: emptyToNull(data.address),
     location: null,
+    lat: coordForPayload(data.lat),
+    lng: coordForPayload(data.lng),
     source_url: emptyToNull(data.source_url),
     thumbnail_url: emptyToNull(data.thumbnail_url),
   }
