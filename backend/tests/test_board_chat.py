@@ -470,3 +470,42 @@ def test_append_incomplete_reply_notice():
     out = _append_incomplete_reply_notice("Here are some options:")
     assert "cut off" in out
     assert out.startswith("Here are some options:")
+
+
+def test_parse_strips_echoed_pins_table():
+    raw = """No problem, adding these!
+
+title | type | location | lat | lng | details
+------|------|----------|-----|-----|--------
+St. Peter's Basilica | poi | Piazza San Pietro, 00120 Città del Vaticano, Vatican City | 41.90224 | 12.45738 | The largest church in the world.
+Vatican Museums | activity | Viale Vaticano, 00120 Città del Vaticano, Vatican City | 41.90647 | 12.45367 | Explore an immense collection of art."""
+    display, suggestions = parse_poi_suggestions_from_reply(raw)
+    assert display == "No problem, adding these!"
+    assert "title | type" not in display
+    assert len(suggestions) == 2
+    assert suggestions[0].title == "St. Peter's Basilica"
+    assert suggestions[0].lat == 41.90224
+    assert suggestions[0].address == "Piazza San Pietro, 00120 Città del Vaticano, Vatican City"
+    assert suggestions[1].poi_type == "activity"
+
+
+def test_enrich_uses_coords_when_maps_miss(monkeypatch):
+    suggestions = [
+        BoardChatPoiSuggestion(
+            poi_type="poi",
+            title="St. Peter's Basilica",
+            address="Piazza San Pietro, Vatican City",
+            lat=41.90224,
+            lng=12.45738,
+        )
+    ]
+    result = asyncio.run(enrich_poi_suggestions(suggestions, [], []))
+    accepted = result.accepted[0]
+    assert accepted.source_url == "https://www.google.com/maps?q=41.90224,12.45738"
+    assert accepted.lat == 41.90224
+
+
+def test_message_needs_place_search_for_add_followup():
+    from board_chat import _message_needs_place_search
+
+    assert _message_needs_place_search("Oh add the Vatican too", [])

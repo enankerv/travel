@@ -137,7 +137,9 @@ _BOARD_CONTEXT_HINT_RE = re.compile(
     r"\bam\s+i\s+missing\b|"
     r"\b(?:these|those)\s+places\b|"
     r"\bon\s+(?:the|my)\s+board\b|"
-    r"\btourist\b.*\b(?:landmark|attraction|spot|place)s?\b"
+    r"\btourist\b.*\b(?:landmark|attraction|spot|place)s?\b|"
+    r"\b(?:add|include)\b.*\b(?:too|also|as well)\b|"
+    r"\badd\s+(?:the\s+)?\w"
     r")",
     re.IGNORECASE,
 )
@@ -148,7 +150,12 @@ _POI_SUGGESTIONS_FENCE_OPEN_RE = re.compile(
 )
 
 BOARD_PINS_SCHEMA = """\
-Each row below is one pin on the user's cork board. Columns:
+The board pins table below is read-only context about pins already on the board.
+Never reproduce this table format (or its header row) in your reply — not for new
+suggestions and not to show edits. New places belong in conversational prose plus the
+```board-poi-suggestions``` JSON block only.
+
+Column meanings:
   title     — display name shown on the pin
   type      — pin category: getaway | activity | restaurant | flight | note | poi
   location  — place name or address when the user set one
@@ -401,12 +408,19 @@ async def _enrich_place_suggestion(
     maps = _best_maps_source_for_suggestion(
         suggestion, maps_sources, used_place_ids=used_place_ids,
     )
-    if not maps or not maps.uri:
-        return None
-    key = maps.place_id or maps.uri
-    if key:
-        used_place_ids.add(key)
-    return _suggestion_from_maps(suggestion, maps)
+    if maps and maps.uri:
+        key = maps.place_id or maps.uri
+        if key:
+            used_place_ids.add(key)
+        return _suggestion_from_maps(suggestion, maps)
+
+    if suggestion.lat is not None and suggestion.lng is not None:
+        return replace(
+            suggestion,
+            source_url=f"https://www.google.com/maps?q={suggestion.lat},{suggestion.lng}",
+            thumbnail_url=None,
+        )
+    return None
 
 
 async def _enrich_legacy_url_suggestion(
@@ -455,14 +469,16 @@ async def enrich_poi_suggestions(
     for suggestion in suggestions:
         if suggestion.poi_type == "flight":
             current = await _enrich_flight_suggestion(suggestion, sources, used_uris=taken)
-        elif maps:
+        else:
             current = await _enrich_place_suggestion(
                 suggestion,
                 maps,
                 used_place_ids=used_place_ids,
             )
-        else:
-            current = await _enrich_legacy_url_suggestion(suggestion, sources, used_uris=taken)
+            if not current:
+                current = await _enrich_legacy_url_suggestion(
+                    suggestion, sources, used_uris=taken,
+                )
 
         if not current or not current.source_url:
             rejected.append(suggestion)
@@ -778,6 +794,76 @@ def _strip_and_collect_loose_poi_json(
     return re.sub(r"\n{3,}", "\n\n", display).strip()
 
 
+def _optional_float_str(value: str) -> float | None:
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+
+def _suggestion_from_pins_table_row(line: str) -> BoardChatPoiSuggestion | None:
+    stripped = line.strip()
+    if not stripped or stripped.startswith("…"):
+        return None
+    parts = [part.strip() for part in stripped.split("|")]
+    if len(parts) != 6:
+        return None
+    title, poi_type, location, lat_s, lng_s, description = parts
+    if not title or title.lower() == "title":
+        return None
+    normalized_type = poi_type.strip().lower() or "poi"
+    if normalized_type not in _CHAT_SUGGESTION_POI_TYPES:
+        normalized_type = "poi"
+    address = location or None
+    return BoardChatPoiSuggestion(
+        poi_type=normalized_type,
+        title=title[:200],
+        location=address,
+        address=address,
+        description=description or None,
+        lat=_optional_float_str(lat_s),
+        lng=_optional_float_str(lng_s),
+    )
+
+
+def _strip_and_collect_pins_table(
+    text: str,
+    suggestions: list[BoardChatPoiSuggestion],
+) -> str:
+    """Remove echoed board-pin tables from display text and salvage parsed rows."""
+    lines = text.splitlines()
+    out_lines: list[str] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if (
+            line.strip() == _TABLE_HEADER
+            and i + 1 < len(lines)
+            and lines[i + 1].strip() == _TABLE_RULE
+        ):
+            i += 2
+            while i < len(lines):
+                row = lines[i]
+                if not row.strip():
+                    i += 1
+                    break
+                suggestion = _suggestion_from_pins_table_row(row)
+                if suggestion:
+                    suggestions.append(suggestion)
+                elif "|" not in row:
+                    out_lines.append(row)
+                    i += 1
+                    break
+                i += 1
+            continue
+        out_lines.append(line)
+        i += 1
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(out_lines)).strip()
+
+
 def _strip_loose_poi_json_from_display(text: str) -> str:
     """Remove unfenced POI suggestion JSON arrays from user-facing text."""
     return _strip_and_collect_loose_poi_json(text, [])
@@ -798,6 +884,7 @@ def parse_poi_suggestions_from_reply(text: str) -> tuple[str, list[BoardChatPoiS
         return ""
 
     display = _POI_SUGGESTIONS_BLOCK_RE.sub(_replace_block, text)
+    display = _strip_and_collect_pins_table(display, suggestions)
     display = _strip_and_collect_loose_poi_json(display, suggestions)
     return display, suggestions
 
