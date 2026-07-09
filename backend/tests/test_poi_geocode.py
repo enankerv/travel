@@ -37,6 +37,42 @@ def test_new_geocodes_before_insert():
                 assert spine["lng"] == 2.3
 
 
+def test_new_prefers_address_for_geocode():
+    fields = {
+        "poi_type": "restaurant",
+        "title": "Osteria",
+        "location": "Cetona, Italy",
+        "address": "Via Roma 1, Cetona, Italy",
+    }
+    with patch("utils.geocode.geocode", return_value=(42.99, 11.95)) as geocode_fn:
+        with patch("db.pois.insert_poi_row", return_value={"id": "poi-1"}) as insert:
+            with patch.object(POI, "get", return_value=_sample_poi()):
+                POI.new("list-1", "fake", user_id="user-1", **fields)
+                geocode_fn.assert_called_once_with("Via Roma 1, Cetona, Italy", user_id="user-1")
+                spine = insert.call_args[0][1]
+                assert spine["lat"] == 42.99
+                assert spine["lng"] == 11.95
+
+
+def test_new_skips_geocode_when_coords_present():
+    fields = {
+        "poi_type": "restaurant",
+        "title": "Osteria",
+        "location": "Cetona, Italy",
+        "address": "Via Roma 1, Cetona, Italy",
+        "lat": 42.993,
+        "lng": 11.952,
+    }
+    with patch("utils.geocode.geocode") as geocode_fn:
+        with patch("db.pois.insert_poi_row", return_value={"id": "poi-1"}) as insert:
+            with patch.object(POI, "get", return_value=_sample_poi()):
+                POI.new("list-1", "fake", user_id="user-1", **fields)
+                geocode_fn.assert_not_called()
+                spine = insert.call_args[0][1]
+                assert spine["lat"] == 42.993
+                assert spine["lng"] == 11.952
+
+
 def test_persist_update_geocodes_when_location_changes():
     current = _sample_poi(location="Old town")
     updated = _sample_poi(location="New town", lat=1.0, lng=2.0)

@@ -11,7 +11,6 @@ from typing import Any
 from google import genai
 from google.genai import types
 
-from utils.images import fetch_og_image
 from utils.url_verify import url_is_reachable
 
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
@@ -43,58 +42,65 @@ SYSTEM_INSTRUCTION_BASE = (
 POI_SUGGESTION_INSTRUCTIONS = f"""\
 Place suggestions (saveable board pins):
 When you recommend a specific place the user might add to their board — a restaurant,
-activity, attraction, flight leg, or general pin — append a fenced JSON block AFTER your
-prose using exactly this fence label:
+activity, attraction, or general pin — append a fenced JSON block AFTER your prose using
+exactly this fence label:
 
 ```{POI_SUGGESTION_FENCE}
 [
   {{
     "poi_type": "restaurant",
     "title": "Place name",
-    "description": "One or two sentences on why it fits",
     "location": "City or area",
-    "address": "Street address when known",
-    "lat": null,
-    "lng": null,
-    "source_url": "https://official-or-booking-url (required)",
-    "thumbnail_url": "https://direct-image-url when known (optional)"
+    "address": "123 Main St, City, Region",
+    "description": "One sentence on why it fits this trip"
   }}
 ]
 ```
 
 Rules:
 - Only include the block when suggesting concrete place(s) to visit — not for pure logistics Q&A.
-- ``poi_type`` must be one of: activity, restaurant, flight, poi (never getaway or note).
-- ``title`` and ``source_url`` are required for every item — never include a place without a verified https URL.
-- Use Google Search this turn to find each place's official site, booking page, or Maps/listing URL before adding it.
-- Use null for unknown lat/lng — do not guess coordinates.
-- Never invent ``source_url`` — only URLs returned by search for that specific place.
-- Prefer copying ``source_url`` from Google Search grounding citations over paraphrasing URLs from memory.
-- Include ``thumbnail_url`` only for a direct https image you verified; we also try og:image from ``source_url`` server-side.
+- ``poi_type`` must be one of: activity, restaurant, poi (never getaway or note).
+- ``title``, ``location``, and ``description`` are required for every item.
+- ``location`` is the city, neighborhood, or region.
+- ``address`` is the full street address when you can determine it from Google Maps grounding
+  (street number and name when available). Use your best effort — omit only when no address
+  is available.
+- ``description`` must be one practical sentence on why this place fits the user's trip — not a generic tagline.
+- The server adds verified Google Maps links from grounding.
+- Do NOT include ``source_url``, ``lat``, ``lng``, or ``thumbnail_url`` for restaurants, activities, or general pins.
+- For ``poi_type`` ``flight`` only: include ``source_url`` (https booking or airline page from search).
 - Suggest at most {BOARD_CHAT_MAX_SUGGESTIONS} places per reply — pick the best fits, not an exhaustive list.
-- You may suggest multiple places in one array; keep prose natural above the fence.
+- Your visible prose must name every suggested place (bullets or a short list). Never stop at an introduction
+  like "Here are some options:" — complete the list in prose before the JSON block.
+- The ```{POI_SUGGESTION_FENCE}``` block must be valid, complete JSON with a closing fence — incomplete blocks are discarded.
 - Put ALL places in ONE ```{POI_SUGGESTION_FENCE}``` block at the END — never embed JSON arrays inline between paragraphs."""
 
 POI_SUGGESTION_INSTRUCTIONS_NO_SEARCH = """\
 Place suggestions (saveable board pins):
-Do NOT include a ```board-poi-suggestions``` block on this turn — live search is off and
-every saveable pin requires a verified URL. Describe places in prose only and tell the user
-to ask again with "find links for …" if they want add-to-board cards."""
+You may include a ```board-poi-suggestions``` block with ``title``, ``location``, ``poi_type``,
+``address`` when known, and a required one-sentence ``description`` for restaurants, activities,
+and general pins. Include the most specific street address you know; the server adds Maps links.
+For ``flight`` suggestions, only include items when you have a verified ``source_url`` from context;
+otherwise describe flights in prose only."""
+
+POI_SUGGESTION_INSTRUCTIONS_MAPS = """\
+Google Maps grounding is enabled for this turn. When suggesting restaurants, activities, or pins,
+use grounded place data to fill ``address`` with the most specific street address you can verify —
+not just repeating the city in ``location``."""
 
 URL_INSTRUCTIONS_WITH_SEARCH = """\
 URLs and websites (Google Search enabled for this turn):
-- Use search to find current official websites, booking pages, and hours for every place suggestion.
-- Every ```board-poi-suggestions``` item MUST include a ``source_url`` from search results.
-- Only share URLs you found via search — never guess or fabricate links.
-- Prefer markdown links like [Place name](url) in prose when you have a verified URL.
-- If search does not surface a reliable URL for a place, omit that place from the JSON block."""
+- Use search for flight booking links and general trip logistics when helpful.
+- Restaurant/activity/poi cards do not need URLs in JSON — include ``address`` from Maps when known;
+  the server adds verified Maps links.
+- For ``flight`` items in ```board-poi-suggestions```, include a verified ``source_url`` from search.
+- Prefer markdown links like [Place name](url) in prose when you have a verified URL."""
 
 URL_INSTRUCTIONS_WITHOUT_SEARCH = """\
 URLs and websites (no live web access this turn):
 - Do not invent or guess URLs, phone numbers, or booking links.
-- Do not emit ```board-poi-suggestions``` — saveable pins require verified URLs from search.
-- For general area advice, describe places by name and location instead.
-- If the user wants add-to-board cards, tell them to ask explicitly (e.g. "find restaurants near … with links")."""
+- Restaurant/activity/poi cards can still be suggested without URLs — include ``address`` when known.
+- For ``flight`` cards, omit the JSON block unless you have a verified URL from conversation context."""
 
 # When BOARD_CHAT_GOOGLE_SEARCH=auto, only ground messages that likely need live URLs.
 _SEARCH_HINT_RE = re.compile(
@@ -118,9 +124,26 @@ _SUGGESTION_HINT_RE = re.compile(
     r"\b(?:suggest|suggestion|recommend|recommendation|ideas?)\b|"
     r"\b(?:restaurant|restaurants|caf[eé]|bar|bistro|eatery)\b|"
     r"\b(?:activity|activities|attraction|attractions|museum|hike|trail|beach)\b|"
+    r"\b(?:landmark|landmarks|monument|monuments|sightseeing|sights?)\b|"
     r"\b(?:things to do|what to do|where to eat|where should|places to)\b|"
     r"\b(?:spots?|visit|dinner|lunch|breakfast|nearby)\b"
     r")",
+    re.IGNORECASE,
+)
+
+_BOARD_CONTEXT_HINT_RE = re.compile(
+    r"(?:"
+    r"\b(?:what|which)\s+(?:else|other)\b|"
+    r"\bam\s+i\s+missing\b|"
+    r"\b(?:these|those)\s+places\b|"
+    r"\bon\s+(?:the|my)\s+board\b|"
+    r"\btourist\b.*\b(?:landmark|attraction|spot|place)s?\b"
+    r")",
+    re.IGNORECASE,
+)
+
+_POI_SUGGESTIONS_FENCE_OPEN_RE = re.compile(
+    rf"```{POI_SUGGESTION_FENCE}\b",
     re.IGNORECASE,
 )
 
@@ -158,6 +181,13 @@ class BoardChatPoiSuggestion:
     lng: float | None = None
     source_url: str | None = None
     thumbnail_url: str | None = None
+
+
+@dataclass(frozen=True)
+class BoardMapsSource:
+    title: str
+    uri: str
+    place_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -301,6 +331,106 @@ async def _first_reachable_url(candidates: list[str]) -> str | None:
     return None
 
 
+async def _enrich_flight_suggestion(
+    suggestion: BoardChatPoiSuggestion,
+    sources: list[BoardChatSource],
+    *,
+    used_uris: set[str],
+) -> BoardChatPoiSuggestion | None:
+    grounding_urls = _grounding_candidates_for_suggestion(
+        suggestion, sources, used_uris=used_uris,
+    )
+    candidates: list[str] = []
+    for url in grounding_urls:
+        candidates.append(url)
+    if suggestion.source_url and suggestion.source_url not in candidates:
+        candidates.append(suggestion.source_url)
+
+    source_url = await _first_reachable_url(candidates)
+    if not source_url:
+        return None
+
+    used_uris.add(source_url)
+    return replace(
+        suggestion,
+        source_url=source_url,
+        thumbnail_url=None,
+        lat=None,
+        lng=None,
+    )
+
+
+def _best_maps_source_for_suggestion(
+    suggestion: BoardChatPoiSuggestion,
+    maps_sources: list[BoardMapsSource],
+    *,
+    used_place_ids: set[str],
+) -> BoardMapsSource | None:
+    ranked: list[tuple[int, BoardMapsSource]] = []
+    for src in maps_sources:
+        key = src.place_id or src.uri
+        if not key or key in used_place_ids:
+            continue
+        score = _title_match_score(suggestion.title, src.title)
+        if score > 0:
+            ranked.append((score, src))
+    if not ranked:
+        return None
+    ranked.sort(key=lambda pair: pair[0], reverse=True)
+    return ranked[0][1]
+
+
+def _suggestion_from_maps(
+    suggestion: BoardChatPoiSuggestion,
+    maps: BoardMapsSource,
+) -> BoardChatPoiSuggestion:
+    return replace(
+        suggestion,
+        title=(maps.title[:200] if maps.title else suggestion.title),
+        source_url=maps.uri,
+        thumbnail_url=None,
+    )
+
+
+async def _enrich_place_suggestion(
+    suggestion: BoardChatPoiSuggestion,
+    maps_sources: list[BoardMapsSource],
+    *,
+    used_place_ids: set[str],
+) -> BoardChatPoiSuggestion | None:
+    maps = _best_maps_source_for_suggestion(
+        suggestion, maps_sources, used_place_ids=used_place_ids,
+    )
+    if not maps or not maps.uri:
+        return None
+    key = maps.place_id or maps.uri
+    if key:
+        used_place_ids.add(key)
+    return _suggestion_from_maps(suggestion, maps)
+
+
+async def _enrich_legacy_url_suggestion(
+    suggestion: BoardChatPoiSuggestion,
+    sources: list[BoardChatSource],
+    *,
+    used_uris: set[str],
+) -> BoardChatPoiSuggestion | None:
+    """Fallback when Maps grounding is unavailable for this turn."""
+    grounding_urls = _grounding_candidates_for_suggestion(
+        suggestion, sources, used_uris=used_uris,
+    )
+    candidates: list[str] = list(grounding_urls)
+    if suggestion.source_url and suggestion.source_url not in candidates:
+        candidates.append(suggestion.source_url)
+
+    source_url = await _first_reachable_url(candidates)
+    if not source_url:
+        return None
+
+    used_uris.add(source_url)
+    return replace(suggestion, source_url=source_url, thumbnail_url=None)
+
+
 @dataclass(frozen=True)
 class EnrichedSuggestions:
     accepted: list[BoardChatPoiSuggestion]
@@ -310,37 +440,33 @@ class EnrichedSuggestions:
 async def enrich_poi_suggestions(
     suggestions: list[BoardChatPoiSuggestion],
     sources: list[BoardChatSource],
+    maps_sources: list[BoardMapsSource] | None = None,
     *,
     used_uris: set[str] | None = None,
 ) -> EnrichedSuggestions:
-    """Require a verified reachable source_url, then best-effort thumbnails."""
+    """Hydrate suggestions from Gemini Maps grounding, then verified URLs."""
 
     enriched: list[BoardChatPoiSuggestion] = []
     rejected: list[BoardChatPoiSuggestion] = []
     taken = used_uris if used_uris is not None else set()
+    used_place_ids: set[str] = set()
+    maps = maps_sources or []
 
     for suggestion in suggestions:
-        grounding_urls = _grounding_candidates_for_suggestion(
-            suggestion, sources, used_uris=taken,
-        )
-        candidates: list[str] = []
-        for url in grounding_urls:
-            candidates.append(url)
-        if suggestion.source_url and suggestion.source_url not in candidates:
-            candidates.append(suggestion.source_url)
+        if suggestion.poi_type == "flight":
+            current = await _enrich_flight_suggestion(suggestion, sources, used_uris=taken)
+        elif maps:
+            current = await _enrich_place_suggestion(
+                suggestion,
+                maps,
+                used_place_ids=used_place_ids,
+            )
+        else:
+            current = await _enrich_legacy_url_suggestion(suggestion, sources, used_uris=taken)
 
-        source_url = await _first_reachable_url(candidates)
-        if not source_url:
+        if not current or not current.source_url:
             rejected.append(suggestion)
             continue
-
-        taken.add(source_url)
-        current = replace(suggestion, source_url=source_url)
-
-        if not current.thumbnail_url:
-            og_url = await fetch_og_image(source_url)
-            if og_url:
-                current = replace(current, thumbnail_url=og_url)
 
         enriched.append(current)
 
@@ -360,8 +486,80 @@ def _truncate_display_reply(text: str) -> str:
     return text[: BOARD_CHAT_MAX_REPLY_CHARS - len(suffix)] + suffix
 
 
+def _text_needs_place_search(text: str) -> bool:
+    return bool(_SUGGESTION_HINT_RE.search(text) or _BOARD_CONTEXT_HINT_RE.search(text))
+
+
+def _reply_has_incomplete_poi_fence(text: str) -> bool:
+    if _POI_SUGGESTIONS_BLOCK_RE.search(text):
+        return False
+    return bool(_POI_SUGGESTIONS_FENCE_OPEN_RE.search(text))
+
+
+def _reply_looks_like_incomplete_list_intro(text: str) -> bool:
+    stripped = text.strip()
+    if not stripped:
+        return False
+    if "\n" in stripped:
+        return False
+    return bool(
+        re.search(
+            r":\s*$|"
+            r"\b(?:here are|here's|you might want to add|you could add|consider adding)\b",
+            stripped,
+            re.IGNORECASE,
+        )
+    )
+
+
+def _append_incomplete_reply_notice(display_reply: str) -> str:
+    notice = (
+        "My reply was cut off before I could finish listing places or building saveable cards. "
+        "Try asking for fewer landmarks at a time, or ask again."
+    )
+    if not display_reply.strip():
+        return notice
+    return f"{display_reply.rstrip()}\n\n{notice}"
+
+
 def _suggestion_dedupe_key(suggestion: BoardChatPoiSuggestion) -> str:
     return suggestion.title.strip().lower()
+
+
+def _description_from_prose(title: str, prose: str) -> str | None:
+    """Pull a one-sentence blurb for a place from Gemini's prose reply."""
+    if not title.strip() or not prose.strip():
+        return None
+
+    title_lower = title.strip().lower()
+    for sentence in re.split(r"(?<=[.!?])\s+", prose.strip()):
+        cleaned = re.sub(r"\s+", " ", sentence).strip()
+        if not cleaned or title_lower not in cleaned.lower():
+            continue
+        cleaned = re.sub(r"^[-*•]\s*", "", cleaned)
+        if len(cleaned) > 300:
+            cleaned = cleaned[:297].rstrip() + "..."
+        return cleaned
+    return None
+
+
+def _fill_missing_descriptions(
+    suggestions: list[BoardChatPoiSuggestion],
+    prose: str,
+) -> list[BoardChatPoiSuggestion]:
+    if not prose.strip():
+        return suggestions
+    filled: list[BoardChatPoiSuggestion] = []
+    for suggestion in suggestions:
+        if (suggestion.description or "").strip():
+            filled.append(suggestion)
+            continue
+        description = _description_from_prose(suggestion.title, prose)
+        if description:
+            filled.append(replace(suggestion, description=description))
+        else:
+            filled.append(suggestion)
+    return filled
 
 
 def _merge_suggestions(
@@ -458,8 +656,9 @@ def _url_recovery_user_message(rejected: list[BoardChatPoiSuggestion]) -> str:
         "listing, or major booking page. This is the only automatic retry.\n\n"
         "Respond with ONLY a raw JSON array — no markdown fences, no explanation, "
         "no prose before or after. We discard anything that is not valid JSON.\n\n"
-        "Each object must include poi_type, title, and source_url (https, from search). "
-        "Optional: description, location, address, lat, lng, thumbnail_url.\n\n"
+        "Each object must include poi_type, title, and description. "
+        "For flight: source_url (https, from search). "
+        "For other types: location when known; address when you can determine a street address.\n\n"
         f"Places needing verified links:\n{places}\n\n"
         "Example shape (return the array only):\n"
         '[{"poi_type":"restaurant","title":"Example","source_url":"https://example.com"}]'
@@ -501,7 +700,9 @@ async def _recover_suggestions_via_follow_up(
     # JSON-only recovery: parse suggestions from the response; never surface follow_text.
     parsed = parse_poi_suggestions_json_only(follow_text)
     sources = _extract_grounding_sources(response)
-    result = await enrich_poi_suggestions(parsed, sources, used_uris=used_uris)
+    result = await enrich_poi_suggestions(
+        parsed, sources, maps_sources=[], used_uris=used_uris,
+    )
     return result.accepted, sources, result.rejected
 
 
@@ -645,12 +846,12 @@ def _google_search_mode() -> str:
 
 
 def _message_needs_place_search(message: str, history: list[dict[str, str]]) -> bool:
-    if _SUGGESTION_HINT_RE.search(message):
+    if _text_needs_place_search(message):
         return True
     for item in reversed(history[-4:]):
         if item.get("role") != "user":
             continue
-        if _SUGGESTION_HINT_RE.search(item.get("content") or ""):
+        if _text_needs_place_search(item.get("content") or ""):
             return True
         break
     return False
@@ -686,6 +887,32 @@ def _use_google_search(message: str, history: list[dict[str, str]]) -> bool:
     )
 
 
+def _google_maps_mode() -> str:
+    return os.getenv("BOARD_CHAT_GOOGLE_MAPS", "auto").strip().lower()
+
+
+def _use_google_maps(message: str, history: list[dict[str, str]]) -> bool:
+    mode = _google_maps_mode()
+    if mode in ("0", "false", "no", "off"):
+        return False
+    if mode in ("1", "true", "yes", "on", "always"):
+        return True
+    return _message_needs_place_search(message, history)
+
+
+def _pin_centroid(pin_rows: list[BoardPinContext]) -> tuple[float, float] | None:
+    coords = [
+        (row.lat, row.lng)
+        for row in pin_rows
+        if row.lat is not None and row.lng is not None
+    ]
+    if not coords:
+        return None
+    lat = sum(item[0] for item in coords) / len(coords)
+    lng = sum(item[1] for item in coords) / len(coords)
+    return lat, lng
+
+
 def _extract_grounding_sources(response) -> list[BoardChatSource]:
     if not response.candidates:
         return []
@@ -708,21 +935,54 @@ def _extract_grounding_sources(response) -> list[BoardChatSource]:
     return sources
 
 
+def _extract_maps_grounding(response) -> list[BoardMapsSource]:
+    if not response.candidates:
+        return []
+    meta = getattr(response.candidates[0], "grounding_metadata", None)
+    if not meta:
+        return []
+
+    seen: set[str] = set()
+    sources: list[BoardMapsSource] = []
+    for chunk in getattr(meta, "grounding_chunks", None) or []:
+        maps = getattr(chunk, "maps", None)
+        if not maps:
+            continue
+        uri = getattr(maps, "uri", None) or ""
+        place_id = getattr(maps, "place_id", None) or getattr(maps, "placeId", None) or None
+        title = getattr(maps, "title", None) or uri
+        key = place_id or uri
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        sources.append(
+            BoardMapsSource(
+                title=str(title),
+                uri=str(uri),
+                place_id=str(place_id) if place_id else None,
+            )
+        )
+    return sources
+
+
 def _build_system_instruction(
-    *, list_name: str, pins_table: str, use_search: bool,
+    *, list_name: str, pins_table: str, use_search: bool, use_maps: bool,
 ) -> str:
     url_block = URL_INSTRUCTIONS_WITH_SEARCH if use_search else URL_INSTRUCTIONS_WITHOUT_SEARCH
     suggestion_block = POI_SUGGESTION_INSTRUCTIONS if use_search else POI_SUGGESTION_INSTRUCTIONS_NO_SEARCH
-    return "\n\n".join(
-        [
-            SYSTEM_INSTRUCTION_BASE,
-            suggestion_block,
-            url_block,
-            f"Trip board name: {list_name}",
-            BOARD_PINS_SCHEMA,
-            pins_table,
-        ]
-    )
+    parts = [
+        SYSTEM_INSTRUCTION_BASE,
+        suggestion_block,
+        url_block,
+    ]
+    if use_maps:
+        parts.append(POI_SUGGESTION_INSTRUCTIONS_MAPS)
+    parts.extend([
+        f"Trip board name: {list_name}",
+        BOARD_PINS_SCHEMA,
+        pins_table,
+    ])
+    return "\n\n".join(parts)
 
 
 def _generate_content_config(
@@ -730,17 +990,33 @@ def _generate_content_config(
     list_name: str,
     pin_rows: list[BoardPinContext],
     use_search: bool,
+    use_maps: bool,
 ) -> types.GenerateContentConfig:
     config_kwargs: dict = {
         "system_instruction": _build_system_instruction(
             list_name=list_name,
             pins_table=format_board_pins_table(pin_rows),
             use_search=use_search,
+            use_maps=use_maps,
         ),
         "max_output_tokens": BOARD_CHAT_MAX_OUTPUT_TOKENS,
     }
+    tools: list[types.Tool] = []
     if use_search:
-        config_kwargs["tools"] = [types.Tool(google_search=types.GoogleSearch())]
+        tools.append(types.Tool(google_search=types.GoogleSearch()))
+    if use_maps:
+        tools.append(types.Tool(google_maps=types.GoogleMaps()))
+    if tools:
+        config_kwargs["tools"] = tools
+    if use_maps:
+        centroid = _pin_centroid(pin_rows)
+        if centroid:
+            config_kwargs["tool_config"] = types.ToolConfig(
+                retrieval_config=types.RetrievalConfig(
+                    lat_lng=types.LatLng(latitude=centroid[0], longitude=centroid[1]),
+                    language_code="en_US",
+                ),
+            )
     return types.GenerateContentConfig(**config_kwargs)
 
 
@@ -766,6 +1042,7 @@ async def board_chat_reply(
     contents.append(types.Content(role="user", parts=[types.Part(text=message.strip())]))
 
     use_search = _use_google_search(message, history)
+    use_maps = _use_google_maps(message, history)
     client = genai.Client(api_key=api_key)
     response = client.models.generate_content(
         model=GEMINI_MODEL,
@@ -774,28 +1051,36 @@ async def board_chat_reply(
             list_name=list_name,
             pin_rows=pin_rows,
             use_search=use_search,
+            use_maps=use_maps,
         ),
     )
     reply = (response.text or "").strip()
     if not reply:
         raise RuntimeError("Empty response from model")
     display_reply, suggestions = parse_poi_suggestions_from_reply(reply)
+    suggestions = _fill_missing_descriptions(suggestions, display_reply)
     suggestions = _cap_suggestions(suggestions)
     sources = _extract_grounding_sources(response)
-    enrich_result = await enrich_poi_suggestions(suggestions, sources)
+    maps_sources = _extract_maps_grounding(response)
+    enrich_result = await enrich_poi_suggestions(suggestions, sources, maps_sources)
     accepted = enrich_result.accepted
     rejected = enrich_result.rejected
     used_uris = {s.source_url for s in accepted if s.source_url}
 
     for _ in range(URL_RECOVERY_MAX_FOLLOW_UPS):
-        if not rejected:
+        recovery_candidates = (
+            [s for s in rejected if s.poi_type == "flight"]
+            if maps_sources
+            else rejected
+        )
+        if not recovery_candidates:
             break
         recovered, follow_sources, rejected = (
             await _recover_suggestions_via_follow_up(
                 client,
                 contents=contents,
                 assistant_reply=display_reply,
-                rejected=rejected,
+                rejected=recovery_candidates,
                 list_name=list_name,
                 pin_rows=pin_rows,
                 used_uris=used_uris,
@@ -808,12 +1093,28 @@ async def board_chat_reply(
     unresolved = _unresolved_after_recovery(rejected, accepted)
     if unresolved:
         names = ", ".join(p.title for p in unresolved[:BOARD_CHAT_MAX_SUGGESTIONS])
-        display_reply = (
-            f"{display_reply}\n\n"
-            f"I couldn't verify working links for: {names}. "
-            "Try asking for one place at a time with its city (e.g. "
-            "\"find the official website for Helderberg Mountain Brewing in East Berne\")."
-        ).strip()
+        if maps_sources:
+            display_reply = (
+                f"{display_reply}\n\n"
+                f"I couldn't match these on Google Maps: {names}. "
+                "Try asking for one place at a time with its city "
+                '(e.g. "Osteria del Borgo in Cetona").'
+            ).strip()
+        else:
+            display_reply = (
+                f"{display_reply}\n\n"
+                f"I couldn't verify working links for: {names}. "
+                "Try asking for one place at a time with its city."
+            ).strip()
+
+    if (
+        not accepted
+        and (
+            _reply_has_incomplete_poi_fence(reply)
+            or _reply_looks_like_incomplete_list_intro(display_reply)
+        )
+    ):
+        display_reply = _append_incomplete_reply_notice(display_reply)
 
     display_reply = _truncate_display_reply(display_reply)
     accepted = _cap_suggestions(accepted)

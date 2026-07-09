@@ -36,6 +36,9 @@ export function useBoardChat({
   const [savingKey, setSavingKey] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const prevMessageCountRef = useRef(0)
+  const prevSendingRef = useRef(false)
+  const prevIsOpenRef = useRef(false)
 
   useEffect(() => {
     if (!isOpen) return
@@ -44,8 +47,25 @@ export function useBoardChat({
 
   useEffect(() => {
     const el = scrollRef.current
+    if (!isOpen) {
+      prevMessageCountRef.current = 0
+      prevSendingRef.current = false
+      prevIsOpenRef.current = false
+      return
+    }
     if (!el) return
-    el.scrollTop = el.scrollHeight
+
+    const justOpened = !prevIsOpenRef.current
+    const messageCountIncreased = messages.length > prevMessageCountRef.current
+    const sendingStarted = sending && !prevSendingRef.current
+
+    if (justOpened || messageCountIncreased || sendingStarted) {
+      el.scrollTop = el.scrollHeight
+    }
+
+    prevMessageCountRef.current = messages.length
+    prevSendingRef.current = sending
+    prevIsOpenRef.current = true
   }, [messages, sending, isOpen])
 
   const saveSuggestion = useCallback(

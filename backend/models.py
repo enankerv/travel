@@ -266,7 +266,7 @@ class POI(POIBase):
     ) -> PoiPersistResult:
         from db.pois import update_poi_row, update_subtype_row
         from routes.auth import extract_user_id_from_token
-        from utils.geocode import geocode, location_query_if_changed
+        from utils.geocode import geocode, geocode_query_for_poi_fields, location_query_if_changed
 
         user_id: str | None = None
         try:
@@ -274,14 +274,21 @@ class POI(POIBase):
         except Exception:
             pass
 
-        if user_id and ("location" in changes or "region" in changes):
+        if user_id and ("location" in changes or "region" in changes or "address" in changes):
             current = model_cls.get(poi_id, auth_token)
             if current:
-                q = location_query_if_changed(
-                    current_location=current.location,
-                    current_region=getattr(current, "region", None),
-                    changes=changes,
-                )
+                q = None
+                if "address" in changes:
+                    q = geocode_query_for_poi_fields({
+                        "address": changes.get("address"),
+                        "location": changes.get("location", current.location),
+                    })
+                if not q:
+                    q = location_query_if_changed(
+                        current_location=current.location,
+                        current_region=getattr(current, "region", None),
+                        changes=changes,
+                    )
                 if q:
                     lat, lng = geocode(q, user_id=user_id)
                     changes["lat"] = lat
@@ -333,14 +340,14 @@ class POI(POIBase):
     def new(cls, list_id: str, auth_token: str, *, user_id: Optional[str] = None, **fields) -> Optional["POI"]:
         """Create a POI (+ subtype row). Token is stored on the returned instance."""
         from db.pois import insert_poi_row, insert_subtype_row
-        from utils.geocode import geocode, location_query
+        from utils.geocode import geocode, geocode_query_for_poi_fields
 
         if (
             user_id
             and fields.get("lat") is None
             and fields.get("lng") is None
         ):
-            q = location_query(fields.get("location"))
+            q = geocode_query_for_poi_fields(fields)
             if q:
                 lat, lng = geocode(q, user_id=user_id)
                 if lat is not None and lng is not None:

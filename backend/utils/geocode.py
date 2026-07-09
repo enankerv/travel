@@ -138,6 +138,14 @@ def location_query(location: str | None, region: str | None = None) -> str | Non
     return q or None
 
 
+def geocode_query_for_poi_fields(fields: dict) -> str | None:
+    """Prefer a street address over a loose location label for OpenCage."""
+    address = str(fields.get("address") or "").strip()
+    if address:
+        return address
+    return location_query(fields.get("location"))
+
+
 def location_query_if_changed(
     *,
     current_location: str | None,

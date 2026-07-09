@@ -20,6 +20,7 @@ def test_parse_strips_fence_and_returns_suggestions():
     "title": "Osteria del Borgo",
     "description": "Rustic Tuscan pasta",
     "location": "Cetona",
+    "address": "Via Roma 1, Cetona, Italy",
     "source_url": "https://example.com/osteria"
   }
 ]
@@ -30,6 +31,7 @@ def test_parse_strips_fence_and_returns_suggestions():
     assert len(suggestions) == 1
     assert suggestions[0].poi_type == "restaurant"
     assert suggestions[0].title == "Osteria del Borgo"
+    assert suggestions[0].address == "Via Roma 1, Cetona, Italy"
     assert suggestions[0].source_url == "https://example.com/osteria"
 
 
@@ -58,65 +60,144 @@ def test_parse_thumbnail_url():
     assert suggestions[0].thumbnail_url == "https://cdn.example.com/trail.jpg"
 
 
-def test_enrich_fetches_og_image(monkeypatch):
-    import board_chat as mod
+def test_fill_missing_descriptions_from_prose():
+    from board_chat import _fill_missing_descriptions
 
-    async def fake_fetch(url: str) -> str | None:
-        assert url == "https://example.com/place"
-        return "https://cdn.example.com/og.jpg"
-
-    async def always_ok(_url: str) -> bool:
-        return True
-
-    monkeypatch.setattr(mod, "fetch_og_image", fake_fetch)
-    monkeypatch.setattr(mod, "url_is_reachable", always_ok)
-    suggestions = [
-        BoardChatPoiSuggestion(
-            poi_type="restaurant",
-            title="Test",
-            source_url="https://example.com/place",
-        )
-    ]
-    result = asyncio.run(enrich_poi_suggestions(suggestions, []))
-    assert result.accepted[0].thumbnail_url == "https://cdn.example.com/og.jpg"
-
-
-def test_enrich_matches_grounding_url(monkeypatch):
-    async def always_ok(_url: str) -> bool:
-        return True
-
-    monkeypatch.setattr("board_chat.url_is_reachable", always_ok)
-    suggestions = [
-        BoardChatPoiSuggestion(poi_type="restaurant", title="Osteria del Borgo"),
-    ]
-    sources = [
-        BoardChatSource(title="Osteria del Borgo — Official Site", uri="https://example.com/osteria"),
-    ]
-    result = asyncio.run(enrich_poi_suggestions(suggestions, sources))
-    assert len(result.accepted) == 1
-    assert result.accepted[0].source_url == "https://example.com/osteria"
-
-
-def test_enrich_prefers_reachable_grounding_over_bad_model_url(monkeypatch):
-    async def verify(url: str) -> bool:
-        return url == "https://example.com/osteria"
-
-    monkeypatch.setattr("board_chat.url_is_reachable", verify)
     suggestions = [
         BoardChatPoiSuggestion(
             poi_type="restaurant",
             title="Osteria del Borgo",
-            source_url="https://example.com/hallucinated",
-        ),
+            location="Cetona",
+        )
+    ]
+    prose = (
+        "For dinner, try Osteria del Borgo — rustic pasta in a quiet hill town. "
+        "Great for a slow evening."
+    )
+    filled = _fill_missing_descriptions(suggestions, prose)
+    assert filled[0].description == (
+        "For dinner, try Osteria del Borgo — rustic pasta in a quiet hill town."
+    )
+
+
+def test_fill_missing_descriptions_keeps_json_description():
+    from board_chat import _fill_missing_descriptions
+
+    suggestions = [
+        BoardChatPoiSuggestion(
+            poi_type="restaurant",
+            title="Osteria del Borgo",
+            location="Cetona",
+            description="Gemini wrote this blurb.",
+        )
+    ]
+    filled = _fill_missing_descriptions(suggestions, "Osteria del Borgo is also mentioned here.")
+    assert filled[0].description == "Gemini wrote this blurb."
+
+
+def test_enrich_maps_grounding():
+    from board_chat import BoardMapsSource
+
+    suggestions = [
+        BoardChatPoiSuggestion(
+            poi_type="restaurant",
+            title="Osteria del Borgo",
+            location="Cetona, Italy",
+            description="Perfect for a long lunch after exploring.",
+        )
+    ]
+    maps_sources = [
+        BoardMapsSource(
+            title="Osteria del Borgo",
+            uri="https://maps.google.com/?cid=123",
+            place_id="places/ChIJ123",
+        )
+    ]
+    result = asyncio.run(enrich_poi_suggestions(suggestions, [], maps_sources))
+    accepted = result.accepted[0]
+    assert accepted.source_url == "https://maps.google.com/?cid=123"
+    assert accepted.thumbnail_url is None
+    assert accepted.description == "Perfect for a long lunch after exploring."
+    assert accepted.lat is None
+
+
+def test_enrich_maps_preserves_gemini_address():
+    from board_chat import BoardMapsSource
+
+    suggestions = [
+        BoardChatPoiSuggestion(
+            poi_type="restaurant",
+            title="Osteria del Borgo",
+            location="Cetona, Italy",
+            address="Via Roma 1, Cetona, Italy",
+        )
+    ]
+    maps_sources = [
+        BoardMapsSource(
+            title="Osteria del Borgo",
+            uri="https://maps.google.com/?cid=123",
+            place_id="places/ChIJ123",
+        )
+    ]
+    result = asyncio.run(enrich_poi_suggestions(suggestions, [], maps_sources))
+    accepted = result.accepted[0]
+    assert accepted.source_url == "https://maps.google.com/?cid=123"
+    assert accepted.address == "Via Roma 1, Cetona, Italy"
+
+
+def test_enrich_rejects_place_without_maps_match():
+    suggestions = [
+        BoardChatPoiSuggestion(poi_type="restaurant", title="Unknown Place", location="Nowhere"),
+    ]
+    result = asyncio.run(enrich_poi_suggestions(suggestions, [], []))
+    assert result.accepted == []
+    assert len(result.rejected) == 1
+
+
+def test_enrich_flight_requires_reachable_url(monkeypatch):
+    import board_chat as mod
+
+    async def verify(url: str) -> bool:
+        return url == "https://airline.example/flight"
+
+    monkeypatch.setattr(mod, "url_is_reachable", verify)
+    suggestions = [
+        BoardChatPoiSuggestion(
+            poi_type="flight",
+            title="JFK to CDG",
+            source_url="https://airline.example/flight",
+        )
+    ]
+    result = asyncio.run(enrich_poi_suggestions(suggestions, [], []))
+    assert result.accepted[0].source_url == "https://airline.example/flight"
+    assert result.accepted[0].thumbnail_url is None
+
+
+def test_enrich_legacy_without_maps(monkeypatch):
+    import board_chat as mod
+
+    async def always_ok(_url: str) -> bool:
+        return True
+
+    monkeypatch.setattr(mod, "url_is_reachable", always_ok)
+    suggestions = [
+        BoardChatPoiSuggestion(
+            poi_type="restaurant",
+            title="Osteria del Borgo",
+            source_url="https://example.com/osteria",
+        )
     ]
     sources = [
         BoardChatSource(title="Osteria del Borgo — Official Site", uri="https://example.com/osteria"),
     ]
-    result = asyncio.run(enrich_poi_suggestions(suggestions, sources))
+    result = asyncio.run(enrich_poi_suggestions(suggestions, sources, []))
     assert result.accepted[0].source_url == "https://example.com/osteria"
+    assert result.accepted[0].thumbnail_url is None
 
 
 def test_enrich_drops_suggestion_without_reachable_url(monkeypatch):
+    import board_chat as mod
+
     async def never_ok(_url: str) -> bool:
         return False
 
@@ -133,6 +214,8 @@ def test_enrich_drops_suggestion_without_reachable_url(monkeypatch):
 
 
 def test_enrich_drops_suggestion_without_url(monkeypatch):
+    import board_chat as mod
+
     async def always_ok(_url: str) -> bool:
         return True
 
@@ -140,7 +223,7 @@ def test_enrich_drops_suggestion_without_url(monkeypatch):
     suggestions = [
         BoardChatPoiSuggestion(poi_type="restaurant", title="Unknown Place"),
     ]
-    result = asyncio.run(enrich_poi_suggestions(suggestions, []))
+    result = asyncio.run(enrich_poi_suggestions(suggestions, [], []))
     assert result.accepted == []
 
 
@@ -230,7 +313,7 @@ def test_board_chat_reply_ignores_recovery_prose(monkeypatch):
 
     enrich_calls = [0]
 
-    async def fake_enrich(suggestions, sources, used_uris=None):
+    async def fake_enrich(suggestions, sources, maps_sources=None, used_uris=None):
         enrich_calls[0] += 1
         if enrich_calls[0] == 1:
             return mod.EnrichedSuggestions(accepted=[], rejected=list(suggestions))
@@ -348,3 +431,42 @@ def test_parse_no_block():
     display, suggestions = parse_poi_suggestions_from_reply("Just general advice.")
     assert display == "Just general advice."
     assert suggestions == []
+
+
+def test_message_needs_place_search_for_landmarks():
+    from board_chat import _message_needs_place_search
+
+    assert _message_needs_place_search(
+        "what other large tourist landmarks am I missing in these places?",
+        [],
+    )
+
+
+def test_reply_looks_like_incomplete_list_intro():
+    from board_chat import _reply_looks_like_incomplete_list_intro
+
+    assert _reply_looks_like_incomplete_list_intro(
+        "Here are some other major landmarks you might want to add:",
+    )
+    assert not _reply_looks_like_incomplete_list_intro(
+        "Here are some other major landmarks you might want to add:\n- Colosseum",
+    )
+
+
+def test_reply_has_incomplete_poi_fence():
+    from board_chat import _reply_has_incomplete_poi_fence
+
+    assert _reply_has_incomplete_poi_fence(
+        "Here you go.\n\n```board-poi-suggestions\n[{\"poi_type\": \"poi\","
+    )
+    assert not _reply_has_incomplete_poi_fence(
+        "Here.\n\n```board-poi-suggestions\n[{\"poi_type\":\"poi\",\"title\":\"X\"}]\n```"
+    )
+
+
+def test_append_incomplete_reply_notice():
+    from board_chat import _append_incomplete_reply_notice
+
+    out = _append_incomplete_reply_notice("Here are some options:")
+    assert "cut off" in out
+    assert out.startswith("Here are some options:")

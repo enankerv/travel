@@ -42,7 +42,6 @@ export function suggestionToPoiCreate(
     lat: suggestion.lat ?? undefined,
     lng: suggestion.lng ?? undefined,
     source_url: suggestion.source_url ?? undefined,
-    thumbnail_url: suggestion.thumbnail_url ?? undefined,
     board_x,
     board_y,
   }
