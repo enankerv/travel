@@ -14,6 +14,9 @@ export default function Footer() {
         background: 'var(--dark-2)',
         fontSize: '0.85rem',
         color: 'var(--muted)',
+        flexShrink: 0,
+        position: 'relative',
+        zIndex: 1,
       }}
     >
       <span>© {new Date().getFullYear()} Nankervis Digital LLC</span>

@@ -140,28 +140,41 @@ export default function ListScreenShell({
     />
   )
 
+  const detailScrollClass = [
+    'list-detail-scroll',
+    activeView === 'map' ? 'list-detail-scroll--map' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  const detailViewClass = [
+    'app-detail-view',
+    activeView === 'map' ? 'app-detail-view--map' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   return (
     <ListScreenShellProvider value={shellValue}>
       <ListPlacesProvider listId={listId} listName={listName}>
-        <div
-          className={
-            isBoard
-              ? 'list-screen-shell list-screen-shell--board'
-              : `list-detail-scroll${activeView === 'map' ? ' list-detail-scroll--map' : ''}`
-          }
-        >
-          {isBoard ? (
+        {isBoard ? (
+          <div className="list-screen-shell list-screen-shell--board">
             <div className={boardTopClass}>
               <div className={chromeWrapClass}>{chrome}</div>
               {chromeBoardRow != null && (
                 <div className="list-board-top__row">{chromeBoardRow}</div>
               )}
             </div>
-          ) : (
-            <div className={chromeWrapClass}>{chrome}</div>
-          )}
-          {children}
-        </div>
+            {children}
+          </div>
+        ) : (
+          <div className={detailViewClass}>
+            <div className={detailScrollClass}>
+              <div className={chromeWrapClass}>{chrome}</div>
+              {children}
+            </div>
+          </div>
+        )}
       </ListPlacesProvider>
 
       <ListMembersModal
