@@ -1,28 +1,50 @@
-"""Allowlist middleware: block API access for users not in ALLOWED_EMAILS env."""
+"""Allowlist middleware: block API access for users not on the invite list."""
+from __future__ import annotations
+
 import base64
 import json
 import logging
-import os
+import time
 from typing import Optional
 
 log = logging.getLogger("allowlist")
 
-_ALLOWED_EMAILS: Optional[set[str]] = None
+_DB_ALLOWED_EMAILS: Optional[set[str]] = None
+_DB_CACHE_AT: float = 0.0
+_DB_CACHE_TTL_SEC = 60.0
 
 
-def _get_allowed_emails() -> Optional[set[str]]:
-    """Get allowlist from ALLOWED_EMAILS env (comma-separated). None = allow all."""
-    global _ALLOWED_EMAILS
-    if _ALLOWED_EMAILS is not None:
-        return _ALLOWED_EMAILS
-    raw = os.getenv("ALLOWED_EMAILS", "").strip()
-    if not raw:
-        _ALLOWED_EMAILS = None
+def clear_allowlist_cache() -> None:
+    """Clear cached allowlist (tests / after admin updates)."""
+    global _DB_ALLOWED_EMAILS, _DB_CACHE_AT
+    _DB_ALLOWED_EMAILS = None
+    _DB_CACHE_AT = 0.0
+
+
+def _get_db_allowed_emails() -> Optional[set[str]]:
+    """Load allowed_emails table (same source as Supabase signup hook). None if unreadable."""
+    global _DB_ALLOWED_EMAILS, _DB_CACHE_AT
+    now = time.monotonic()
+    if _DB_ALLOWED_EMAILS is not None and (now - _DB_CACHE_AT) < _DB_CACHE_TTL_SEC:
+        return _DB_ALLOWED_EMAILS
+
+    try:
+        from db.client import get_service_client
+
+        client = get_service_client()
+        response = client.table("allowed_emails").select("email").execute()
+        emails = {
+            row["email"].strip().lower()
+            for row in (response.data or [])
+            if row.get("email")
+        }
+        _DB_ALLOWED_EMAILS = emails
+        _DB_CACHE_AT = now
+        log.info("Allowlist from DB: %d emails", len(emails))
+        return emails
+    except Exception as exc:
+        log.warning("Failed to load allowed_emails from DB: %s", exc)
         return None
-    emails = {e.strip().lower() for e in raw.split(",") if e.strip()}
-    _ALLOWED_EMAILS = emails
-    log.info("Allowlist from env: %d emails", len(emails))
-    return emails
 
 
 def _decode_jwt_payload(token: str) -> dict:
@@ -48,10 +70,12 @@ def get_email_from_token(token: str) -> Optional[str]:
 
 
 def is_email_allowed(email: Optional[str]) -> bool:
-    """Check if email is in allowlist. Returns True if allowlist is disabled (None)."""
-    allowed = _get_allowed_emails()
-    if allowed is None:
-        return True  # No allowlist configured
+    """Check invite list membership against allowed_emails table."""
+    db = _get_db_allowed_emails()
+    if not db:
+        return True
+
     if not email:
         return False
-    return email.lower() in allowed
+
+    return email.lower() in db
