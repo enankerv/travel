@@ -2,7 +2,7 @@
 import base64
 import json
 import os
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 # terms_guard imports db at load time
 os.environ.setdefault("SUPABASE_URL", "https://example.supabase.co")
@@ -57,3 +57,30 @@ def test_terms_version_bump_clears_cache():
         with patch.object(terms_guard, "TERMS_UPDATED_AT", "2027-01-01T00:00:00Z"):
             assert terms_guard.check_terms_and_age(token) == (True, None)
             assert lookup.call_count == 2
+
+
+def test_parse_supabase_timestamptz_with_short_tz_offset():
+    parsed = terms_guard._parse_timestamptz("2026-07-27 14:02:30.96+00")
+    assert parsed.year == 2026
+    assert parsed.month == 7
+    assert parsed.day == 27
+
+
+def test_profile_terms_pass_with_supabase_timestamp_format():
+    token = _fake_token("user-4")
+    profile = {
+        "terms_accepted_at": "2026-07-27 14:02:30.96+00",
+        "age_verified_at": "2026-07-27 14:02:30.96+00",
+    }
+
+    class _Resp:
+        data = profile
+
+    mock_client = MagicMock()
+    mock_client.table.return_value.select.return_value.eq.return_value.single.return_value.execute.return_value = _Resp()
+
+    with patch("utils.terms_guard.get_supabase_client", return_value=mock_client):
+        terms_guard.clear_terms_verified_cache()
+        ok, code = terms_guard.get_profile_terms_status("user-4", token)
+    assert ok is True
+    assert code is None

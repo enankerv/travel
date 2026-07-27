@@ -39,6 +39,6 @@ def extract_user_id_from_token(token: str) -> str:
 
 @router.get("/check-access")
 async def check_access(authorization: Optional[str] = Header(None)):
-    """Lightweight endpoint to verify user is on allowlist. Returns 200 if allowed."""
+    """Verify allowlist + terms (via middleware). Returns 200 if fully allowed."""
     extract_auth_token(authorization)
     return {"ok": True}

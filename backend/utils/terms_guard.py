@@ -7,6 +7,8 @@ import os
 from datetime import datetime
 from typing import Optional
 
+from dateutil.parser import isoparse
+
 from db import get_supabase_client
 
 # Bump this when you update Terms/Privacy. Must match frontend lib/constants.ts
@@ -48,6 +50,17 @@ def _get_user_id_from_token(token: str) -> Optional[str]:
         return None
 
 
+def _parse_timestamptz(value: str | datetime) -> datetime:
+    """Parse Supabase/Postgres timestamptz strings.
+
+    Python 3.10's ``fromisoformat`` rejects valid ISO variants Postgres emits
+    (``+00`` offsets, 1-2 digit fractional seconds), so use dateutil instead.
+    """
+    if isinstance(value, datetime):
+        return value
+    return isoparse(value.strip())
+
+
 def get_profile_terms_status(user_id: str, auth_token: str) -> tuple[bool, Optional[str]]:
     """
     Check if user has accepted terms (after TERMS_UPDATED_AT) and verified age.
@@ -71,8 +84,8 @@ def get_profile_terms_status(user_id: str, auth_token: str) -> tuple[bool, Optio
             return False, "TERMS_NOT_ACCEPTED"
 
         try:
-            terms_updated = datetime.fromisoformat(TERMS_UPDATED_AT.replace("Z", "+00:00"))
-            accepted = datetime.fromisoformat(terms_at.replace("Z", "+00:00")) if isinstance(terms_at, str) else terms_at
+            terms_updated = _parse_timestamptz(TERMS_UPDATED_AT)
+            accepted = _parse_timestamptz(terms_at)
             if accepted.tzinfo is None:
                 accepted = accepted.replace(tzinfo=terms_updated.tzinfo)
             if accepted < terms_updated:

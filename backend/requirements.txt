@@ -8,4 +8,5 @@ ollama
 uvicorn[standard]
 supabase
 python-dotenv
+python-dateutil
 httpx

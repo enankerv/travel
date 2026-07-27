@@ -44,8 +44,6 @@ class TermsGuardMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         if not request.url.path.startswith("/api/"):
             return await call_next(request)
-        if request.url.path == "/api/check-access":
-            return await call_next(request)
 
         auth = request.headers.get("Authorization")
         if not auth or not auth.lower().startswith("bearer "):
