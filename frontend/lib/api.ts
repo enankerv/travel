@@ -60,7 +60,7 @@ export async function acceptTerms(age?: number): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
-/** Check if user is on allowlist. Throws with code 'NOT_ON_ALLOWLIST' if blocked. */
+/** Check allowlist + terms (same gates as all other API routes). */
 export async function checkAccess(): Promise<void> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_URL}/api/check-access`, { headers })
@@ -516,7 +516,10 @@ export async function revokeInvite(token: string) {
 export async function getInviteDetails(token: string) {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_URL}/api/invites/${token}`, { headers })
-  if (!res.ok) throw new Error('Failed to fetch invite')
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.detail || data.code || 'Failed to fetch invite')
+  }
   return res.json()
 }
 
@@ -527,7 +530,10 @@ export async function acceptInvite(token: string) {
     method: 'POST',
     headers,
   })
-  if (!res.ok) throw new Error('Failed to accept invite')
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.detail || data.code || 'Failed to accept invite')
+  }
   return res.json()
 }
 

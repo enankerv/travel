@@ -68,9 +68,6 @@ export function useAuthBootstrap({
 
     async function run() {
       try {
-        await checkAccess()
-        if (cancelled) return
-
         const profile = await getMyProfile()
         if (cancelled) return
 
@@ -102,6 +99,11 @@ export function useAuthBootstrap({
         }
 
         if (cancelled) return
+
+        // Same middleware stack as invite/list/etc.: allowlist + terms on the backend.
+        await checkAccess()
+        if (cancelled) return
+
         setStatus({ kind: 'ready' })
       } catch (err: unknown) {
         if (cancelled) return
@@ -109,6 +111,18 @@ export function useAuthBootstrap({
         if (e.code === 'NOT_ON_ALLOWLIST') {
           void signOutRef.current()
           setStatus({ kind: 'allowlist-denied' })
+        } else if (e.code === 'AGE_NOT_VERIFIED') {
+          setStatus({
+            kind: 'terms-needed',
+            isReAccept: false,
+            requiresAge: true,
+          })
+        } else if (e.code === 'TERMS_NOT_ACCEPTED') {
+          setStatus({
+            kind: 'terms-needed',
+            isReAccept: true,
+            requiresAge: false,
+          })
         } else {
           setStatus({ kind: 'error', message: 'Failed to load' })
         }
