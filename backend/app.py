@@ -62,7 +62,7 @@ class TermsGuardMiddleware(BaseHTTPMiddleware):
 
 
 class AllowlistMiddleware(BaseHTTPMiddleware):
-    """Block /api/* access for users not in ALLOWED_EMAILS (when set)."""
+    """Block /api/* access for users not in allowed_emails (when the table has rows)."""
 
     async def dispatch(self, request: Request, call_next):
         if not request.url.path.startswith("/api/"):
