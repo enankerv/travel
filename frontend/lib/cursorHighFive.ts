@@ -1,7 +1,7 @@
 export const HIGH_FIVE_HIT_PX = 48
 export const HIGH_FIVE_SEPARATE_PX = 76
 export const HIGH_FIVE_COOLDOWN_MS = 2800
-export const HIGH_FIVE_DURATION_MS = 900
+export const HIGH_FIVE_DURATION_MS = 650
 
 export type HighFivePoint = {
   id: string

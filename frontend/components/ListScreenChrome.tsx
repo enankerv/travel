@@ -25,13 +25,23 @@ function uniqueViewers(users: PresenceUser[]) {
   return out
 }
 
-function PresenceAvatar({ user }: { user: PresenceUser }) {
+function PresenceAvatar({
+  user,
+  stackIndex,
+}: {
+  user: PresenceUser
+  stackIndex: number
+}) {
   const [imgFailed, setImgFailed] = useState(false)
   const name = presenceLabel(user)
   const showImg = Boolean(user.avatar_url) && !imgFailed
 
   return (
-    <div className="list-screen-chrome__presence-avatar-wrap" data-name={name}>
+    <div
+      className="list-screen-chrome__presence-avatar-wrap"
+      data-name={name}
+      style={{ ['--presence-stack' as string]: stackIndex + 1 }}
+    >
       <div
         className="list-screen-chrome__presence-avatar"
         style={{
@@ -131,8 +141,8 @@ export default function ListScreenChrome({
           <div className="list-screen-chrome__presence">
             <span className="list-screen-chrome__presence-label">Viewing with</span>
             <div className="list-screen-chrome__presence-avatars">
-              {viewers.map((user) => (
-                <PresenceAvatar key={user.user_id} user={user} />
+              {viewers.map((user, i) => (
+                <PresenceAvatar key={user.user_id} user={user} stackIndex={i} />
               ))}
             </div>
           </div>

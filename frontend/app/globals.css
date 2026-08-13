@@ -2591,7 +2591,7 @@ button:focus-visible {
   filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.55));
 }
 
-/* Shared-cursor high-five burst (list + board). */
+/* Shared-cursor high-five burst (list + board) — Figma-style pointer slap. */
 .cursor-high-five {
   position: absolute;
   left: 0;
@@ -2609,46 +2609,33 @@ button:focus-visible {
 
 .cursor-high-five__flash {
   position: absolute;
+  left: -7px;
+  top: -7px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff6c8;
+  box-shadow: 0 0 10px 3px rgba(255, 213, 74, 0.75);
+  animation: cursor-high-five-flash 0.42s ease-out forwards;
+}
+
+.cursor-high-five__pointer {
+  position: absolute;
   left: -10px;
-  top: -10px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 0 12px 4px rgba(255, 255, 255, 0.55);
-  animation: cursor-high-five-flash 0.55s ease-out forwards;
-}
-
-.cursor-high-five__ring {
-  position: absolute;
-  left: -8px;
-  top: -8px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.85);
-  animation: cursor-high-five-ring 0.7s ease-out forwards;
-}
-
-.cursor-high-five__hand {
-  position: absolute;
-  left: -12px;
-  top: -12px;
-  width: 24px;
-  height: 24px;
+  top: -7px;
+  width: 28px;
+  height: 28px;
   overflow: visible;
-  filter:
-    drop-shadow(0 0 0.6px #fff)
-    drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4));
-  transform-origin: 70% 80%;
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.5));
+  transform-origin: 10px 7px;
 }
 
-.cursor-high-five__hand--a {
-  animation: cursor-high-five-hand-a 0.7s cubic-bezier(0.2, 0.85, 0.3, 1.15) forwards;
+.cursor-high-five__pointer--a {
+  animation: cursor-high-five-pointer-a 0.55s cubic-bezier(0.2, 0.9, 0.32, 1.15) forwards;
 }
 
-.cursor-high-five__hand--b {
-  animation: cursor-high-five-hand-b 0.7s cubic-bezier(0.2, 0.85, 0.3, 1.15) forwards;
+.cursor-high-five__pointer--b {
+  animation: cursor-high-five-pointer-b 0.55s cubic-bezier(0.2, 0.9, 0.32, 1.15) forwards;
 }
 
 .cursor-high-five__spark {
@@ -2656,100 +2643,96 @@ button:focus-visible {
   left: 0;
   top: 0;
   display: block;
-  animation: cursor-high-five-spark 0.7s ease-out forwards;
+  animation: cursor-high-five-spark 0.5s ease-out forwards;
   animation-delay: var(--spark-delay, 0ms);
-  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.7));
+  filter: drop-shadow(0 0 1.5px rgba(255, 213, 74, 0.85));
 }
 
 @keyframes cursor-high-five-flash {
   0% {
-    transform: scale(0.2);
+    transform: scale(0.3);
     opacity: 1;
   }
   100% {
-    transform: scale(2.4);
+    transform: scale(2.1);
     opacity: 0;
   }
 }
 
-@keyframes cursor-high-five-ring {
+@keyframes cursor-high-five-pointer-a {
   0% {
-    transform: scale(0.4);
-    opacity: 0.9;
-  }
-  100% {
-    transform: scale(3.6);
-    opacity: 0;
-  }
-}
-
-@keyframes cursor-high-five-hand-a {
-  0% {
-    transform: translate(-22px, 8px) rotate(-38deg) scale(0.55);
+    transform: translate(-16px, 7px) scaleX(-1) rotate(-26deg);
     opacity: 0;
   }
   38% {
-    transform: translate(-5px, 1px) rotate(-8deg) scale(1.12);
+    transform: translate(-1px, 0) scaleX(-1) rotate(-4deg);
     opacity: 1;
   }
-  52% {
-    transform: translate(-3px, 0) rotate(0deg) scale(1);
+  50% {
+    transform: translate(3px, -1px) scaleX(-1) rotate(12deg);
+    opacity: 1;
+  }
+  64% {
+    transform: translate(-4px, 1px) scaleX(-1) rotate(-10deg);
     opacity: 1;
   }
   100% {
-    transform: translate(-10px, -10px) rotate(-16deg) scale(0.75);
+    transform: translate(-9px, -5px) scaleX(-1) rotate(-18deg);
     opacity: 0;
   }
 }
 
-@keyframes cursor-high-five-hand-b {
+@keyframes cursor-high-five-pointer-b {
   0% {
-    transform: translate(22px, 8px) scaleX(-1) rotate(-38deg) scale(0.55);
+    transform: translate(16px, 7px) rotate(-26deg);
     opacity: 0;
   }
   38% {
-    transform: translate(5px, 1px) scaleX(-1) rotate(-8deg) scale(1.12);
+    transform: translate(1px, 0) rotate(-4deg);
     opacity: 1;
   }
-  52% {
-    transform: translate(3px, 0) scaleX(-1) rotate(0deg) scale(1);
+  50% {
+    transform: translate(-3px, -1px) rotate(12deg);
+    opacity: 1;
+  }
+  64% {
+    transform: translate(4px, 1px) rotate(-10deg);
     opacity: 1;
   }
   100% {
-    transform: translate(10px, -10px) scaleX(-1) rotate(-16deg) scale(0.75);
+    transform: translate(9px, -5px) rotate(-18deg);
     opacity: 0;
   }
 }
 
 @keyframes cursor-high-five-spark {
   0% {
-    transform: translate(-50%, -50%) scale(0.2);
+    transform: translate(-50%, -50%) scale(0.12) rotate(0deg);
     opacity: 0;
   }
-  25% {
+  16% {
     opacity: 1;
   }
   100% {
     transform: translate(calc(-50% + var(--spark-x)), calc(-50% + var(--spark-y)))
-      scale(1);
+      scale(1) rotate(var(--spark-spin, 0deg));
     opacity: 0;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .cursor-high-five__flash,
-  .cursor-high-five__ring,
-  .cursor-high-five__hand,
+  .cursor-high-five__pointer,
   .cursor-high-five__spark {
-    animation-duration: 0.45s;
+    animation-duration: 0.4s;
     animation-timing-function: ease-out;
   }
 
-  .cursor-high-five__hand--a {
+  .cursor-high-five__pointer--a {
     animation-name: cursor-high-five-reduced-a;
   }
 
-  .cursor-high-five__hand--b {
+  .cursor-high-five__pointer--b {
     animation-name: cursor-high-five-reduced-b;
   }
 }
@@ -2757,7 +2740,7 @@ button:focus-visible {
 @keyframes cursor-high-five-reduced-a {
   0%,
   70% {
-    transform: translate(-4px, 0) rotate(-6deg);
+    transform: translate(-3px, 0) scaleX(-1) rotate(-6deg);
     opacity: 1;
   }
   100% {
@@ -2768,7 +2751,7 @@ button:focus-visible {
 @keyframes cursor-high-five-reduced-b {
   0%,
   70% {
-    transform: translate(4px, 0) scaleX(-1) rotate(-6deg);
+    transform: translate(3px, 0) rotate(-6deg);
     opacity: 1;
   }
   100% {
@@ -3581,14 +3564,18 @@ body.board-screen-active main {
 }
 
 .list-screen-chrome__presence-avatars {
+  --presence-avatar-size: 24px;
   display: flex;
+  align-items: center;
   flex-shrink: 0;
 }
 
 .list-screen-chrome__presence-avatar-wrap {
   position: relative;
+  z-index: var(--presence-stack, 1);
   flex-shrink: 0;
-  margin-left: -6px;
+  width: var(--presence-avatar-size);
+  margin-left: calc(-0.35 * var(--presence-avatar-size));
 }
 
 .list-screen-chrome__presence-avatar-wrap:first-child {
@@ -3596,7 +3583,7 @@ body.board-screen-active main {
 }
 
 .list-screen-chrome__presence-avatar-wrap:hover {
-  z-index: 2;
+  z-index: 20;
 }
 
 .list-screen-chrome__presence-avatar-wrap:hover::after {
@@ -3617,8 +3604,9 @@ body.board-screen-active main {
 }
 
 .list-screen-chrome__presence-avatar {
-  width: 24px;
-  height: 24px;
+  box-sizing: border-box;
+  width: var(--presence-avatar-size);
+  height: var(--presence-avatar-size);
   border-radius: 50%;
   overflow: hidden;
   border: 2px solid var(--dark);
