@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   createComment,
   updateComment,
@@ -48,23 +48,23 @@ export default function CommentsSidebar({
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editBody, setEditBody] = useState("");
-  const [newCommentGetaway, setNewCommentGetaway] = useState<string | null>(null);
   const [newCommentBody, setNewCommentBody] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const focusedRef = useRef<HTMLDivElement>(null);
+  const activePoi = useMemo(
+    () =>
+      focusedGetawayId
+        ? pois.find((p) => p.id === focusedGetawayId) ?? null
+        : null,
+    [focusedGetawayId, pois],
+  );
+  const comments = activePoi ? grouped[activePoi.id] ?? [] : [];
 
   useEffect(() => {
-    if (focusedGetawayId && isOpen) {
-      setNewCommentGetaway(focusedGetawayId);
-    }
-  }, [focusedGetawayId, isOpen]);
-
-  useEffect(() => {
-    if (focusedGetawayId && isOpen && focusedRef.current) {
-      focusedRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }
-  }, [focusedGetawayId, isOpen]);
+    setNewCommentBody("");
+    setEditingId(null);
+    setEditBody("");
+  }, [focusedGetawayId]);
 
   if (!board && !list) {
     throw new Error(
@@ -73,13 +73,6 @@ export default function CommentsSidebar({
   }
 
   if (!isOpen) return null;
-
-  const poisWithComments = pois.filter(
-    (p) => (grouped[p.id]?.length ?? 0) > 0,
-  );
-  const poisWithoutComments = pois.filter(
-    (p) => (grouped[p.id]?.length ?? 0) === 0,
-  );
 
   function syncCommentUpdate(comment: CommentRecord) {
     if (board) {
@@ -118,7 +111,6 @@ export default function CommentsSidebar({
     try {
       await createComment(listMeta!.id, poiId, body);
       setNewCommentBody("");
-      setNewCommentGetaway(null);
       // Comment appears via realtime COMMENT_INSERT (avoids duplicate if we also added here)
     } catch {
       // Error handled by parent
@@ -183,184 +175,110 @@ export default function CommentsSidebar({
       <div className="comments-sidebar__content">
         {!isListMember ? (
           <p className="comments-sidebar__muted">Sign in to view comments.</p>
+        ) : !activePoi ? (
+          <p className="comments-sidebar__muted">
+            Select a villa to see comments.
+          </p>
         ) : (
-          <>
-            {poisWithComments.map((p) => (
-              <div
-                key={p.id}
-                ref={focusedGetawayId === p.id ? focusedRef : undefined}
-                className={`comments-sidebar__getaway-group ${
-                  focusedGetawayId === p.id ? "comments-sidebar__getaway-group--focused" : ""
-                }`}
-              >
-                <button
-                  type="button"
-                  className="comments-sidebar__getaway-title"
-                  onClick={() => onGetawayClick?.(p.id)}
-                >
-                  {p.title || "(Untitled)"}
-                </button>
-                {(grouped[p.id] || []).map((c) => (
-                  <div key={c.id} className="comments-sidebar__comment">
-                    <div className="comments-sidebar__comment-header">
-                      <span className="comments-sidebar__comment-author">
-                        {c.first_name || "Anonymous"}
-                      </span>
-                      <span className="comments-sidebar__comment-date">
-                        {formatDate(c.created_at)}
-                      </span>
-                      {currentUserId === c.user_id && (
-                        <div className="comments-sidebar__comment-actions">
-                          {editingId === c.id ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleUpdateComment(c.id, editBody)
-                                }
-                                disabled={saving}
-                              >
-                                Save
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingId(null);
-                                  setEditBody("");
-                                }}
-                              >
-                                Cancel
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingId(c.id);
-                                  setEditBody(c.body);
-                                }}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleDeleteComment(c.id, p.id)
-                                }
-                                disabled={saving}
-                                className="comments-sidebar__delete"
-                              >
-                                Delete
-                              </button>
-                            </>
-                          )}
-                        </div>
+          <div className="comments-sidebar__getaway-group comments-sidebar__getaway-group--focused">
+            <button
+              type="button"
+              className="comments-sidebar__getaway-title"
+              onClick={() => onGetawayClick?.(activePoi.id)}
+            >
+              {activePoi.title || "(Untitled)"}
+            </button>
+            {comments.length === 0 && (
+              <p className="comments-sidebar__muted">No comments yet.</p>
+            )}
+            {comments.map((c) => (
+              <div key={c.id} className="comments-sidebar__comment">
+                <div className="comments-sidebar__comment-header">
+                  <span className="comments-sidebar__comment-author">
+                    {c.first_name || "Anonymous"}
+                  </span>
+                  <span className="comments-sidebar__comment-date">
+                    {formatDate(c.created_at)}
+                  </span>
+                  {currentUserId === c.user_id && (
+                    <div className="comments-sidebar__comment-actions">
+                      {editingId === c.id ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateComment(c.id, editBody)}
+                            disabled={saving}
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingId(null);
+                              setEditBody("");
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingId(c.id);
+                              setEditBody(c.body);
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleDeleteComment(c.id, activePoi.id)
+                            }
+                            disabled={saving}
+                            className="comments-sidebar__delete"
+                          >
+                            Delete
+                          </button>
+                        </>
                       )}
                     </div>
-                    {editingId === c.id ? (
-                      <textarea
-                        value={editBody}
-                        onChange={(e) => setEditBody(e.target.value)}
-                        className="comments-sidebar__input"
-                        rows={3}
-                        autoFocus
-                      />
-                    ) : (
-                      <p className="comments-sidebar__comment-body">{c.body}</p>
-                    )}
-                  </div>
-                ))}
-                {isListMember && newCommentGetaway === p.id && (
-                  <div className="comments-sidebar__add-form">
-                    <textarea
-                      value={newCommentBody}
-                      onChange={(e) => setNewCommentBody(e.target.value)}
-                      placeholder="Add a comment..."
-                      className="comments-sidebar__input"
-                      rows={3}
-                      autoFocus
-                    />
-                    <div className="comments-sidebar__add-actions">
-                      <button
-                        type="button"
-                        onClick={() => handleAddComment(p.id)}
-                        disabled={!newCommentBody.trim() || saving}
-                      >
-                        Add
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setNewCommentGetaway(null);
-                          setNewCommentBody("");
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
+                  )}
+                </div>
+                {editingId === c.id ? (
+                  <textarea
+                    value={editBody}
+                    onChange={(e) => setEditBody(e.target.value)}
+                    className="comments-sidebar__input"
+                    rows={3}
+                    autoFocus
+                  />
+                ) : (
+                  <p className="comments-sidebar__comment-body">{c.body}</p>
                 )}
               </div>
             ))}
-
-            {poisWithoutComments.map((p) => (
-              <div key={p.id} className="comments-sidebar__getaway-group">
+            <div className="comments-sidebar__add-form">
+              <textarea
+                value={newCommentBody}
+                onChange={(e) => setNewCommentBody(e.target.value)}
+                placeholder="Add a comment..."
+                className="comments-sidebar__input"
+                rows={3}
+              />
+              <div className="comments-sidebar__add-actions">
                 <button
                   type="button"
-                  className="comments-sidebar__getaway-title"
-                  onClick={() => onGetawayClick?.(p.id)}
+                  onClick={() => handleAddComment(activePoi.id)}
+                  disabled={!newCommentBody.trim() || saving}
                 >
-                  {p.title || "(Untitled)"}
+                  Add
                 </button>
-                {isListMember &&
-                  (newCommentGetaway === p.id ? (
-                    <div className="comments-sidebar__add-form">
-                      <textarea
-                        value={newCommentBody}
-                        onChange={(e) => setNewCommentBody(e.target.value)}
-                        placeholder="Add a comment..."
-                        className="comments-sidebar__input"
-                        rows={3}
-                        autoFocus
-                      />
-                      <div className="comments-sidebar__add-actions">
-                        <button
-                          type="button"
-                          onClick={() => handleAddComment(p.id)}
-                          disabled={!newCommentBody.trim() || saving}
-                        >
-                          Add
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setNewCommentGetaway(null);
-                            setNewCommentBody("");
-                          }}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      className="comments-sidebar__add-link"
-                      onClick={() => setNewCommentGetaway(p.id)}
-                    >
-                      + Add comment
-                    </button>
-                  ))}
               </div>
-            ))}
-
-            {pois.length === 0 && (
-              <p className="comments-sidebar__muted">
-                {board ? "No items yet." : "No getaways yet."}
-              </p>
-            )}
-          </>
+            </div>
+          </div>
         )}
       </div>
     </div>
