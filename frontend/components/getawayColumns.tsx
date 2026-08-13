@@ -52,7 +52,7 @@ export const DEFAULT_VISIBLE: VisibleColumns = {
   price: true,
   amenities: true,
   description: false,
-  caveats: false,
+  caveats: true,
   included: false,
   actions: true,
 };
