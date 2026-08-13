@@ -27,31 +27,6 @@ function CommentMention({ comment }: { comment: CommentRecord }) {
   )
 }
 
-function ReplyComposer({
-  mention,
-  value,
-  rows,
-  onChange,
-}: {
-  mention: CommentRecord
-  value: string
-  rows: number
-  onChange: (value: string) => void
-}) {
-  return (
-    <div className="comment-thread__composer">
-      <CommentMention comment={mention} />
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="comment-thread__input"
-        rows={rows}
-        autoFocus
-      />
-    </div>
-  )
-}
-
 export default function CommentThreadList({
   comments,
   currentUserId,
@@ -176,22 +151,13 @@ export default function CommentThreadList({
             </div>
           </header>
           {isEditing ? (
-            parent ? (
-              <ReplyComposer
-                mention={parent}
-                value={editBody}
-                rows={3}
-                onChange={setEditBody}
-              />
-            ) : (
-              <textarea
-                value={editBody}
-                onChange={(e) => setEditBody(e.target.value)}
-                className="comment-thread__input"
-                rows={3}
-                autoFocus
-              />
-            )
+            <textarea
+              value={editBody}
+              onChange={(e) => setEditBody(e.target.value)}
+              className="comment-thread__input"
+              rows={3}
+              autoFocus
+            />
           ) : (
             <p className="comment-thread__body">
               {parent && <CommentMention comment={parent} />}
@@ -200,11 +166,12 @@ export default function CommentThreadList({
           )}
           {isReplying && (
             <div className="comment-thread__reply-form">
-              <ReplyComposer
-                mention={comment}
+              <textarea
                 value={replyBody}
+                onChange={(e) => setReplyBody(e.target.value)}
+                className="comment-thread__input"
                 rows={2}
-                onChange={setReplyBody}
+                autoFocus
               />
               <div className="comment-thread__reply-actions">
                 <button
