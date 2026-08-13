@@ -145,6 +145,7 @@ class Comment(BaseModel):
     poi_id: str
     user_id: str
     body: str
+    replying_to: Optional[str] = None
     created_at: str
     updated_at: str
     first_name: Optional[str] = None
@@ -418,9 +419,9 @@ class POI(POIBase):
         from db.votes import remove_vote
         return remove_vote(self.id, user_id, self._session_token())
 
-    def add_comment(self, user_id: str, body: str) -> Optional["Comment"]:
+    def add_comment(self, user_id: str, body: str, replying_to: Optional[str] = None) -> Optional["Comment"]:
         from db.comments import create_comment
-        row = create_comment(self.id, user_id, body, self._session_token())
+        row = create_comment(self.id, user_id, body, self._session_token(), replying_to=replying_to)
         return Comment(**row) if row else None
 
 

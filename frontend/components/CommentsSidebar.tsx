@@ -7,8 +7,10 @@ import {
   deleteComment,
   type CommentRecord,
 } from "@/lib/api";
+import { withoutCommentTree } from "@/lib/comments";
 import { useBoardContextOptional } from "@/lib/BoardContext";
 import { useListDetailContextOptional } from "@/lib/ListDetailContext";
+import CommentThreadList from "./CommentThreadList";
 
 type CommentsByPoi = Record<string, CommentRecord[]>;
 
@@ -46,8 +48,6 @@ export default function CommentsSidebar({
     [board, list],
   );
 
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editBody, setEditBody] = useState("");
   const [newCommentBody, setNewCommentBody] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -62,8 +62,6 @@ export default function CommentsSidebar({
 
   useEffect(() => {
     setNewCommentBody("");
-    setEditingId(null);
-    setEditBody("");
   }, [focusedGetawayId]);
 
   if (!board && !list) {
@@ -73,6 +71,19 @@ export default function CommentsSidebar({
   }
 
   if (!isOpen) return null;
+
+  function syncCommentInsert(comment: CommentRecord) {
+    if (board) {
+      board.upsertComment(comment);
+      return;
+    }
+    if (!list) return;
+    list.setCommentsByGetaway((prev: CommentsByPoi) => {
+      const existing = prev[comment.poi_id] || [];
+      if (existing.some((c) => c.id === comment.id)) return prev;
+      return { ...prev, [comment.poi_id]: [...existing, comment] };
+    });
+  }
 
   function syncCommentUpdate(comment: CommentRecord) {
     if (board) {
@@ -99,19 +110,24 @@ export default function CommentsSidebar({
     if (!list) return;
     list.setCommentsByGetaway((prev: CommentsByPoi) => {
       const next = { ...prev };
-      next[poiId] = (next[poiId] || []).filter((c) => c.id !== commentId);
+      next[poiId] = withoutCommentTree(next[poiId] || [], commentId);
       return next;
     });
   }
 
-  async function handleAddComment(poiId: string) {
-    const body = newCommentBody.trim();
+  async function handleAddComment(poiId: string, parent?: CommentRecord, replyBody?: string) {
+    const body = (replyBody ?? newCommentBody).trim();
     if (!body || !isListMember) return;
     setSaving(true);
     try {
-      await createComment(listMeta!.id, poiId, body);
-      setNewCommentBody("");
-      // Comment appears via realtime COMMENT_INSERT (avoids duplicate if we also added here)
+      const result = await createComment(
+        listMeta!.id,
+        poiId,
+        body,
+        parent?.id,
+      );
+      if (result?.comment) syncCommentInsert(result.comment);
+      if (!parent) setNewCommentBody("");
     } catch {
       // Error handled by parent
     } finally {
@@ -126,8 +142,6 @@ export default function CommentsSidebar({
     try {
       const { comment } = await updateComment(listMeta!.id, commentId, trimmed);
       syncCommentUpdate(comment);
-      setEditingId(null);
-      setEditBody("");
     } catch {
       // Error handled by parent
     } finally {
@@ -146,16 +160,6 @@ export default function CommentsSidebar({
     } finally {
       setSaving(false);
     }
-  }
-
-  function formatDate(s: string) {
-    const d = new Date(s);
-    const now = new Date();
-    const diff = now.getTime() - d.getTime();
-    if (diff < 60000) return "Just now";
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-    return d.toLocaleDateString();
   }
 
   return (
@@ -191,75 +195,18 @@ export default function CommentsSidebar({
             {comments.length === 0 && (
               <p className="comments-sidebar__muted">No comments yet.</p>
             )}
-            {comments.map((c) => (
-              <div key={c.id} className="comments-sidebar__comment">
-                <div className="comments-sidebar__comment-header">
-                  <span className="comments-sidebar__comment-author">
-                    {c.first_name || "Anonymous"}
-                  </span>
-                  <span className="comments-sidebar__comment-date">
-                    {formatDate(c.created_at)}
-                  </span>
-                  {currentUserId === c.user_id && (
-                    <div className="comments-sidebar__comment-actions">
-                      {editingId === c.id ? (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateComment(c.id, editBody)}
-                            disabled={saving}
-                          >
-                            Save
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingId(null);
-                              setEditBody("");
-                            }}
-                          >
-                            Cancel
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingId(c.id);
-                              setEditBody(c.body);
-                            }}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleDeleteComment(c.id, activePoi.id)
-                            }
-                            disabled={saving}
-                            className="comments-sidebar__delete"
-                          >
-                            Delete
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-                {editingId === c.id ? (
-                  <textarea
-                    value={editBody}
-                    onChange={(e) => setEditBody(e.target.value)}
-                    className="comments-sidebar__input"
-                    rows={3}
-                    autoFocus
-                  />
-                ) : (
-                  <p className="comments-sidebar__comment-body">{c.body}</p>
-                )}
-              </div>
-            ))}
+            <CommentThreadList
+              comments={comments}
+              currentUserId={currentUserId}
+              saving={saving}
+              onReply={(parent, body) =>
+                handleAddComment(activePoi.id, parent, body)
+              }
+              onUpdate={handleUpdateComment}
+              onDelete={(commentId) =>
+                handleDeleteComment(commentId, activePoi.id)
+              }
+            />
             <div className="comments-sidebar__add-form">
               <textarea
                 value={newCommentBody}
@@ -271,7 +218,7 @@ export default function CommentsSidebar({
               <div className="comments-sidebar__add-actions">
                 <button
                   type="button"
-                  onClick={() => handleAddComment(activePoi.id)}
+                  onClick={() => void handleAddComment(activePoi.id)}
                   disabled={!newCommentBody.trim() || saving}
                 >
                   Add

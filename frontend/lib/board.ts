@@ -1,5 +1,6 @@
 /** Cork board types and POI-local comment/vote helpers. */
 import type { CommentRecord, VoteRecord } from './api'
+import { withoutCommentTree } from './comments'
 import type { Getaway, POIBase } from './getaway'
 import type { BoardSubgroup } from './subgroup'
 import { mergePoiFromRealtime } from './poi'
@@ -76,7 +77,7 @@ export function removeCommentFromBoardPoi(
 ): BoardPoi[] {
   return pois.map((p) =>
     p.id === poiId
-      ? { ...p, comments: p.comments.filter((c) => c.id !== commentId) }
+      ? { ...p, comments: withoutCommentTree(p.comments, commentId) }
       : p,
   )
 }

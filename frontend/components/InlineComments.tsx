@@ -5,8 +5,11 @@ import {
   createComment,
   updateComment,
   deleteComment,
+  type CommentRecord,
 } from "@/lib/api";
+import { withoutCommentTree } from "@/lib/comments";
 import { usePoiSocial } from "@/hooks/usePoiSocial";
+import CommentThreadList from "./CommentThreadList";
 
 export default function InlineComments({
   getawayId,
@@ -23,30 +26,33 @@ export default function InlineComments({
   } = social;
 
   const [newCommentBody, setNewCommentBody] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editBody, setEditBody] = useState("");
   const [saving, setSaving] = useState(false);
 
-  function formatDate(s: string) {
-    const d = new Date(s);
-    const now = new Date();
-    const diff = now.getTime() - d.getTime();
-    if (diff < 60000) return "Just now";
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-    return d.toLocaleDateString();
+  function applyCreated(comment: CommentRecord) {
+    if (source === "board") {
+      social.upsertComment(comment);
+      return;
+    }
+    social.setCommentsByGetaway((prev) => {
+      const existing = prev[getawayId] || [];
+      if (existing.some((c) => c.id === comment.id)) return prev;
+      return { ...prev, [getawayId]: [...existing, comment] };
+    });
   }
 
-  async function handleAddComment() {
-    const body = newCommentBody.trim();
-    if (!body || !isListMember) return;
+  async function handleAddComment(body: string, parent?: CommentRecord) {
+    const trimmed = body.trim();
+    if (!trimmed || !isListMember) return;
     setSaving(true);
     try {
-      const result = await createComment(listId, getawayId, body);
-      if (source === "board" && result?.comment) {
-        social.upsertComment(result.comment);
-      }
-      setNewCommentBody("");
+      const result = await createComment(
+        listId,
+        getawayId,
+        trimmed,
+        parent?.id,
+      );
+      if (result?.comment) applyCreated(result.comment);
+      if (!parent) setNewCommentBody("");
     } catch {
       // Error handled by parent
     } finally {
@@ -73,8 +79,6 @@ export default function InlineComments({
           return next;
         });
       }
-      setEditingId(null);
-      setEditBody("");
     } catch {
       // Error handled by parent
     } finally {
@@ -92,7 +96,7 @@ export default function InlineComments({
       } else {
         social.setCommentsByGetaway((prev) => {
           const next = { ...prev };
-          next[getawayId] = (next[getawayId] || []).filter((c) => c.id !== commentId);
+          next[getawayId] = withoutCommentTree(next[getawayId] || [], commentId);
           return next;
         });
       }
@@ -116,75 +120,14 @@ export default function InlineComments({
     <div className="inline-comments">
       <h4>Comments</h4>
 
-      <div className="inline-comments__list">
-        {comments.map((c) => (
-          <div key={c.id} className="inline-comments__comment">
-            <div className="inline-comments__comment-header">
-              <span className="inline-comments__comment-author">
-                {c.first_name || "Anonymous"}
-              </span>
-              <span className="inline-comments__comment-date">
-                {formatDate(c.created_at)}
-              </span>
-              {currentUserId === c.user_id && (
-                <div className="inline-comments__comment-actions">
-                  {editingId === c.id ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateComment(c.id, editBody)}
-                        disabled={saving}
-                      >
-                        Save
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingId(null);
-                          setEditBody("");
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingId(c.id);
-                          setEditBody(c.body);
-                        }}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteComment(c.id)}
-                        disabled={saving}
-                        className="inline-comments__delete"
-                      >
-                        Delete
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-            {editingId === c.id ? (
-              <textarea
-                value={editBody}
-                onChange={(e) => setEditBody(e.target.value)}
-                className="inline-comments__input"
-                rows={3}
-                autoFocus
-              />
-            ) : (
-              <p className="inline-comments__comment-body">{c.body}</p>
-            )}
-          </div>
-        ))}
-      </div>
+      <CommentThreadList
+        comments={comments}
+        currentUserId={currentUserId}
+        saving={saving}
+        onReply={(parent, body) => handleAddComment(body, parent)}
+        onUpdate={handleUpdateComment}
+        onDelete={handleDeleteComment}
+      />
 
       <div className="inline-comments__add">
         <textarea
@@ -196,7 +139,7 @@ export default function InlineComments({
         />
         <button
           type="button"
-          onClick={handleAddComment}
+          onClick={() => void handleAddComment(newCommentBody)}
           disabled={!newCommentBody.trim() || saving}
           className="inline-comments__add-btn"
         >

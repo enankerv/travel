@@ -234,6 +234,7 @@ CREATE TABLE IF NOT EXISTS public.comments (
   poi_id UUID NOT NULL REFERENCES pois(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   body TEXT NOT NULL,
+  replying_to UUID REFERENCES public.comments(id) ON DELETE CASCADE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -241,7 +242,39 @@ CREATE TABLE IF NOT EXISTS public.comments (
 CREATE INDEX IF NOT EXISTS idx_comments_poi_id ON comments(poi_id);
 CREATE INDEX IF NOT EXISTS idx_comments_user_id ON comments(user_id);
 
+ALTER TABLE public.comments
+  ADD COLUMN IF NOT EXISTS replying_to UUID REFERENCES public.comments(id) ON DELETE CASCADE;
+
+CREATE INDEX IF NOT EXISTS idx_comments_replying_to ON comments(replying_to);
+
 ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
+
+CREATE OR REPLACE FUNCTION public.comments_replying_to_same_poi()
+RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+  parent_poi uuid;
+BEGIN
+  IF NEW.replying_to IS NULL THEN
+    RETURN NEW;
+  END IF;
+  IF NEW.replying_to = NEW.id THEN
+    RAISE EXCEPTION 'comment cannot reply to itself';
+  END IF;
+  SELECT poi_id INTO parent_poi FROM public.comments WHERE id = NEW.replying_to;
+  IF parent_poi IS NULL THEN
+    RAISE EXCEPTION 'parent comment not found';
+  END IF;
+  IF parent_poi IS DISTINCT FROM NEW.poi_id THEN
+    RAISE EXCEPTION 'reply must target a comment on the same poi';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS comments_replying_to_same_poi ON public.comments;
+CREATE TRIGGER comments_replying_to_same_poi
+  BEFORE INSERT OR UPDATE OF replying_to, poi_id ON public.comments
+  FOR EACH ROW EXECUTE FUNCTION public.comments_replying_to_same_poi();
 
 -- Votes ----------------------------------------------------------------------
 
@@ -560,6 +593,7 @@ BEGIN
       'poi_id', NEW.poi_id,
       'user_id', NEW.user_id,
       'body', NEW.body,
+      'replying_to', NEW.replying_to,
       'created_at', NEW.created_at,
       'updated_at', NEW.updated_at,
       'first_name', COALESCE(first_name_val, ''),

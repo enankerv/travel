@@ -8,6 +8,7 @@ import {
   getListComments,
   listPois,
 } from '@/lib/api'
+import { withoutCommentTree } from '@/lib/comments'
 import { useAuth } from '@/lib/AuthContext'
 import { useListRealtime } from '@/lib/realtime'
 import { useListVotes } from '@/hooks/useListVotes'
@@ -116,7 +117,7 @@ export default function ListPlacesProvider({
     onCommentDelete: (id, getawayId) =>
       setCommentsByGetaway((prev) => {
         const next = { ...prev }
-        next[getawayId] = (next[getawayId] || []).filter((x) => x.id !== id)
+        next[getawayId] = withoutCommentTree(next[getawayId] || [], id)
         return next
       }),
   })

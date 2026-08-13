@@ -48,7 +48,14 @@ async def create_comment_endpoint(
         comment_body = body.get("body", "").strip()
         if not comment_body:
             raise HTTPException(status_code=400, detail="Comment body is required")
-        result = create_comment(poi_id, user_id, comment_body, token)
+        replying_to = body.get("replying_to") or None
+        if replying_to is not None:
+            if not isinstance(replying_to, str) or not replying_to.strip():
+                raise HTTPException(status_code=400, detail="Invalid parent comment")
+            replying_to = replying_to.strip()
+        result = create_comment(
+            poi_id, user_id, comment_body, token, replying_to=replying_to
+        )
         if result is None:
             raise HTTPException(status_code=400, detail="POI not found or invalid")
         return {"comment": result}

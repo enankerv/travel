@@ -591,6 +591,7 @@ export type CommentRecord = {
   poi_id: string
   user_id: string
   body: string
+  replying_to?: string | null
   created_at: string
   updated_at: string
   first_name?: string
@@ -604,12 +605,20 @@ export async function getListComments(listId: string): Promise<{ comments: Comme
   return res.json()
 }
 
-export async function createComment(listId: string, getawayId: string, body: string) {
+export async function createComment(
+  listId: string,
+  getawayId: string,
+  body: string,
+  replyingTo?: string | null,
+) {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_URL}/api/lists/${listId}/getaways/${getawayId}/comments`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ body }),
+    body: JSON.stringify({
+      body,
+      ...(replyingTo ? { replying_to: replyingTo } : {}),
+    }),
   })
   if (!res.ok) throw new Error('Failed to add comment')
   return res.json()
