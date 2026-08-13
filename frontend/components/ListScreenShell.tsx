@@ -135,6 +135,7 @@ export default function ListScreenShell({
       activeView={activeView}
       variant={isBoard ? 'overlay' : 'page'}
       onBack={onBack}
+      otherViewers={otherViewers}
       memberCount={memberCount}
       onMembersClick={() => setMembersOpen(true)}
     />

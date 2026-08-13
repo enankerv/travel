@@ -5,9 +5,31 @@ import { isLockedByPeer, pinLabel, pinStackZIndex, pinTiltDeg, type PinHoldState
 import type { POIBase } from '@/lib/getaway'
 import { iconForPoiType, poiImageSources } from '@/lib/poi'
 import type { BoardSubgroup } from '@/lib/subgroup'
-import { subgroupsByParentId } from '@/lib/boardSpace'
+import { subgroupsById, subgroupsByParentId } from '@/lib/boardSpace'
 import type { SubgroupRect } from '@/hooks/useBoardSubgroupEdit'
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls'
+
+function draggedPinAncestorIds(
+  pins: POIBase[],
+  subgroups: BoardSubgroup[],
+  getPinHoldState: (poiId: string) => PinHoldState,
+): Set<string> {
+  const held = pins.find((p) => {
+    const hold = getPinHoldState(p.id)
+    return hold === 'local' || hold === 'remote'
+  })
+  const start = held?.subgroup_id ?? null
+  const ids = new Set<string>()
+  if (!start) return ids
+  const byId = subgroupsById(subgroups)
+  let current: string | null = start
+  while (current) {
+    if (ids.has(current)) break
+    ids.add(current)
+    current = byId.get(current)?.parent_subgroup_id ?? null
+  }
+  return ids
+}
 
 const BoardPin = memo(function BoardPin({
   poi,
@@ -131,6 +153,11 @@ export default memo(function BoardSurface({
 }: BoardSurfaceProps) {
   const childrenByParent = subgroupsByParentId(subgroups)
   const childSubgroups = childrenByParent.get(parentSubgroupId) ?? []
+  const dragAncestorIds = draggedPinAncestorIds(
+    sortedPins,
+    subgroups,
+    getPinHoldState,
+  )
   const framePois = sortedPins.filter(
     (poi) => (poi.subgroup_id ?? null) === parentSubgroupId,
   )
@@ -155,7 +182,10 @@ export default memo(function BoardSurface({
               top: `${rect.board_y * 100}%`,
               width: `${rect.board_w * 100}%`,
               height: `${rect.board_h * 100}%`,
-              zIndex: sg.board_z + (selected ? 100 : 0),
+              zIndex:
+                sg.board_z +
+                (selected ? 100 : 0) +
+                (dragAncestorIds.has(sg.id) ? 10000 : 0),
             }}
           >
             <div

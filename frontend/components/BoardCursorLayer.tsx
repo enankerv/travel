@@ -9,6 +9,8 @@ import {
   useState,
   type RefObject,
 } from 'react'
+import CursorHighFive from '@/components/CursorHighFive'
+import { useCursorHighFives } from '@/hooks/useCursorHighFives'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabase'
 import {
@@ -17,6 +19,7 @@ import {
   screenToBoardNorm,
   type BoardCamera,
 } from '@/lib/boardCoords'
+import type { HighFivePoint } from '@/lib/cursorHighFive'
 import { presenceColorForUserId } from '@/lib/presenceColors'
 import {
   subscribeListCursorBroadcast,
@@ -114,7 +117,9 @@ export default function BoardCursorLayer({
   const [peers, setPeers] = useState<Record<string, PeerPos>>({})
   const lastSendRef = useRef(0)
   const lastInsideRef = useRef(false)
+  const localPosRef = useRef<{ wx: number; wy: number } | null>(null)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const { bursts, scan } = useCursorHighFives()
 
   const hasOtherViewers = otherViewers.length > 0
   const hideLocalCursor = !!(userId && hiddenCursorUserIds?.has(userId))
@@ -124,6 +129,42 @@ export default function BoardCursorLayer({
     for (const v of otherViewers) m.set(v.user_id, v.cursor_color)
     return m
   }, [otherViewers])
+  const peersRef = useRef(peers)
+  peersRef.current = peers
+  const viewerColorByIdRef = useRef(viewerColorById)
+  viewerColorByIdRef.current = viewerColorById
+  const hiddenCursorUserIdsRef = useRef(hiddenCursorUserIds)
+  hiddenCursorUserIdsRef.current = hiddenCursorUserIds
+
+  const collectHighFivePoints = useCallback((): HighFivePoint[] => {
+    const colors = viewerColorByIdRef.current
+    const hidden = hiddenCursorUserIdsRef.current
+    const pts: HighFivePoint[] = []
+    const local = localPosRef.current
+    if (local && userId && !hidden?.has(userId)) {
+      pts.push({
+        id: userId,
+        x: local.wx * BOARD_WORLD_W,
+        y: local.wy * BOARD_WORLD_H,
+        color: presenceColorForUserId(userId),
+      })
+    }
+    for (const [id, pos] of Object.entries(peersRef.current)) {
+      if (hidden?.has(id)) continue
+      pts.push({
+        id,
+        x: pos.wx * BOARD_WORLD_W,
+        y: pos.wy * BOARD_WORLD_H,
+        color: colors.get(id) ?? presenceColorForUserId(id),
+      })
+    }
+    return pts
+  }, [userId])
+
+  const scanHighFives = useCallback(() => {
+    const scale = cameraRef.current?.scale || 1
+    scan(collectHighFivePoints(), scale)
+  }, [cameraRef, scan, collectHighFivePoints])
 
   useEffect(() => {
     if (!enabled || !userId) {
@@ -222,6 +263,7 @@ export default function BoardCursorLayer({
   useEffect(() => {
     if (!hideLocalCursor || !lastInsideRef.current) return
     lastInsideRef.current = false
+    localPosRef.current = null
     lastSendRef.current = 0
     sendLeave()
   }, [hideLocalCursor, sendLeave])
@@ -269,6 +311,7 @@ export default function BoardCursorLayer({
       if (!inside) {
         if (lastInsideRef.current) {
           lastInsideRef.current = false
+          localPosRef.current = null
           lastSendRef.current = 0
           sendLeave()
         }
@@ -276,10 +319,11 @@ export default function BoardCursorLayer({
       }
 
       lastInsideRef.current = true
-      send(
-        Math.min(1, Math.max(0, norm.wx)),
-        Math.min(1, Math.max(0, norm.wy)),
-      )
+      const wx = Math.min(1, Math.max(0, norm.wx))
+      const wy = Math.min(1, Math.max(0, norm.wy))
+      localPosRef.current = { wx, wy }
+      send(wx, wy)
+      scanHighFives()
     }
 
     window.addEventListener('mousemove', onMove, { passive: true })
@@ -287,13 +331,19 @@ export default function BoardCursorLayer({
       window.removeEventListener('mousemove', onMove)
       if (lastInsideRef.current) sendLeave()
       lastInsideRef.current = false
+      localPosRef.current = null
     }
-  }, [enabled, userId, send, sendLeave, viewportRef, cameraRef, hideLocalCursor])
+  }, [enabled, userId, send, sendLeave, viewportRef, cameraRef, hideLocalCursor, scanHighFives])
 
   const visiblePeers = useMemo(
     () => Object.entries(peers).filter(([id]) => !hiddenCursorUserIds?.has(id)),
     [peers, hiddenCursorUserIds],
   )
+
+  useEffect(() => {
+    if (!enabled || !hasOtherViewers) return
+    scanHighFives()
+  }, [enabled, hasOtherViewers, peers, scanHighFives])
 
   return (
     <>
@@ -303,6 +353,16 @@ export default function BoardCursorLayer({
           color={viewerColorById.get(id) ?? presenceColorForUserId(id)}
           wx={pos.wx}
           wy={pos.wy}
+        />
+      ))}
+      {bursts.map((burst) => (
+        <CursorHighFive
+          key={burst.id}
+          x={burst.x}
+          y={burst.y}
+          colorA={burst.colorA}
+          colorB={burst.colorB}
+          scale={1 / (cameraRef.current?.scale || 1)}
         />
       ))}
     </>
