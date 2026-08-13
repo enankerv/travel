@@ -10,9 +10,12 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react'
+import CursorHighFive from '@/components/CursorHighFive'
+import { useCursorHighFives } from '@/hooks/useCursorHighFives'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { presenceColorForUserId } from '@/lib/presenceColors'
+import type { HighFivePoint } from '@/lib/cursorHighFive'
 import {
   subscribeListCursorBroadcast,
   type ListCursorBroadcastPayload,
@@ -152,7 +155,9 @@ export default function ListCursorSurface({
   const [peers, setPeers] = useState<Record<string, PeerPos>>({})
   const lastSendRef = useRef(0)
   const lastClientRef = useRef<{ clientX: number; clientY: number } | null>(null)
+  const localPosRef = useRef<{ nx: number; ny: number } | null>(null)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const { bursts, scan } = useCursorHighFives()
 
   const hasOtherViewers = otherViewers.length > 0
   const viewerColorById = useMemo(() => {
@@ -160,6 +165,37 @@ export default function ListCursorSurface({
     for (const v of otherViewers) m.set(v.user_id, v.cursor_color)
     return m
   }, [otherViewers])
+  const peersRef = useRef(peers)
+  peersRef.current = peers
+  const viewerColorByIdRef = useRef(viewerColorById)
+  viewerColorByIdRef.current = viewerColorById
+
+  const collectHighFivePoints = useCallback((): HighFivePoint[] => {
+    const surf = wrapRef.current
+    if (!surf) return []
+    const { width, height } = surf.getBoundingClientRect()
+    if (width <= 0 || height <= 0) return []
+    const colors = viewerColorByIdRef.current
+    const pts: HighFivePoint[] = []
+    const local = localPosRef.current
+    if (local && userId) {
+      pts.push({
+        id: userId,
+        x: local.nx * width,
+        y: local.ny * height,
+        color: presenceColorForUserId(userId),
+      })
+    }
+    for (const [id, pos] of Object.entries(peersRef.current)) {
+      pts.push({
+        id,
+        x: pos.nx * width,
+        y: pos.ny * height,
+        color: colors.get(id) ?? presenceColorForUserId(id),
+      })
+    }
+    return pts
+  }, [userId])
 
   useEffect(() => {
     if (!enabled || !userId) {
@@ -309,6 +345,7 @@ export default function ListCursorSurface({
       if (!p) return
       if (pointerInsideSurface(p.clientX, p.clientY)) return
       lastClientRef.current = null
+      localPosRef.current = null
       lastSendRef.current = 0
       sendLeave()
     }
@@ -317,6 +354,7 @@ export default function ListCursorSurface({
       if (!pointerInsideSurface(e.clientX, e.clientY)) {
         if (lastClientRef.current !== null) {
           lastClientRef.current = null
+          localPosRef.current = null
           lastSendRef.current = 0
           sendLeave()
         }
@@ -326,7 +364,11 @@ export default function ListCursorSurface({
       const r = root.getBoundingClientRect()
       const nx = (e.clientX - r.left) / r.width
       const ny = (e.clientY - r.top) / r.height
-      send(Math.min(1, Math.max(0, nx)), Math.min(1, Math.max(0, ny)))
+      const clampedNx = Math.min(1, Math.max(0, nx))
+      const clampedNy = Math.min(1, Math.max(0, ny))
+      localPosRef.current = { nx: clampedNx, ny: clampedNy }
+      send(clampedNx, clampedNy)
+      scan(collectHighFivePoints())
     }
 
     window.addEventListener('mousemove', onMove, { passive: true })
@@ -337,7 +379,12 @@ export default function ListCursorSurface({
       window.removeEventListener('scroll', clearIfLeftSurface, true)
       window.removeEventListener('resize', clearIfLeftSurface)
     }
-  }, [enabled, userId, send, sendLeave])
+  }, [enabled, userId, send, sendLeave, scan, collectHighFivePoints])
+
+  useEffect(() => {
+    if (!enabled || !hasOtherViewers) return
+    scan(collectHighFivePoints())
+  }, [enabled, hasOtherViewers, peers, scan, collectHighFivePoints])
 
   return (
     <div className="list-cursor-surface" ref={wrapRef}>
@@ -350,6 +397,15 @@ export default function ListCursorSurface({
             nx={pos.nx}
             ny={pos.ny}
             surfaceRef={wrapRef}
+          />
+        ))}
+        {bursts.map((burst) => (
+          <CursorHighFive
+            key={burst.id}
+            x={burst.x}
+            y={burst.y}
+            colorA={burst.colorA}
+            colorB={burst.colorB}
           />
         ))}
       </div>

@@ -1,15 +1,62 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
+import { presenceColorForUserId } from '@/lib/presenceColors'
+import type { PresenceUser } from '@/lib/realtime'
 import ScoutCredits from './ScoutCredits'
 import ScoutCreditCost from './ScoutCreditCost'
 import ListViewToggle from './ListViewToggle'
 import ListHeaderScout from './ListHeaderScout'
 import { type ListView } from '@/lib/listRoutes'
 
+function presenceLabel(user: PresenceUser) {
+  const name = user.first_name?.trim()
+  return name || user.user_id.slice(0, 8)
+}
+
+function uniqueViewers(users: PresenceUser[]) {
+  const seen = new Set<string>()
+  const out: PresenceUser[] = []
+  for (const user of users) {
+    if (seen.has(user.user_id)) continue
+    seen.add(user.user_id)
+    out.push(user)
+  }
+  return out
+}
+
+function PresenceAvatar({ user }: { user: PresenceUser }) {
+  const [imgFailed, setImgFailed] = useState(false)
+  const name = presenceLabel(user)
+  const showImg = Boolean(user.avatar_url) && !imgFailed
+
+  return (
+    <div className="list-screen-chrome__presence-avatar-wrap" data-name={name}>
+      <div
+        className="list-screen-chrome__presence-avatar"
+        style={{
+          borderColor: user.cursor_color || presenceColorForUserId(user.user_id),
+        }}
+      >
+        {showImg ? (
+          <img
+            src={user.avatar_url}
+            alt=""
+            referrerPolicy="no-referrer"
+            onError={() => setImgFailed(true)}
+          />
+        ) : (
+          <span aria-hidden>{name.charAt(0).toUpperCase()}</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function ListScreenChrome({
   listId,
   listName,
+  otherViewers = [],
   activeView,
   onBack,
   variant = 'page',
@@ -20,6 +67,7 @@ export default function ListScreenChrome({
 }: {
   listId: string
   listName: string
+  otherViewers?: PresenceUser[]
   activeView: ListView
   onBack: () => void
   variant?: 'page' | 'overlay'
@@ -28,6 +76,8 @@ export default function ListScreenChrome({
   onMembersClick?: () => void
   children?: ReactNode
 }) {
+  const viewers = useMemo(() => uniqueViewers(otherViewers), [otherViewers])
+
   return (
     <div className={`list-screen-chrome list-screen-chrome--${variant}`}>
       <header className="list-screen-chrome__header">
@@ -76,6 +126,16 @@ export default function ListScreenChrome({
             </svg>
             <span className="list-screen-chrome__members-count">{memberCount}</span>
           </button>
+        )}
+        {viewers.length > 0 && (
+          <div className="list-screen-chrome__presence">
+            <span className="list-screen-chrome__presence-label">Viewing with</span>
+            <div className="list-screen-chrome__presence-avatars">
+              {viewers.map((user) => (
+                <PresenceAvatar key={user.user_id} user={user} />
+              ))}
+            </div>
+          </div>
         )}
         <ScoutCredits className="list-screen-chrome__credits" />
       </header>

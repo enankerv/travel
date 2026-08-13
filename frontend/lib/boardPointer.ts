@@ -2,11 +2,12 @@
 import type { BoardCamera } from '@/lib/boardCoords'
 import {
   anchorFromDragPointer,
+  clamp,
   exceedsDragThreshold,
   type BoardNorm,
   type PinDragGrab,
 } from '@/lib/boardMath'
-import { poiOffsetBounds, screenToPoiOffset } from '@/lib/boardSpace'
+import { poiFromRoot, poiToRoot, screenToPoiOffset } from '@/lib/boardSpace'
 import type { POIBase } from '@/lib/getaway'
 import type { BoardSubgroup } from '@/lib/subgroup'
 
@@ -147,7 +148,6 @@ export function pinPosFromPointer(
   poi: POIBase,
   subgroups: BoardSubgroup[],
 ): BoardNorm | null {
-  const bounds = poiOffsetBounds(poi.subgroup_id ?? null, subgroups)
   const cursor = screenToPoiOffset(
     vp,
     camera,
@@ -157,7 +157,13 @@ export function pinPosFromPointer(
     poi.subgroup_id ?? null,
   )
   if (!cursor) return null
-  return anchorFromDragPointer(grab, cursor.wx, cursor.wy, bounds)
+  const local = anchorFromDragPointer(grab, cursor.wx, cursor.wy)
+  const root = poiToRoot(poi, subgroups, local)
+  return poiFromRoot(
+    { wx: clamp(root.wx, 0, 1), wy: clamp(root.wy, 0, 1) },
+    poi.subgroup_id ?? null,
+    subgroups,
+  )
 }
 
 export function buildPendingPinPointer(opts: {

@@ -249,13 +249,14 @@ export function anchorFromDragPointer(
   drag: PinDragGrab,
   cursorWx: number,
   cursorWy: number,
-  bounds: PoiOffsetBounds = { maxWx: 1, maxWy: 1 },
+  bounds?: PoiOffsetBounds | null,
 ): BoardNorm {
-  const centerWx = cursorWx - drag.grabOffsetWx
-  const centerWy = cursorWy - drag.grabOffsetWy
+  const wx = cursorWx - drag.grabOffsetWx + drag.anchorFromCenterWx
+  const wy = cursorWy - drag.grabOffsetWy + drag.anchorFromCenterWy
+  if (!bounds) return { wx, wy }
   return {
-    wx: clamp(centerWx + drag.anchorFromCenterWx, 0, bounds.maxWx),
-    wy: clamp(centerWy + drag.anchorFromCenterWy, 0, bounds.maxWy),
+    wx: clamp(wx, 0, bounds.maxWx),
+    wy: clamp(wy, 0, bounds.maxWy),
   }
 }
 

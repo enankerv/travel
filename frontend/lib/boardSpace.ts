@@ -100,6 +100,7 @@ function rootContainsRect(rect: SubgroupRootRect, root: BoardNorm): boolean {
   )
 }
 
+/** `local` is 0–1 of the parent frame (board root when `parentSubgroupId` is null). */
 function parentLocalToRoot(
   parentSubgroupId: string | null,
   local: BoardNorm,
@@ -108,12 +109,8 @@ function parentLocalToRoot(
   if (parentSubgroupId === null) return local
   const parent = byId.get(parentSubgroupId)
   if (!parent) return local
-  const gp = parent.parent_subgroup_id ?? null
-  if (gp === null) {
-    return { wx: parent.board_x + local.wx, wy: parent.board_y + local.wy }
-  }
   return parentLocalToRoot(
-    gp,
+    parent.parent_subgroup_id ?? null,
     {
       wx: parent.board_x + local.wx * parent.board_w,
       wy: parent.board_y + local.wy * parent.board_h,
@@ -131,11 +128,11 @@ export function rootToParentLocal(
   if (parentSubgroupId === null) return root
   const parent = byId.get(parentSubgroupId)
   if (!parent) return root
-  const gp = parent.parent_subgroup_id ?? null
-  if (gp === null) {
-    return { wx: root.wx - parent.board_x, wy: root.wy - parent.board_y }
-  }
-  const gpLocal = rootToParentLocal(root, gp, subgroups)
+  const gpLocal = rootToParentLocal(
+    root,
+    parent.parent_subgroup_id ?? null,
+    subgroups,
+  )
   return {
     wx: parent.board_w > 0 ? (gpLocal.wx - parent.board_x) / parent.board_w : 0,
     wy: parent.board_h > 0 ? (gpLocal.wy - parent.board_y) / parent.board_h : 0,
